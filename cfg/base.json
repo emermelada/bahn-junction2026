@@ -1,0 +1,1 @@
+{ "name": "base", "flags": { "gate": true, "capacity": true, "ladder": true, "governor": true, "fees": true, "pricing": true, "trust": true, "guards": true, "offers": true, "bundles": true, "notes": true, "triage": true } }
