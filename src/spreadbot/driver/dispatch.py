@@ -10,7 +10,9 @@ from typing import Optional
 
 from spread.types import Action, FeeStep, Order, StopRef
 
+from spreadbot.core.rng import rng
 from spreadbot.core.state import State, legs_of
+from spreadbot.driver.flags import FLAGS
 
 HOUR = 60
 SPLIT_MINUTES = 12 * HOUR  # RULES: a gig with more than one car may plan at most 12 hours of driving
@@ -66,10 +68,16 @@ def post(state: State, order: Order, legs: list[int], now: int) -> Action:
 
 def fees(state: State, order: Order, cars: int, now: int) -> list[FeeStep]:
     fee = state.requests[order["id"]]["referenceFeeCents"] * cars / len(order["legs"])
-    if order["id"] in state.urgent:  # 1.5 times at once, then a quarter more every half hour, up to 2.5 times
-        steps = [(k * 30, 1.5 + k / 4) for k in range(5)]
-    else:  # the typical fee, then 10% more every hour, up to 1.5 times
-        steps = [(k * HOUR, 1 + k / 10) for k in range(6)]
+    if FLAGS["fee_ladder"]:
+        ratio = 0.8 + rng(state.world_id, order["id"], cars).random() * FLAGS["fee_ladder"]
+        return [{"at": now, "feeCents": max(1, int(fee * ratio + 0.5))}]
+    lo, hi = FLAGS["fee_open"], FLAGS["fee_top"]
+    if order["id"] in state.urgent:  # the top fee or 1.5 times at once, then a quarter more every half hour
+        steps = [(k * 30, max(1.5, hi) + k / 4) for k in range(5)]
+    elif hi <= lo:  # one flat fee: drivers who see no raises have nothing to wait for
+        steps = [(0, lo)]
+    else:  # from the opening fee up to the top, in five hourly steps (the starter: 1.0 to 1.5)
+        steps = [(k * HOUR, lo + (hi - lo) * k / 5) for k in range(6)]
     if state.level == 1:
         steps = steps[:1]
     return [{"at": now + dt, "feeCents": max(1, int(fee * f + 0.5))} for dt, f in steps]

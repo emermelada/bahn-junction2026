@@ -21,11 +21,23 @@ from spreadbot.core.state import State
 from spreadbot.dealer.quote import decline, quote
 from spreadbot.driver.dispatch import dispatch
 
-# The events that need an answer; views and ledger lines come along with the next one.
+# Outside request hours: wake on the events that need an answer, and at least every hour.
 WAKE_ON: list[DeskEventKind] = ["price_request", "order_won", "order_changed", "order_cancelled", "visit_failed", "gig_expired",
                                 "deadline_close"]
-TICK = 60  # world minutes between wakes without an event, so refused posts and timers get another look
+TICK = 60
+# In request hours (weekdays 08:00-18:00) a request comes every few minutes, so waking on each costs ~1,900
+# steps a week. A fixed 10 minute tick answers every request inside its 15 minute window in ~300 steps.
+BUSY_TICK = 10
+DAY = 24 * 60
 RUNS, REGISTRY = "data/runs", "data/worlds_a.jsonl"
+
+
+def next_stop(now: int, ends_at: int) -> dict[str, Any]:
+    """The advance arguments for the next step from `now`."""
+    busy = now // DAY < 5 and 8 * 60 <= now % DAY < 18 * 60
+    if busy:
+        return {"to": min(ends_at, now + BUSY_TICK)}
+    return {"until": WAKE_ON, "max": min(ends_at, now + TICK)}
 
 
 def decide(state: State, requests: list[dict]) -> list[Action]:
@@ -65,10 +77,11 @@ def play(level: int, seed: Optional[str], client: Optional[Client] = None, world
         with open(os.path.join(run_dir, "log.jsonl"), "w", encoding="utf-8") as log:
             snapshot = world.snapshot()
             state = State(world.id, level, snapshot["now"], snapshot["endsAt"], world_map, log=declog)
+            state.ext["roster"] = world.roster()
             outbox: list[Action] = []
             steps = 0
             while state.now < state.ends_at:
-                step = world.advance(until=WAKE_ON, max=min(state.ends_at, state.now + TICK), actions=outbox)
+                step = world.advance(**next_stop(state.now, state.ends_at), actions=outbox)
                 steps += 1
                 for action, result in zip(outbox, step["results"]):
                     state.applied(action, result)
