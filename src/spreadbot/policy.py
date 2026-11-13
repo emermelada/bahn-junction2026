@@ -96,9 +96,12 @@ class Market:
         day = at // DAY
         g = (1.0 if won else 0.0) - self.p_win(ratio_eff, dealer, day, place)
         k = self.cfg.win_slope
-        self.mu += self.cfg.mu_lr * k * g
+        war = self.cfg.war_guard and self.day_shift[day] < -self.cfg.war_shift
+        if not war:
+            # On a price-war day (the competitor 20% under everywhere) only today's shift learns: tomorrow it is back.
+            self.mu += self.cfg.mu_lr * k * g
+            self.dealer_shift[dealer] += self.cfg.dealer_lr * k * g
         self.day_shift[day] += self.cfg.day_lr * k * g
-        self.dealer_shift[dealer] += self.cfg.dealer_lr * k * g
         if self.cfg.place_lr and place:
             # The outage: one region's dealers pay ~30% more for a day. Each place nearby learns from this result.
             for other, w in self.desk.nearby(place):
