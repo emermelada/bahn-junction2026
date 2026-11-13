@@ -88,6 +88,7 @@ class Desk:
         self.bundle_last: dict[str, int] = {}  # order -> last minute to start its bundle
         self.morning_drops: dict[int, int] = defaultdict(int)
         self.due_count: dict[int, int] = defaultdict(int)
+        self.need_resync = False
         self.crunch_day = -1
         self.offer_log: list[tuple[str, str, float, int]] = []  # (gig, driver, fee over base, minute)
         self.positions: dict[str, tuple[str, int]] = {}  # driver -> (place, minute), from our gigs
@@ -793,12 +794,42 @@ class Desk:
                     refused_posts.append((a, res.get("reason", "")))
             elif not res.get("ok"):
                 self.say("REFUSED", f"{a['type']} {a.get('gigId', a.get('requestId', ''))} {res.get('reason', '')[:120]}")
+                if a["type"] == "withdraw" and a["gigId"] in self.gigs:
+                    # A driver booked it first (or it started): the gig is live, so its cars must not be posted again.
+                    rec = self.gigs[a["gigId"]]
+                    rec.status = "booked"
+                    for key in rec.legs:
+                        if key[0] in self.orders and self.orders[key[0]].order["deliveredAt"][key[1]] is None:
+                            self.leg_gig[key] = rec.id
+                    self.pending_posts = [(pa, w) for (pa, w) in self.pending_posts if not any((st["orderId"], st["leg"]) in rec.legs for st in pa["stops"])]
+                    self.outbox[:] = [x for x in self.outbox if not (x["type"] == "post" and any((st["orderId"], st["leg"]) in rec.legs for st in x["stops"]))]
         for a, reason in refused_posts:
             self.say("POST_REFUSED", f"{a['stops'][0]['orderId']} {reason[:160]}")
             self.repair_post(a, reason)
 
+    def resync(self, snapshot: dict) -> None:
+        """Takes gig statuses from the world's snapshot: our books can drift when an action loses a race."""
+        live = {}
+        for g in snapshot["gigs"]:
+            rec = self.gigs.get(g["id"])
+            if rec is None:
+                rec = GigRec(g["id"], g["stops"], g["audience"], g["schedule"], g["postedAt"])
+                self.gigs[rec.id] = rec
+            rec.status, rec.driver = g["status"], g.get("driverId")
+            if g["status"] in ("open", "booked", "working"):
+                for key in rec.legs:
+                    live[key] = rec.id
+        pending = {(st["orderId"], st["leg"]) for pa, _ in self.pending_posts for st in pa["stops"]}
+        for key in list(self.leg_gig):
+            if key not in live and key not in pending:
+                del self.leg_gig[key]
+        self.leg_gig.update(live)
+
     def repair_post(self, a: dict, reason: str) -> None:
         """A refused post: split multi-car gigs, or drop own windows, and try again next step."""
+        if "already in a live gig" in reason:
+            self.need_resync = True
+            return
         legs = sorted({(s["orderId"], s["leg"]) for s in a["stops"]})
         oid = legs[0][0]
         ob = self.orders.get(oid)

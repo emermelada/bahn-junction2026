@@ -49,7 +49,7 @@ class Config:
     load_slope: float = 1.0            # extra cost, in typical fees, per 0.05 of load above load_free
     # --- fees
     fee_mode: str = "relative"         # "span": fee_plan over the slack; "relative": fee_rel anchored to lastPickupAt
-    fee_open: float = 0.95
+    fee_open: float = 1.05              # 12/12 ranked, min on-time 0.919 vs 11/12, 0.896 at 0.95 (v1v vs v1p, 12 seeds)
     fee_hold: int = 45                 # minutes the opening fee shows before any raise
     fee_rel: tuple = ((8, 1.25), (5, 1.6))   # (hours before lastPickupAt, fee over typical fee)
     fee_plan: tuple = ((0.0, 0.95), (0.15, 1.15), (0.4, 1.45), (0.7, 1.85))  # (share of slack, fee over typical fee)

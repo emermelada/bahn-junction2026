@@ -52,6 +52,9 @@ def play_practice(world: "spread.World", desk: Desk, ends_at: int, events_out: l
         for e in step["events"]:
             events_out.append(e)
             desk.handle(e)
+        if desk.need_resync:
+            desk.resync(world.snapshot())
+            desk.need_resync = False
         desk.tick()
         if desk.now // DAY > day and not quiet:
             s = world.score()
@@ -218,7 +221,7 @@ def run_live(world, client, geo, cfg: Config, logf, clock) -> bool:
     flush(world, desk, logf)
     last_seq = history[-1]["seq"] if history else -1
     day = desk.now // DAY
-    last_tick = last_flush = last_event = last_clock = time.time()
+    last_tick = last_flush = last_event = last_clock = last_sync = time.time()
     for e in world.stream(after=last_seq, idle=0.25):
         t = time.time()
         if e is not None:
@@ -232,6 +235,9 @@ def run_live(world, client, geo, cfg: Config, logf, clock) -> bool:
             desk.now = max(desk.now, clock())  # read the clock: when the stream is quiet, and every 5 s (one read token)
             last_event = last_clock = t
         if t - last_tick > 2.0:
+            if desk.need_resync or t - last_sync > 60.0:
+                desk.resync(world.snapshot())  # one read a minute keeps our books equal to the world's
+                desk.need_resync, last_sync = False, t
             desk.tick()
             last_tick = t
         # Batch: one actions call per 0.3 s at most, or at once when the stream is quiet. A price
