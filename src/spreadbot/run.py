@@ -69,7 +69,15 @@ def practice(args) -> int:
     cfg = Config.parse(args.set or [])
     client = spread.Client()
     geo = load_geo(client)
-    world = client.create(args.level, seed=args.seed)
+    # The team's 8 practice slots are shared: wait for one instead of failing.
+    for attempt in range(180):
+        try:
+            world = client.create(args.level, seed=args.seed)
+            break
+        except spread.SpreadError as e:
+            if e.status != 409 or attempt == 179:
+                raise
+            time.sleep(20)
     register(world.id, seed=args.seed, level=args.level, tag=args.tag)
     out = os.path.join("data", "runs", args.tag, f"{args.seed}-L{args.level}")
     os.makedirs(out, exist_ok=True)
@@ -147,7 +155,7 @@ def final(args) -> int:
             if world is None:
                 world = wait_final(client)
                 print("final world", world.id, flush=True)
-            if run_final(world, client, geo, cfg, logf):
+            if run_live(world, client, geo, cfg, logf, lambda: client.final()["now"]):
                 break
         except spread.Unreachable as e:
             print("unreachable:", e, "- rebuilding in 5 s", flush=True)
@@ -177,7 +185,9 @@ def wait_final(client) -> "spread.World":
         time.sleep(5)
 
 
-def run_final(world, client, geo, cfg: Config, logf) -> bool:
+def run_live(world, client, geo, cfg: Config, logf, clock) -> bool:
+    """The live loop: rebuild from the world's record, then answer events from the stream.
+    `clock()` gives the world minute when no event comes (client.final() in the final)."""
     history = world.events()
     snapshot = world.snapshot()
     if snapshot["now"] >= snapshot["endsAt"]:
@@ -198,7 +208,7 @@ def run_final(world, client, geo, cfg: Config, logf) -> bool:
             desk.handle(e)
         if e is None or time.time() - last_tick > 2.0:
             if e is None:
-                desk.now = max(desk.now, client.final()["now"])
+                desk.now = max(desk.now, clock())
             desk.tick()
             last_tick = time.time()
         flush(world, desk, logf)

@@ -19,6 +19,15 @@ from .policy import Governor, Market, OnTime
 OPTION_ORDER = ("same_day", "next_day", "within_3_days")
 
 
+def business_hours(a: int, b: int) -> float:
+    """Request hours (Mon-Fri 08:00-18:00) between world minutes a and b."""
+    total = 0
+    for d in range(max(0, a // DAY), min(5, b // DAY + 1)):
+        lo, hi = max(a, d * DAY + 8 * HOUR), min(b, d * DAY + 18 * HOUR)
+        total += max(0, hi - lo)
+    return total / 60
+
+
 def h01(*parts: Any) -> float:
     """Deterministic uniform [0,1) from a key: no global RNG, so a replay decides the same."""
     d = hashlib.blake2b("|".join(map(str, parts)).encode(), digest_size=8).digest()
@@ -75,6 +84,8 @@ class Desk:
         self.offers_today: dict[tuple[str, int], int] = defaultdict(int)
         self.open_offers: dict[str, int] = defaultdict(int)  # gig -> open offers
         self.offered: set[tuple[str, str]] = set()  # (gig, driver)
+        self.gig_viewers: dict[str, list[str]] = {}  # gig -> drivers who viewed it, in order
+        self.offer_log: list[tuple[str, str, float, int]] = []  # (gig, driver, fee over base, minute)
         self.positions: dict[str, tuple[str, int]] = {}  # driver -> (place, minute), from our gigs
         self.viewers: dict[str, int] = {}  # driver -> last minute seen in the app
         self.roster = {d["id"]: d for d in roster}
@@ -84,6 +95,10 @@ class Desk:
         self.won_count = 0
         self.late_orders: set[str] = set()
         self.ontime_orders: set[str] = set()
+        self.dealer_requests: dict[str, int] = defaultdict(int)
+        self.n_quoted_outcomes = 0
+        self.n_won_quoted = 0
+        self.sum_won_price = 0
         self.quote_meta: dict[str, dict] = {}  # request id -> option -> on-time chance at quote time
         self.market = Market(self)
         self.ontime = OnTime(self)
@@ -122,6 +137,8 @@ class Desk:
 
     def on_price_request(self, e: dict) -> None:
         r = e["request"]
+        if r["id"] not in self.requests:
+            self.dealer_requests[r["dealerId"]] += 1
         self.requests[r["id"]] = r
         prices, why = self.price(r)
         self.quoted[r["id"]] = prices
@@ -151,6 +168,11 @@ class Desk:
         ratios = [q[o["kind"]] / o["listPriceCents"] for o in r["options"] if o["kind"] in q and q[o["kind"]] < 3 * o["listPriceCents"]]
         if ratios:
             self.market.observe(at, r["dealerId"], min(ratios) / self.trust_factor(r["dealerId"]), won)
+            self.n_quoted_outcomes += 1
+            if won:
+                self.n_won_quoted += 1
+                o = self.orders.get(rid)
+                self.sum_won_price += o.order["priceCents"] if o else 0
 
     def on_order_changed(self, e: dict) -> None:
         o = e["order"]
@@ -272,6 +294,9 @@ class Desk:
 
     def on_gig_viewed(self, e: dict) -> None:
         self.viewers[e["driverId"]] = e["at"]
+        v = self.gig_viewers.setdefault(e["gigId"], [])
+        if e["driverId"] not in v:
+            v.append(e["driverId"])
 
     def on_deadline_close(self, e: dict) -> None:
         ob = self.orders.get(e["orderId"])
@@ -331,7 +356,11 @@ class Desk:
         tf = self.trust_factor(dealer)
         day = r["respondBy"] // DAY
         bar = self.gov.bar()
+        cal = self.gov.calibration() if cfg.calibrate else 1.0
         cost = r["referenceFeeCents"] * self.cost_mult()
+        backlog = self.backlog(r["legs"][0]["pickup"]["placeId"])
+        t_gain, t_loss = self.trust_value(dealer)
+        congestion = cfg.cong_frac * r["referenceFeeCents"] * max(0, backlog - cfg.cong_free)
         prices: dict = {}
         meta: dict = {}
         info = []
@@ -340,11 +369,14 @@ class Desk:
             if kind not in cfg.quote_options:
                 continue
             p_ok, slack = self.ontime.p_ok(r, opt["deadline"], kind)
+            p_ok = min(0.99, p_ok * cal)
             if p_ok < bar or slack < cfg.min_slack_h:
                 info.append(f"{kind}:skip(p={p_ok:.2f},s={slack:.1f})")
                 continue
             risk_frac = (1 - p_ok) * cfg.late_cost_frac
-            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, cost, risk_frac, cfg.shadow_cents)
+            # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
+            trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain)
+            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, cost, risk_frac, cfg.shadow_cents + congestion + trust_adj)
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 info.append(f"{kind}:noev")
                 continue
@@ -352,10 +384,38 @@ class Desk:
             meta[kind] = p_ok
             info.append(f"{kind}:r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f}")
         self.quote_meta[r["id"]] = meta
-        head = f"bar={bar:.2f} tf={tf:.2f} mu={self.market.mu_for(dealer, day):.3f} cost={cost/100:.0f}"
+        head = f"bar={bar:.2f} bl={backlog} tg={t_gain/100:.0f} tf={tf:.2f} mu={self.market.mu_for(dealer, day):.3f} cost={cost/100:.0f}"
         if not prices:
             return decline_prices(r), f"DECLINE {head} {' '.join(info)}"
         return prices, f"{head} {' '.join(info)}"
+
+    def trust_value(self, dealer: str) -> tuple[float, float]:
+        """(gain, loss) in cents: 1% of this dealer's expected revenue for the rest of the week, for one more
+        on-time order (while the count is under 25), and the count halved for a late one."""
+        if self.level < 8:
+            return 0.0, 0.0
+        elapsed, remaining = business_hours(0, self.now), business_hours(self.now, 4 * DAY + 18 * HOUR)
+        rate = self.dealer_requests[dealer] / max(elapsed, 3.0)
+        q = self.n_quoted_outcomes
+        win_share = (self.n_won_quoted + 0.4 * 20) / (q + 20)
+        avg_price = (self.sum_won_price + 8500 * 10) / (self.n_won_quoted + 10)
+        future = rate * remaining * win_share * avg_price
+        t = self.trust[dealer]
+        return (0.01 * future if t < 25 else 0.0), 0.01 * (t - t // 2) * future
+
+    def backlog(self, place: str) -> int:
+        """Our gigs near this pickup that no driver holds yet: the live sign that local drivers are used up."""
+        n = 0
+        for rec in self.gigs.values():
+            if rec.status != "open":
+                continue
+            o = self.orders.get(rec.legs[0][0])
+            if not o:
+                continue
+            p = o.order["legs"][rec.legs[0][1]]["pickup"]["placeId"]
+            if self.geo.air(p, place) <= self.cfg.cong_radius and o.order["lastPickupAt"] - self.now < self.cfg.cong_horizon:
+                n += 1
+        return n
 
     def cost_mult(self) -> float:
         """Expected fee over typical fee: the prior, moved by what our own bookings paid this week."""
@@ -462,8 +522,21 @@ class Desk:
             ratio = cfg.exp_fee_ratios[int(h01("f", ob.order["id"]) * len(cfg.exp_fee_ratios))]
             return [{"at": now, "feeCents": max(1, int(round(base * ratio)))}]
         last = ob.order["lastPickupAt"]
+        if cfg.late_plan and self.is_late(ob, legs):
+            # Already late: on-time is lost, only the refund tier and delivery matter. No steep fees.
+            return dedupe([{"at": now + int(h * HOUR), "feeCents": max(1, int(round(base * m)))} for h, m in cfg.late_plan])
         if ob.urgent or last - now < 2 * HOUR:
-            return steep(now, base, cfg)
+            return steep(now, base, cfg, plan=self.steep_plan_now())
+        if cfg.fee_mode == "relative":
+            # Steps anchored to lastPickupAt: hold the opening fee while there is time, raise as the pickup nears.
+            # The opening fee always shows for at least fee_hold minutes: most views come in the first minutes.
+            out, prev = [{"at": now, "feeCents": int(round(base * cfg.fee_open))}], int(round(base * cfg.fee_open))
+            for hours_before, mult in cfg.fee_rel:
+                at = max(now + cfg.fee_hold, last - int(hours_before * HOUR))
+                fee = max(prev, int(round(base * mult)))
+                out.append({"at": at, "feeCents": fee})
+                prev = fee
+            return dedupe(sorted(out, key=lambda s: (s["at"], s["feeCents"])))
         # Open low, then a few raises spread over the slack, all before the deadline warning (3 h before lastPickupAt).
         span = max(30, last - 3 * HOUR - now)
         out, prev = [], 0
@@ -472,6 +545,27 @@ class Desk:
             out.append({"at": now + int(span * frac), "feeCents": fee})
             prev = fee
         return dedupe(out)
+
+    def is_late(self, ob: OrderBook, legs: list[int]) -> bool:
+        """No pickup from now on can make the deadline of these legs."""
+        o = ob.order
+        for l in legs:
+            L = o["legs"][l]
+            if self.now + self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) > self.deadline(o, l):
+                return True
+        return False
+
+    def steep_plan_now(self) -> tuple:
+        """How much to pay to save a car: little while the on-time budget is comfortable, a lot near the gate."""
+        cfg = self.cfg
+        if not cfg.gov_steep:
+            return cfg.steep_plan
+        proj = self.gov.projection()
+        if proj >= cfg.gov_relaxed:
+            return cfg.steep_relaxed
+        if proj >= cfg.gov_tight:
+            return cfg.steep_plan
+        return cfg.steep_rescue
 
     def escalate_gig(self, rec: GigRec, why: str) -> None:
         if rec.status != "open":
@@ -483,7 +577,9 @@ class Desk:
             return
         base = self.base_fee(ob, [l for _, l in legs])
         cur = current_fee(rec.schedule, self.now)
-        sched = steep(self.now, base, self.cfg, floor=cur)
+        if self.cfg.late_plan and self.is_late(ob, [l for _, l in legs]):
+            return
+        sched = steep(self.now, base, self.cfg, floor=cur, plan=self.steep_plan_now())
         rec.schedule = sched
         rec.escalated = True
         self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": sched})
@@ -572,17 +668,64 @@ class Desk:
 
     # ------------------------------------------------------------------ periodic
     def tick(self) -> None:
-        """Called once per step: posts anything missing."""
+        """Called once per step: posts anything missing, then offers unbooked gigs to drivers who looked at them."""
         for oid in list(self.orders):
             ob = self.orders[oid]
             if ob.order["status"] == "cancelled":
                 continue
             self.dispatch_order(oid, "tick")
+        if self.cfg.viewer_offers:
+            self.offer_viewers()
+
+    def offer_viewers(self) -> None:
+        """A driver who viewed our gig and did not book is active today and close by; in the app they may be
+        waiting for a raise, but a direct offer they take as soon as it pays them."""
+        cfg = self.cfg
+        hour = (self.now % DAY) // 60
+        if hour >= 23 or hour < 7:
+            return
+        for rec in list(self.gigs.values()):
+            if rec.status != "open" or self.now - rec.posted_at < cfg.offer_after or self.open_offers[rec.id] >= 3:
+                continue
+            viewers = self.gig_viewers.get(rec.id, [])
+            if not viewers:
+                continue
+            ob = self.orders.get(rec.legs[0][0])
+            if not ob or (cfg.late_plan and self.is_late(ob, [l for _, l in rec.legs])):
+                continue
+            first = rec.stops[0]
+            place = ob.order["legs"][first["leg"]]["pickup"]["placeId"]
+            base = self.base_fee(ob, [l for _, l in rec.legs])
+            fee = max(current_fee(rec.schedule, self.now), int(round(base * (cfg.offer_mult_urgent if ob.urgent else cfg.offer_mult))))
+            cands = []
+            for did in viewers:
+                d = self.roster.get(did)
+                if not d or (rec.id, did) in self.offered or self.offers_today[(did, self.now // DAY)] >= 3:
+                    continue
+                if rec.audience.get("manualLicence") and d["licence"] != "manual":
+                    continue
+                if rec.audience.get("experienced") and not (d["rating"] >= 4.8 and d["completedGigs"] >= 50):
+                    continue
+                where, at = self.positions.get(did, (d["homePlaceId"], -1))
+                if at < self.now - 6 * HOUR:
+                    where = d["homePlaceId"]
+                dist = self.geo.air(where, place)
+                if dist > cfg.offer_max_km:
+                    continue
+                cands.append((dist, did))
+            cands.sort()
+            for _, did in cands[: 3 - self.open_offers[rec.id]]:
+                self.outbox.append({"type": "offer", "gigId": rec.id, "driverId": did, "feeCents": int(fee)})
+                self.offers_today[(did, self.now // DAY)] += 1
+                self.open_offers[rec.id] += 1
+                self.offered.add((rec.id, did))
+                self.offer_log.append((rec.id, did, fee / base, self.now))
+                self.say("VOFFER", f"{rec.id} {did} {fee} x{fee/base:.2f}")
 
 
-def steep(now: int, base: float, cfg: Config, floor: int = 0) -> list[dict]:
+def steep(now: int, base: float, cfg: Config, floor: int = 0, plan: tuple = ()) -> list[dict]:
     out, prev = [], floor
-    for i, m in enumerate(cfg.steep_plan):
+    for i, m in enumerate(plan or cfg.steep_plan):
         fee = max(prev, int(round(base * m)))
         out.append({"at": now + i * cfg.steep_step, "feeCents": max(1, fee)})
         prev = fee

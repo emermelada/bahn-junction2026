@@ -14,6 +14,7 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 from spreadbot.notes import read_note  # noqa: E402
+from note_cases import check  # noqa: E402  (same folder)
 
 WD = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 FIELDS = ["ready", "payment", "pickup_hours", "delivery_hours", "deadline", "manual", "plates", "summer"]
@@ -46,7 +47,8 @@ def compare(leg: dict, ours, truth: dict) -> dict[str, tuple]:
         safe = o == tr or (o is not None and tr is not None and o[0] >= tr[0] and o[1] <= tr[1])
         out[f] = (o, tr, o == tr, safe)
     d_o, d_t = ours.deadline, truth["noteDeadline"]
-    out["deadline"] = (d_o, d_t, d_o == d_t, (d_o if d_o is not None else 1 << 30) <= (d_t if d_t is not None else 1 << 30))
+    never = 1 << 30  # no deadline = later than any
+    out["deadline"] = (d_o, d_t, d_o == d_t, (never if d_o is None else d_o) <= (never if d_t is None else d_t))
     for f, attr, key in (("manual", "manual", "manualGearbox"), ("plates", "plates", "needsPlates"),
                          ("summer", "summer_tyres", "summerTyres")):
         o, tr = getattr(ours, attr), bool(truth[key])
@@ -114,6 +116,10 @@ def main() -> None:
     total_ok = sum(lang_ok.values())
     print(f"  all: {total_ok}/{len(rows)} = {100 * total_ok / len(rows):.1f}%")
     print(f"\nflagged uncertain: {uncertain} notes ({uncertain_missed} of them with a miss)")
+    total, rule_misses = check()
+    print(f"hand-written rule cases (held out, lab/frank/note_cases.py): {total - len(rule_misses)}/{total}")
+    for m in rule_misses:
+        print("  RULE MISS", m)
     if "--quiet" in sys.argv:
         return
     print(f"\nmisses ({len(misses)}):")

@@ -1,0 +1,87 @@
+"""Rehearse the live final on a practice world: a ticker advances the clock by itself, the bot runs its
+live loop on the stream. Optional kill/restart to test recovery.
+
+  python harness/emulate.py --seed emu-01 [--ms-per-min 100] [--restart-at 2000] [--set k=v ...]
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+import threading
+import time
+
+sys.path.insert(0, "src")
+import spread  # noqa: E402
+
+from spreadbot.config import Config  # noqa: E402
+from spreadbot.geo import DAY, HOUR, load_geo  # noqa: E402
+from spreadbot.run import register, run_live  # noqa: E402
+
+
+class Ticker(threading.Thread):
+    """Advances the world like the final's clock: slow in weekday daytime, fast at night and after Friday."""
+
+    def __init__(self, world_id: str, ms_per_min: int):
+        super().__init__(daemon=True)
+        self.world = spread.Client().world(world_id)
+        self.ms, self.now, self.ends, self.stop = ms_per_min, 0, None, False
+        self.day_by = 5
+
+    def run(self) -> None:
+        snap = self.world.snapshot()
+        self.now, self.ends = snap["now"], snap["endsAt"]
+        while self.now < self.ends and not self.stop:
+            d, m = self.now // DAY, self.now % DAY
+            busy = d < 5 and 6 * HOUR <= m < 22 * HOUR
+            by = self.day_by if busy else 30
+            t0 = time.time()
+            step = self.world.advance(by=min(by, self.ends - self.now))
+            self.now = step["now"]
+            time.sleep(max(0.0, self.ms * by / 1000 - (time.time() - t0)))
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--seed", default="emu-01")
+    ap.add_argument("--level", type=int, default=8)
+    ap.add_argument("--ms-per-min", type=int, default=100)
+    ap.add_argument("--restart-at", type=int, default=-1, help="world minute at which the bot is killed and rebuilt")
+    ap.add_argument("--set", action="append", default=[])
+    args = ap.parse_args()
+    cfg = Config.parse(args.set)
+    client = spread.Client()
+    geo = load_geo(client)
+    world = client.create(args.level, seed=args.seed)
+    register(world.id, seed=args.seed, level=args.level, tag="emulate")
+    print("emulated world", world.id, flush=True)
+    ticker = Ticker(world.id, args.ms_per_min)
+    ticker.start()
+    os.makedirs("data", exist_ok=True)
+    logf = open(f"data/emulate-{args.seed}.log", "w", encoding="utf-8")
+    t0 = time.time()
+    try:
+        if args.restart_at > 0:
+            # First life: stop the live loop at the restart minute by making the clock look finished.
+            class Kill(Exception):
+                pass
+
+            def clock1() -> int:
+                if ticker.now >= args.restart_at:
+                    raise Kill()
+                return ticker.now
+            try:
+                run_live(world, client, geo, cfg, logf, clock1)
+            except Kill:
+                print(f"killed at minute {ticker.now}; rebuilding from snapshot and events", flush=True)
+            client = spread.Client()  # a fresh process would have a fresh client
+        run_live(client.world(world.id), client, geo, cfg, logf, lambda: ticker.now)
+    finally:
+        ticker.stop = True
+    s = client.world(world.id).score()
+    print(f"END emulate {args.seed} margin {s['marginCents']/100:.2f} orders {s['wonOrders']} on-time {s['onTimeShare']:.3f} ranked {s['ranked']} ({time.time()-t0:.0f}s)", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

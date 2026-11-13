@@ -118,21 +118,44 @@ class Governor:
     def __init__(self, desk: "Desk"):
         self.desk = desk
 
+    def calibration(self) -> float:
+        """Observed on-time share of finished orders over what the model predicted for them (this world)."""
+        d = self.desk
+        done, obs = [], 0
+        for oid, ob in d.orders.items():
+            if oid in d.ontime_orders:
+                done.append(ob)
+                obs += 1
+            elif oid in d.late_orders or any(t is None and d.now > d.deadline(ob.order, l) for l, t in enumerate(ob.order["deliveredAt"])):
+                done.append(ob)
+        if len(done) < 15:
+            return 1.0
+        pred = sum(ob.p_ok for ob in done)
+        k = len(done) / (len(done) + 30)  # shrink to 1 while few orders are done
+        return min(1.05, max(0.75, k * obs / max(pred, 1e-6) + (1 - k)))
+
     def projection(self) -> float:
+        """Expected final on-time share of the orders won so far, from the live state of each open order."""
         d = self.desk
         ontime = len(d.ontime_orders)
         late = len(d.late_orders)
+        cal = self.calibration()
         open_p = 0.0
         n_open = 0
         for oid, ob in d.orders.items():
             if oid in d.ontime_orders or oid in d.late_orders:
                 continue
             n_open += 1
-            p = ob.p_ok
-            if ob.urgent:
-                p *= 0.6
-            if d.now > ob.order["deadline"] and any(t is None for t in ob.order["deliveredAt"]):
+            legs = [l for l, t in enumerate(ob.order["deliveredAt"]) if t is None]
+            held = legs and all((g := d.leg_gig.get((oid, l))) and d.gigs[g].status in ("booked", "working") for l in legs)
+            if any(d.now > d.deadline(ob.order, l) for l in legs):
                 p = 0.0
+            elif held:
+                p = 0.95
+            elif ob.urgent:
+                p = 0.45
+            else:
+                p = ob.p_ok * cal
             open_p += p
         total = ontime + late + n_open
         return (ontime + open_p) / total if total else 1.0
