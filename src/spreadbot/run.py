@@ -72,13 +72,16 @@ def practice(args) -> int:
     # The team's 8 practice slots are shared: wait for one instead of failing.
     for attempt in range(180):
         try:
-            world = client.create(args.level, seed=args.seed)
+            world = client.create(args.level, board=True) if args.board else client.create(args.level, seed=args.seed)
             break
         except spread.SpreadError as e:
             if e.status != 409 or attempt == 179:
                 raise
             time.sleep(20)
-    register(world.id, seed=args.seed, level=args.level, tag=args.tag)
+    if args.board:
+        args.seed = f"board-{world.id}"
+        print(f"ranking run {world.id} (never delete it: it would play out without us and still count)", flush=True)
+    register(world.id, seed=args.seed, level=args.level, tag=args.tag, board=bool(args.board))
     out = os.path.join("data", "runs", args.tag, f"{args.seed}-L{args.level}")
     os.makedirs(out, exist_ok=True)
     t0 = time.time()
@@ -88,13 +91,30 @@ def practice(args) -> int:
         desk = Desk(geo, cfg, args.level, snap["now"], world.roster())
         play_practice(world, desk, snap["endsAt"], events, quiet=args.quiet)
         score = world.score()
-    except BaseException:
+    except BaseException as first_error:
         traceback.print_exc()
-        try:
-            world.delete()
-        except Exception:
-            pass
-        return 1
+        if not args.board or isinstance(first_error, KeyboardInterrupt):
+            try:
+                if not args.board:
+                    world.delete()
+            except Exception:
+                pass
+            return 1
+        # A ranking run must finish with us: rebuild from the world's record and play on.
+        for attempt in range(10):
+            try:
+                time.sleep(5)
+                events = world.events()
+                snap = world.snapshot()
+                desk = Desk(geo, cfg, args.level, snap["now"], world.roster())
+                rejoin(desk, snap, events)
+                play_practice(world, desk, snap["endsAt"], events, quiet=args.quiet)
+                score = world.score()
+                break
+            except Exception:
+                traceback.print_exc()
+        else:
+            return 1
     summary = {"seed": args.seed, "level": args.level, "tag": args.tag, "world": world.id, "score": score,
                "seconds": round(time.time() - t0, 1), "config": {k: getattr(cfg, k) for k in cfg.__dataclass_fields__}}
     with open(os.path.join(out, "summary.json"), "w") as f:
@@ -256,6 +276,7 @@ def main() -> int:
     ap.add_argument("--reveal", action="store_true")
     ap.add_argument("--save-events", action="store_true")
     ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--board", action="store_true", help="play the team's next ranking run (humans only)")
     args = ap.parse_args()
     return practice(args) if args.mode == "practice" else final(args)
 
