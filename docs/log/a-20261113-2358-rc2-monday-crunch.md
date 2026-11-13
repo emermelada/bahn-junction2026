@@ -18,3 +18,15 @@ Every Friday next_day order has its last pickup on the last Monday; the backlog 
 **The ideas.** b22: no cheap long-slack fee when the last pickup is on the last Monday. b23: cap won orders per last-pickup day at 0.14 x the drivers in the world.
 
 **Keep or kill.** Pending (both on rc2, paired against rc2).
+
+## Results (rc2, 12 seeds, paired)
+
+| Tag | Change | Ranked | Min on-time | p10 | Median |
+|---|---|---|---|---|---|
+| rc2 | defaults after b18 | 8/12 | 87.1% | €5,908 | €8,440 |
+| b22 | no cheap fee when the last pickup is after the weekend | 12/12 | 90.6% | €3,993 | €6,613 |
+| b23 | cap orders per last-pickup day at 0.14 x drivers | 9/12 | 86.4% | €5,460 | €8,440 |
+| b24 | b22, but 1.2x (not 1.4x) after the weekend | 10/12 | 88.9% | €4,741 | €7,033 |
+| b25 | b22 with a stricter governor (3% / 6%) | 12/12 | 90.4% | €3,993 | €6,347 |
+
+**Keep or kill.** Keep b22 (tag rc3): the gate comes first, and it is the only setting ranked on all 12. It costs about €1,800 a week of median. Kill b23, b24, b25. The governor reacts after lateness shows, too late for a Monday that is decided on Friday.
