@@ -86,6 +86,8 @@ class Desk:
         self.offered: set[tuple[str, str]] = set()  # (gig, driver)
         self.gig_viewers: dict[str, list[str]] = {}  # gig -> drivers who viewed it, in order
         self.bundle_last: dict[str, int] = {}  # order -> last minute to start its bundle
+        self.morning_drops: dict[int, int] = defaultdict(int)
+        self.crunch_day = -1
         self.offer_log: list[tuple[str, str, float, int]] = []  # (gig, driver, fee over base, minute)
         self.positions: dict[str, tuple[str, int]] = {}  # driver -> (place, minute), from our gigs
         self.viewers: dict[str, int] = {}  # driver -> last minute seen in the app
@@ -223,6 +225,17 @@ class Desk:
 
     def on_gig_dropped(self, e: dict) -> None:
         self._reopen(e["gigId"], "dropped")
+        day, h = e["at"] // DAY, (e["at"] % DAY) // 60
+        if 5 <= h < 13:
+            self.morning_drops[day] += 1
+            if self.cfg.crunch_drops and self.morning_drops[day] == self.cfg.crunch_drops:
+                self.crunch_day = day
+                self.say("CRUNCH", f"day {day}: {self.morning_drops[day]} drops this morning")
+                for rec in list(self.gigs.values()):
+                    ob = self.orders.get(rec.legs[0][0])
+                    if rec.status == "open" and ob and self.last_pickup(ob, [l for _, l in rec.legs]) < (day + 1) * DAY:
+                        ob.urgent = True
+                        self.escalate_gig(rec, "crunch")
 
     def on_no_show(self, e: dict) -> None:
         self._reopen(e["gigId"], "no_show")
@@ -357,6 +370,8 @@ class Desk:
         tf = self.trust_factor(dealer)
         day = r["respondBy"] // DAY
         bar = self.gov.bar()
+        if self.crunch_day == self.now // DAY:
+            bar = max(bar, cfg.theta_tight)
         gate = 0.0
         if cfg.gate_bonus_cents and self.won_count >= 30:
             gate = cfg.gate_bonus_cents * min(1.0, max(0.0, (cfg.gate_target - self.gov.projection()) / cfg.gate_span))
@@ -371,6 +386,9 @@ class Desk:
         for opt in r["options"]:
             kind = opt["kind"]
             if kind not in cfg.quote_options:
+                continue
+            if cfg.only_next_if_no_same and kind == "next_day" and "same_day" in prices:
+                info.append("next_day:skip(same_day quoted)")
                 continue
             p_ok, slack = self.ontime.p_ok(r, opt["deadline"], kind)
             p_ok = min(0.99, p_ok * cal)
@@ -793,6 +811,21 @@ class Desk:
                     last = min(self.bundle_last.get(o, 0) for o, _ in rec.legs)
                     if last - self.now < self.cfg.unbundle_minutes:
                         self.unbundle(rec, "timeout")
+        if self.cfg.view_raise_n:
+            # Many drivers looked and none booked: the fee is short of the clearing fee. Raise once, now,
+            # instead of waiting for the clock (a late raise finds drivers whose day is already planned).
+            for rec in list(self.gigs.values()):
+                if rec.status != "open" or rec.escalated or getattr(rec, "view_raised", False):
+                    continue
+                if len(self.gig_viewers.get(rec.id, ())) >= self.cfg.view_raise_n and self.now - rec.posted_at >= self.cfg.view_raise_after:
+                    fee = int(round(self.gig_base(rec) * self.cfg.view_raise_mult))
+                    cur = current_fee(rec.schedule, self.now)
+                    if fee > cur:
+                        sched = [x for x in rec.schedule if x["at"] > self.now and x["feeCents"] > fee]
+                        rec.schedule = dedupe([{"at": self.now, "feeCents": fee}] + sched)
+                        self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": rec.schedule})
+                        self.say("VIEWRAISE", f"{rec.id} views={len(self.gig_viewers[rec.id])} {cur}->{fee}")
+                    rec.view_raised = True
         if self.cfg.own_alarm:
             for rec in list(self.gigs.values()):
                 if rec.status != "open" or rec.escalated:

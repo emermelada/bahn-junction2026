@@ -198,7 +198,7 @@ def run_live(world, client, geo, cfg: Config, logf, clock) -> bool:
     flush(world, desk, logf)
     last_seq = history[-1]["seq"] if history else -1
     day = desk.now // DAY
-    last_tick = last_flush = last_event = time.time()
+    last_tick = last_flush = last_event = last_clock = time.time()
     for e in world.stream(after=last_seq, idle=0.25):
         t = time.time()
         if e is not None:
@@ -208,9 +208,9 @@ def run_live(world, client, geo, cfg: Config, logf, clock) -> bool:
             desk.now = max(desk.now, e["at"])
             desk.handle(e)
             last_event = t
-        elif t - last_event > 2.0:
-            desk.now = max(desk.now, clock())  # a quiet stream: read the clock (one read token)
-            last_event = t
+        if (e is None and t - last_event > 2.0) or t - last_clock > 5.0:
+            desk.now = max(desk.now, clock())  # read the clock: when the stream is quiet, and every 5 s (one read token)
+            last_event = last_clock = t
         if t - last_tick > 2.0:
             desk.tick()
             last_tick = t

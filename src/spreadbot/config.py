@@ -20,6 +20,7 @@ class Config:
     late_cost_frac: float = 0.6        # a late car: refund 10-50%, trust halved, the gate at risk
     cost_prior: float = 1.15           # expected fee over typical fee with fee_plan (research: 0.9 books 64% in time)
     cost_prior_n: int = 30
+    only_next_if_no_same: bool = False # quote next_day only when we do not quote same_day (next_day cars cost more)
     trust_bonus: float = 0.0           # weight of dealer-trust value in the quote (1 = full expected value)
     gate_bonus_cents: int = 0          # value of one more safe on-time order when the projection is under target
     gate_target: float = 0.935
@@ -53,6 +54,10 @@ class Config:
     steep_relaxed: tuple = (1.6, 1.9, 2.2)
     steep_rescue: tuple = (2.0, 2.5, 3.0, 3.5, 4.0)
     late_plan: tuple = ()
+    crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar
+    view_raise_n: int = 0              # this many viewers and no booking: raise to view_raise_mult at once
+    view_raise_after: int = 45
+    view_raise_mult: float = 1.5
     own_alarm: bool = False            # escalate 3 h before the effective last pickup (note deadlines included)
     alarm_minutes: int = 180              # e.g. ((0, 1.2), (4, 1.5), (12, 2.0)): fees for a car that is late anyway
     use_offers: bool = True            # offers to drivers near the pickup on a deadline warning
