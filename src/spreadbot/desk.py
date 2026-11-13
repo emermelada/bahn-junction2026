@@ -87,6 +87,7 @@ class Desk:
         self.gig_viewers: dict[str, list[str]] = {}  # gig -> drivers who viewed it, in order
         self.bundle_last: dict[str, int] = {}  # order -> last minute to start its bundle
         self.morning_drops: dict[int, int] = defaultdict(int)
+        self.due_count: dict[int, int] = defaultdict(int)
         self.crunch_day = -1
         self.offer_log: list[tuple[str, str, float, int]] = []  # (gig, driver, fee over base, minute)
         self.positions: dict[str, tuple[str, int]] = {}  # driver -> (place, minute), from our gigs
@@ -153,6 +154,7 @@ class Desk:
         if o["id"] in self.orders:
             return
         ob = OrderBook(o, e["at"])
+        self.due_count[min(self.deadline(o, l) for l in range(len(o["legs"]))) // DAY] += 1 if o["id"] in self.requests else 0
         ob.p_ok = self.quote_meta.get(o["id"], {}).get(o["option"], 0.85)
         self.orders[o["id"]] = ob
         self.won_count += 1
@@ -395,24 +397,40 @@ class Desk:
             if p_ok < bar or slack < cfg.min_slack_h:
                 info.append(f"{kind}:skip(p={p_ok:.2f},s={slack:.1f})")
                 continue
+            # Load: our cars already due that day against the world's drivers. Lateness grows with it
+            # (lab: 2.7% late under 6% of drivers, 8.7% at 9-12%, 12% above 15%), so a busy day's next car costs more.
+            load = self.due_load(self.deadline_day(r, opt))
+            load_cost = cfg.load_slope * r["referenceFeeCents"] * max(0.0, load - cfg.load_free) / 0.05
             risk_frac = (1 - p_ok) * cfg.late_cost_frac
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain)
             # Under the on-time target, a safe car is worth more than its margin: it dilutes the late ones.
             if gate and p_ok >= cfg.gate_safe_p:
                 trust_adj -= gate
-            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, cost, risk_frac, cfg.shadow_cents + congestion + trust_adj)
+            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, cost, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost)
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 info.append(f"{kind}:noev")
                 continue
             prices[kind] = int(round(opt["listPriceCents"] * ratio * tf))
             meta[kind] = p_ok
-            info.append(f"{kind}:r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f}")
+            info.append(f"{kind}:r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f},L={load:.3f}")
         self.quote_meta[r["id"]] = meta
         head = f"bar={bar:.2f} bl={backlog} tg={t_gain/100:.0f} tf={tf:.2f} mu={self.market.mu_for(dealer, day):.3f} cost={cost/100:.0f}"
         if not prices:
             return decline_prices(r), f"DECLINE {head} {' '.join(info)}"
         return prices, f"{head} {' '.join(info)}"
+
+    def deadline_day(self, r: dict, opt: dict) -> int:
+        d = opt["deadline"]
+        ns = self.note(r["id"])
+        if ns and ns[0].deadline:
+            d = min(d, ns[0].deadline)
+        return d // DAY
+
+    def due_load(self, day: int) -> float:
+        """Our orders due on this day (won, not cancelled), over the number of drivers in the world."""
+        n = self.due_count.get(day, 0)
+        return n / max(1, len(self.roster))
 
     def trust_value(self, dealer: str) -> tuple[float, float]:
         """(gain, loss) in cents: 1% of this dealer's expected revenue for the rest of the week, for one more

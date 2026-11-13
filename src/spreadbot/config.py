@@ -29,11 +29,14 @@ class Config:
     # --- on-time selection
     ontime_fee_assumed: float = 1.6    # the fee the on-time model assumes (fee_plan reaches about this)
     ontime_shift: float = 0.0
+    ontime_model: str = "policy"       # "policy": fit on weeks of this dispatch policy; "research": the first fit
+    dilute: bool = True               # in rescue, the bar is the projection (+ margin), not a fixed 0.92
+    dilute_margin: float = 0.01
     calibrate: bool = False            # scale P(on time) by this world's observed/predicted on-time ratio
     min_slack_h: float = 1.5
-    theta: float = 0.70                # bar on P(on time) for a car in normal mode
-    theta_tight: float = 0.82
-    theta_rescue: float = 0.92
+    theta: float = 0.80                # bar on P(on time) for a car in normal mode
+    theta_tight: float = 0.88
+    theta_rescue: float = 0.93
     gov_tight: float = 0.935           # projected on-time share under which the bar tightens
     gov_rescue: float = 0.915
     # --- congestion: open gigs near the pickup make the next car there dearer
@@ -41,26 +44,29 @@ class Config:
     cong_free: int = 3
     cong_radius: float = 80.0          # km: drivers come from about this far for a typical gig
     cong_horizon: int = 18 * 60        # only gigs whose last pickup is within this many minutes
+    # --- load: our cars due per day over the world's drivers
+    load_free: float = 0.07            # load under which a car costs nothing extra (1.0 = off)
+    load_slope: float = 1.0            # extra cost, in typical fees, per 0.05 of load above load_free
     # --- fees
-    fee_mode: str = "span"             # "span": fee_plan over the slack; "relative": fee_rel anchored to lastPickupAt
+    fee_mode: str = "relative"             # "span": fee_plan over the slack; "relative": fee_rel anchored to lastPickupAt
     fee_open: float = 0.95
     fee_hold: int = 45                 # minutes the opening fee shows before any raise
     fee_rel: tuple = ((8, 1.25), (5, 1.6))   # (hours before lastPickupAt, fee over typical fee)
     fee_plan: tuple = ((0.0, 0.95), (0.15, 1.15), (0.4, 1.45), (0.7, 1.85))  # (share of slack, fee over typical fee)
-    steep_plan: tuple = (2.0, 2.4, 2.8, 3.3, 3.8)  # after a deadline warning: generous, a late car costs more
+    steep_plan: tuple = (1.7, 2.0, 2.3, 2.6)  # after a deadline warning: generous, a late car costs more
     steep_step: int = 30
-    gov_steep: bool = False            # choose the escalation by the projected on-time share
+    gov_steep: bool = True            # choose the escalation by the projected on-time share
     gov_relaxed: float = 0.955         # above this projection, a car is not worth saving at any price
     steep_relaxed: tuple = (1.6, 1.9, 2.2)
     steep_rescue: tuple = (2.0, 2.5, 3.0, 3.5, 4.0)
-    late_plan: tuple = ()
+    late_plan: tuple = ((0, 1.2), (4, 1.5), (12, 2.0))
     crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar
     view_raise_n: int = 0              # this many viewers and no booking: raise to view_raise_mult at once
     view_raise_after: int = 45
     view_raise_mult: float = 1.5
-    own_alarm: bool = False            # escalate 3 h before the effective last pickup (note deadlines included)
-    alarm_minutes: int = 180              # e.g. ((0, 1.2), (4, 1.5), (12, 2.0)): fees for a car that is late anyway
-    use_offers: bool = True            # offers to drivers near the pickup on a deadline warning
+    own_alarm: bool = True            # escalate 3 h before the effective last pickup (note deadlines included)
+    alarm_minutes: int = 360              # e.g. ((0, 1.2), (4, 1.5), (12, 2.0)): fees for a car that is late anyway
+    use_offers: bool = False            # offers to drivers near the pickup on a deadline warning
     viewer_offers: bool = False        # offers to drivers who viewed an unbooked gig
     offer_after: int = 20              # minutes a gig is open before its viewers get offers
     offer_mult: float = 1.15           # offer fee over typical fee (or the app fee, if higher)
@@ -68,7 +74,7 @@ class Config:
     offer_max_km: float = 120.0
     charge_km: float = 190.0           # rule: EV < 30% on a route over 200 km needs charging; margin for road km
     # --- bundles: two of our cars in one gig, the second picked up near where the first is delivered
-    bundle: bool = False
+    bundle: bool = True
     bundle_km: float = 25.0            # straight line from the first delivery to the second pickup
     bundle_lead: int = 60              # minutes before a driver can start, when checking a chain
     bundle_margin: int = 60            # minutes to spare before each deadline

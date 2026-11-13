@@ -22,9 +22,15 @@ def sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-max(-40.0, min(40.0, x))))
 
 
-# Logistic fit on 3 research weeks (1,403 won orders, random flat fees), lab/frank/hard.py.
-# Held-out week check: keeping p >= 0.85 gave 89-93% on time against a base of 77-82%.
+# Logistic fit on 6,291 orders played by the v1c/v1h/v1i policies (dev-01..06), lab/frank/refit_ontime.py.
+# Held-out-seed AUC 0.71; predicted vs actual on held-out seeds: 0.78/0.80, 0.88/0.87, 0.92/0.93, 0.95/0.95, 0.97/0.96.
 ONTIME_COEF = {
+    "intercept": 1.02, "slack12": 0.114, "overnight": -0.983, "log_drive": -0.198, "same_day": -0.709,
+    "friday": -0.018, "ready_later": 0.55, "log_sup_p80": 0.359, "log_sup_d30": 0.072, "premium": -1.451,
+    "private": -0.636, "note": -0.258, "fee": 0.0,
+}
+# The first fit, on 3 research weeks with random flat fees (kept for the ablation and the pitch).
+ONTIME_COEF_RESEARCH = {
     "intercept": -0.24, "slack12": 0.306, "overnight": -1.177, "log_drive": -0.424, "same_day": -0.363,
     "friday": -0.574, "ready_later": 0.883, "log_sup_p80": 0.142, "log_sup_d30": 0.037, "premium": -1.19,
     "private": -0.164, "note": -0.375, "fee": 0.755,
@@ -65,7 +71,8 @@ class OnTime:
 
     def p_ok(self, r: dict, deadline: int, option: str) -> tuple[float, float]:
         f = self.features(r, deadline, option)
-        z = ONTIME_COEF["intercept"] + sum(c * f[k] for k, c in ONTIME_COEF.items() if k != "intercept")
+        coef = ONTIME_COEF_RESEARCH if self.desk.cfg.ontime_model == "research" else ONTIME_COEF
+        z = coef["intercept"] + sum(c * f[k] for k, c in coef.items() if k != "intercept")
         return sigmoid(z + self.desk.cfg.ontime_shift), f["slack"]
 
 
@@ -164,6 +171,9 @@ class Governor:
         cfg = self.desk.cfg
         proj = self.projection()
         if proj < cfg.gov_rescue:
+            if cfg.dilute:
+                # Take a car only if it is likelier on time than the orders we hold: each one then lifts the share.
+                return max(cfg.theta_tight, min(cfg.theta_rescue, proj + cfg.dilute_margin))
             return cfg.theta_rescue
         if proj < cfg.gov_tight:
             return cfg.theta_tight

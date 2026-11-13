@@ -10,6 +10,7 @@ import glob
 import json
 import os
 import statistics
+import shutil
 import subprocess
 import sys
 import time
@@ -73,7 +74,11 @@ def main() -> int:
             for k in sorted(common):
                 print(k.ljust(14) + "".join(f"{all_runs[t][k]['score']['marginCents']/100:10.0f}/{all_runs[t][k]['score']['onTimeShare']:.3f}" for t in all_runs))
         return 0
-    env = dict(os.environ, PYTHONPATH="src", PYTHONIOENCODING="utf-8")
+    # Freeze the code of this tag: later edits to src/ must not leak into runs still queued.
+    snap = os.path.join("data", "runs", args.tag, "src")
+    if not os.path.exists(snap):
+        shutil.copytree("src", snap, ignore=shutil.ignore_patterns("__pycache__"))
+    env = dict(os.environ, PYTHONPATH=snap, PYTHONIOENCODING="utf-8")
     todo = [s for s in seeds_of(args.seeds) if not os.path.exists(os.path.join("data", "runs", args.tag, f"{s}-L{args.level}", "summary.json"))]
     running: list[subprocess.Popen] = []
     os.makedirs(os.path.join("data", "runs", args.tag), exist_ok=True)
