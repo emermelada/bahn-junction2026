@@ -7,7 +7,7 @@ FLAGS = {
     "min_drivers_near": 0,  # decline pickups with fewer drivers living within 30 km; 0 is off
     "max_backlog": 15,  # decline new requests while this many won orders due within a day wait for a driver; 0 is off
     "min_slack": 240,  # decline an option whose latest pickup is under this many minutes after we win it; 0 is off (b6: on-time 88->92%)
-    "read_notes": False,  # set plates, manual licence and stop windows from the note (notes/reader.py)
+    "read_notes": True,  # set plates, manual licence and stop windows from the note (b12 vs rc1: 9/9 ranked, +€1.4k over 9 weeks)
     "skip_trade_in": True,  # decline two-car trade-ins: 32% late on rc1 (18 of 54) against 2-7% dealer to dealer
     "skip_private": True,  # decline private pickups and deliveries: 20-23% late for next_day (b11: rc1 8/9 -> 9/9 ranked)
     "governor": True,  # risk_mode from the projected late share; tight and rescue make serviceability stricter (b7: 3/3 ranked)
