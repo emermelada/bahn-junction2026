@@ -78,7 +78,7 @@ def play(level: int, seed: Optional[str], client: Optional[Client] = None, world
     world_map = world_map or client.map()
     started = time.monotonic()
     # A ranking run (board) counts in the practice rankings and plays to its end even if deleted: humans start it.
-    world = client.create(level=level, board=True) if board else create_world(client, level, seed)
+    world = create_world(client, level, seed, board)
     run_dir = os.path.join(RUNS, world.id)
     os.makedirs(run_dir, exist_ok=True)
     meta = {"worldId": world.id, "seed": seed, "level": level, "tag": tag, "commit": commit()}
@@ -124,14 +124,17 @@ def play(level: int, seed: Optional[str], client: Optional[Client] = None, world
     return {**meta, **score, "runDir": run_dir, "digest": summary["digest"], "steps": steps, "seconds": summary["seconds"]}
 
 
-def create_world(client: Client, level: int, seed: Optional[str]) -> World:
-    """A new practice world. The team's 8 slots are shared with teammates: while they are full, wait."""
+def create_world(client: Client, level: int, seed: Optional[str], board: bool = False) -> World:
+    """A new practice world, or the next ranking run. The team's 8 slots are shared with teammates: while they
+    are full, wait. Any other refusal (no round yet, round already played) is raised at once."""
     for attempt in range(90):
         try:
-            return client.create(level=level, seed=seed)
+            return client.create(level=level, board=True) if board else client.create(level=level, seed=seed)
         except SpreadError as error:
             if error.status != 409 or "8 practice worlds" not in str(error) or attempt == 89:
                 raise
+            if attempt == 0:
+                print("All 8 practice slots are in use: waiting for one.", flush=True)
             time.sleep(20)
     raise AssertionError("unreachable")
 
