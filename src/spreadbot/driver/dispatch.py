@@ -36,6 +36,10 @@ def dispatch(state: State, now: int) -> list[Action]:
             elif oid in state.urgent and gig["scheduledAt"] < state.urgent[oid]:
                 actions.append({"type": "reprice", "gigId": gid, "schedule": fees(state, order, _cars(gig), now)})
                 state.log(now, "reprice_urgent", gid, order=oid)
+            elif FLAGS["raise_lead"] and oid not in state.urgent and now >= (due := order["lastPickupAt"] - FLAGS["raise_lead"]) \
+                    and gig["scheduledAt"] < due:
+                actions.append({"type": "reprice", "gigId": gid, "schedule": fees(state, order, _cars(gig), now, raised=True)})
+                state.log(now, "reprice_early", gid, order=oid)
         need = [leg for leg in state.undelivered(order) if (oid, leg) not in state.gig_of or leg in freed]
         need = [leg for leg in need if not _backing_off(state, (oid, leg), now)]
         if not need:
@@ -66,7 +70,7 @@ def post(state: State, order: Order, legs: list[int], now: int) -> Action:
     return {"type": "post", "stops": stops, "audience": audience, "schedule": fees(state, order, len(legs), now)}
 
 
-def fees(state: State, order: Order, cars: int, now: int) -> list[FeeStep]:
+def fees(state: State, order: Order, cars: int, now: int, raised: bool = False) -> list[FeeStep]:
     fee = state.requests[order["id"]]["referenceFeeCents"] * cars / len(order["legs"])
     if FLAGS["fee_ladder"]:
         ratio = 0.8 + rng(state.world_id, order["id"], cars).random() * FLAGS["fee_ladder"]
@@ -74,6 +78,8 @@ def fees(state: State, order: Order, cars: int, now: int) -> list[FeeStep]:
     lo, hi = FLAGS["fee_open"], FLAGS["fee_top"]
     if order["id"] in state.urgent:  # the top fee or 1.5 times at once, then a quarter more every half hour
         steps = [(k * 30, max(1.5, hi) + k / 4) for k in range(5)]
+    elif raised:  # one early raise for a gig still open close to its last pickup, before the deadline warning
+        steps = [(0, FLAGS["fee_raise"])]
     elif hi <= lo:  # one flat fee: drivers who see no raises have nothing to wait for
         steps = [(0, lo)]
     else:  # from the opening fee up to the top, in five hourly steps (the starter: 1.0 to 1.5)
