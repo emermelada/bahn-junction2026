@@ -89,6 +89,8 @@ class Desk:
         self.morning_drops: dict[int, int] = defaultdict(int)
         self.due_count: dict[int, int] = defaultdict(int)
         self.need_resync = False
+        self.fast_book: list[tuple[int, bool]] = []  # (posted at, booked within an hour at the opening fee) per first post
+        self.first_posts: dict[str, int] = {}  # gig -> posted at, for first posts still being judged
         self.crunch_day = -1
         self.offer_log: list[tuple[str, str, float, int]] = []  # (gig, driver, fee over base, minute)
         self.positions: dict[str, tuple[str, int]] = {}  # driver -> (place, minute), from our gigs
@@ -217,6 +219,9 @@ class Desk:
         rec = self.gigs.get(e["gigId"])
         if rec:
             rec.status, rec.driver, rec.fee = "booked", e["driverId"], e["feeCents"]
+            t0 = self.first_posts.pop(rec.id, None)
+            if t0 is not None:
+                self.fast_book.append((t0, e["at"] - t0 <= 60 and e["feeCents"] <= rec.schedule[0]["feeCents"]))
             ob = self.orders.get(rec.legs[0][0])
             if ob:
                 self.book_ratios.append(e["feeCents"] / max(1.0, self.gig_base(rec)))
@@ -401,7 +406,7 @@ class Desk:
             # Load: our cars already due that day against the world's drivers. Lateness grows with it
             # (lab: 2.7% late under 6% of drivers, 8.7% at 9-12%, 12% above 15%), so a busy day's next car costs more.
             load = self.due_load(self.deadline_day(r, opt))
-            load_cost = cfg.load_slope * r["referenceFeeCents"] * max(0.0, load - cfg.load_free) / 0.05
+            load_cost = cfg.load_slope * r["referenceFeeCents"] * max(0.0, load - cfg.load_free * self.capacity_factor()) / 0.05
             risk_frac = (1 - p_ok) * cfg.late_cost_frac
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain)
@@ -427,6 +432,17 @@ class Desk:
         if ns and ns[0].deadline:
             d = min(d, ns[0].deadline)
         return d // DAY
+
+    def capacity_factor(self) -> float:
+        """How easily our gigs find drivers this week: the share of first posts booked within an hour at the
+        opening fee, over the share we usually see (0.7). More easy bookings, more room per day."""
+        if not self.cfg.adaptive_load:
+            return 1.0
+        done = [ok for (at, ok) in self.fast_book[-60:]]
+        if len(done) < 15:
+            return 1.0
+        rate = (sum(done) + 0.7 * 10) / (len(done) + 10)
+        return min(self.cfg.cap_max, max(self.cfg.cap_min, rate / 0.7))
 
     def due_load(self, day: int) -> float:
         """Our orders due on this day (won, not cancelled), over the number of drivers in the world."""
@@ -790,6 +806,8 @@ class Desk:
                     for key in rec.legs:
                         self.leg_gig[key] = rec.id
                     self.say("GIG", f"{rec.id} {a['stops'][0]['orderId']} {why} fee0={a['schedule'][0]['feeCents']}")
+                    if why == "won":
+                        self.first_posts[rec.id] = self.now
                 else:
                     refused_posts.append((a, res.get("reason", "")))
             elif not res.get("ok"):
@@ -849,6 +867,10 @@ class Desk:
     # ------------------------------------------------------------------ periodic
     def tick(self) -> None:
         """Called once per step: posts anything missing, then offers unbooked gigs to drivers who looked at them."""
+        for gid, t0 in list(self.first_posts.items()):
+            if self.now - t0 > 60:
+                self.fast_book.append((t0, False))
+                del self.first_posts[gid]
         for oid in list(self.orders):
             ob = self.orders[oid]
             if ob.order["status"] == "cancelled":

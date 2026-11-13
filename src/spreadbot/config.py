@@ -46,6 +46,9 @@ class Config:
     cong_horizon: int = 18 * 60        # only gigs whose last pickup is within this many minutes
     # --- load: our cars due per day over the world's drivers
     load_free: float = 0.07            # load under which a car costs nothing extra (1.0 = off)
+    adaptive_load: bool = False        # scale load_free by how easily our first posts book this week
+    cap_min: float = 0.7
+    cap_max: float = 1.4
     load_slope: float = 1.0            # extra cost, in typical fees, per 0.05 of load above load_free
     # --- fees
     fee_mode: str = "relative"         # "span": fee_plan over the slack; "relative": fee_rel anchored to lastPickupAt
