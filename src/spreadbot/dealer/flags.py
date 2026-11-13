@@ -2,6 +2,7 @@
 FLAGS = {
     "quote_ratio": 1.4,  # price = ratio x list; the ladder wins ~40% at 1.4 (docs/log a-...-price-ladder); 1.0 is the kit starter
     "min_margin_cents": 1500,  # decline an option whose price minus the planned fee is below this; None is off (b4 vs b2: +€4-8k)
+    "learn_price": False,  # pick the ratio from the live win model instead of quote_ratio
     "trust": False,  # scale prices by the dealer's trust factor (level 8), so wins stay as likely and pay more
     "same_day_extra": 0.2,  # added to the ratio for same_day, so dealers that also accept next_day pick it; same_day ran 60% late
     "ladder": 0.0,  # lab only: >0 quotes one random option at a random ratio in [1.0, 1.0 + ladder], to map wins vs price

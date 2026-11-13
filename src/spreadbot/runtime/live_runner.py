@@ -23,7 +23,7 @@ from spread.types import Action
 
 from spreadbot.core.declog import DecLog
 from spreadbot.core.state import State
-from spreadbot.runtime.practice_runner import RUNS, decide, line, write_json
+from spreadbot.runtime.practice_runner import RUNS, decide, line, observe, write_json
 from spreadbot.runtime.recovery import rejoin
 
 HEARTBEAT = 1.0  # real seconds between clock reads and dispatch cycles; a request has 4.5 s in the final
@@ -74,6 +74,7 @@ def follow(client: Client, world: World, level: int, world_map, declog: DecLog, 
     for event in world.stream(after=state.seq, idle=HEARTBEAT):
         requests = []
         if event is not None and state.apply(event):
+            observe(event, state)
             log.write(line({"t": "ev", "e": event}))
             state.now = max(state.now, event["at"])
             if event["kind"] == "price_request":
