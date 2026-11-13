@@ -8,9 +8,8 @@ from __future__ import annotations
 from spreadbot.core.state import State
 from spreadbot.driver.flags import FLAGS
 
-# Plan: treat lateness as a budget, plan for 5%, never spend 10%. Thresholds on the projected late share:
-TIGHT = 0.05  # above this, win only cars that are easy to move
-RESCUE = 0.08  # above this, win almost nothing new until the share recovers
+# Plan: treat lateness as a budget, plan for 5%, never spend 10%. Thresholds on the projected late share are
+# FLAGS["gov_tight"] (above it, win only cars that are easy to move) and FLAGS["gov_rescue"] (win almost nothing).
 MIN_ORDERS = 40  # early in the week one late car is not 100% late: divide by at least this many orders
 
 
@@ -41,5 +40,5 @@ def risk_mode(state: State, now: int) -> str:
     cache = state.ext.setdefault("driver", {})
     if cache.get("mode_at") != now:
         share = projected_late_share(state, now)
-        cache["mode_at"], cache["mode"] = now, "rescue" if share > RESCUE else "tight" if share > TIGHT else "normal"
+        cache["mode_at"], cache["mode"] = now, "rescue" if share > FLAGS["gov_rescue"] else "tight" if share > FLAGS["gov_tight"] else "normal"
     return cache["mode"]

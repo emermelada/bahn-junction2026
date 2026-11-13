@@ -14,6 +14,8 @@ FLAGS = {
     "read_notes": True,  # set plates, manual licence and stop windows from the note (b12 vs rc1: 9/9 ranked, +€1.4k over 9 weeks)
     "skip_trade_in": True,  # decline two-car trade-ins: 32% late on rc1 (18 of 54) against 2-7% dealer to dealer
     "skip_private": True,  # decline private pickups and deliveries: 20-23% late for next_day (b11: rc1 8/9 -> 9/9 ranked)
+    "gov_tight": 0.05,  # projected late share above which the governor goes tight (plan: budget 5%)
+    "gov_rescue": 0.08,  # and above which it goes to rescue (never spend 10%)
     "governor": True,  # risk_mode from the projected late share; tight and rescue make serviceability stricter (b7: 3/3 ranked)
     "orders_per_driver_day": 0.0,  # cap on won orders per last-pickup day, per driver in the world; 0 is off
     "cars_per_driver_day": 0.0,  # cap on cars won per pickup town and ready day, per nearby driver; 0 is off
