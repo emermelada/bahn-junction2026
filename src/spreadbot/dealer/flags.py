@@ -2,6 +2,7 @@
 FLAGS = {
     "quote_ratio": 1.4,  # price = ratio x list; the ladder wins ~40% at 1.4 (docs/log a-...-price-ladder); 1.0 is the kit starter
     "min_margin_cents": 1500,  # decline an option whose price minus the planned fee is below this; None is off (b4 vs b2: +€4-8k)
+    "lane_weight": 0.0,  # add this share of the lane table's shift (dealer/lanes.json) to the ratio; 0 is off
     "max_ratio": 0.0,  # >0: an option under the floor is priced at fee + floor, up to this ratio of list; 0 declines it
     "learn_price": False,  # pick the ratio from the live win model instead of quote_ratio
     "trust": True,  # scale prices by the dealer's trust factor (level 8), so wins stay as likely and pay more (b6)
