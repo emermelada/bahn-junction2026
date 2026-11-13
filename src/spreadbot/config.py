@@ -22,6 +22,8 @@ class Config:
     cost_prior: float = 1.15           # expected fee over typical fee with fee_plan (research: 0.9 books 64% in time)
     cost_prior_n: int = 30
     only_next_if_no_same: bool = False # quote next_day only when we do not quote same_day (next_day cars cost more)
+    trust_loss_w: float = 0.0          # charge (1 - P(on time)) x the trust a late car would cost this dealer
+    protect_trust_cents: int = 0       # a dealer's trust at stake above this: escalate as normal (x2: as rescue)
     trust_bonus: float = 0.0           # weight of dealer-trust value in the quote (1 = full expected value)
     gate_bonus_cents: int = 0          # value of one more safe on-time order when the projection is under target
     gate_target: float = 0.935
@@ -60,8 +62,8 @@ class Config:
     steep_plan: tuple = (1.7, 2.0, 2.3, 2.6)  # after a deadline warning: generous, a late car costs more
     steep_step: int = 30
     gov_steep: bool = True             # choose the escalation by the projected on-time share
-    gov_relaxed: float = 0.955         # above this projection, a car is not worth saving at any price
-    steep_relaxed: tuple = (1.6, 1.9, 2.2)
+    gov_relaxed: float = 0.95          # above this projection, a car is not worth saving at any price
+    steep_relaxed: tuple = (1.4, 1.6, 1.8)  # v1aa: p10 margin 6,773 vs 5,594, same mean
     steep_rescue: tuple = (2.0, 2.5, 3.0, 3.5, 4.0)
     late_plan: tuple = ((0, 1.2), (4, 1.5), (12, 2.0))  # (hours from now, fee): a car that is late anyway, no steep fees
     crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar

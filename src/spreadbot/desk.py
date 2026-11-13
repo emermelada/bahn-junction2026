@@ -410,7 +410,7 @@ class Desk:
             load_cost = cfg.load_slope * r["referenceFeeCents"] * max(0.0, load - cfg.load_free * self.capacity_factor()) / 0.05
             risk_frac = (1 - p_ok) * cfg.late_cost_frac
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
-            trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain)
+            trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain) + cfg.trust_loss_w * (1 - p_ok) * t_loss
             # Under the on-time target, a safe car is worth more than its margin: it dilutes the late ones.
             if gate and p_ok >= cfg.gate_safe_p:
                 trust_adj -= gate
@@ -685,7 +685,7 @@ class Desk:
             # Already late: on-time is lost, only the refund tier and delivery matter. No steep fees.
             return dedupe([{"at": now + int(h * HOUR), "feeCents": max(1, int(round(base * m)))} for h, m in cfg.late_plan])
         if ob.urgent or last - now < 2 * HOUR:
-            return steep(now, base, cfg, plan=self.steep_plan_now())
+            return steep(now, base, cfg, plan=self.steep_plan_now(ob))
         if cfg.fee_mode == "relative":
             # Steps anchored to lastPickupAt: hold the opening fee while there is time, raise as the pickup nears.
             # The opening fee always shows for at least fee_hold minutes: most views come in the first minutes.
@@ -725,17 +725,21 @@ class Desk:
                 return True
         return False
 
-    def steep_plan_now(self) -> tuple:
-        """How much to pay to save a car: little while the on-time budget is comfortable, a lot near the gate."""
+    def steep_plan_now(self, ob: Optional[OrderBook] = None) -> tuple:
+        """How much to pay to save a car: little while the on-time budget is comfortable, a lot near the gate,
+        and more for a dealer whose trust a late car would halve."""
         cfg = self.cfg
         if not cfg.gov_steep:
             return cfg.steep_plan
         proj = self.gov.projection()
-        if proj >= cfg.gov_relaxed:
-            return cfg.steep_relaxed
-        if proj >= cfg.gov_tight:
-            return cfg.steep_plan
-        return cfg.steep_rescue
+        level = 0 if proj >= cfg.gov_relaxed else 1 if proj >= cfg.gov_tight else 2
+        if cfg.protect_trust_cents and ob is not None:
+            loss = self.trust_value(ob.order["dealerId"])[1]
+            if loss >= 2 * cfg.protect_trust_cents:
+                level = 2
+            elif loss >= cfg.protect_trust_cents:
+                level = max(level, 1)
+        return (cfg.steep_relaxed, cfg.steep_plan, cfg.steep_rescue)[level]
 
     def escalate_gig(self, rec: GigRec, why: str) -> None:
         if rec.status != "open":
@@ -752,7 +756,7 @@ class Desk:
         cur = current_fee(rec.schedule, self.now)
         if self.cfg.late_plan and self.is_late(ob, [l for _, l in legs]):
             return
-        sched = steep(self.now, base, self.cfg, floor=cur, plan=self.steep_plan_now())
+        sched = steep(self.now, base, self.cfg, floor=cur, plan=self.steep_plan_now(ob))
         rec.schedule = sched
         rec.escalated = True
         self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": sched})
