@@ -37,8 +37,8 @@ class Config:
     theta: float = 0.80                # bar on P(on time) for a car in normal mode
     theta_tight: float = 0.88
     theta_rescue: float = 0.93
-    gov_tight: float = 0.935           # projected on-time share under which the bar tightens
-    gov_rescue: float = 0.915
+    gov_tight: float = 0.95            # projected on-time share under which the bar tightens (v1w: min on-time 0.932 vs 0.919)
+    gov_rescue: float = 0.93 
     # --- congestion: open gigs near the pickup make the next car there dearer
     cong_frac: float = 0.0             # extra cost per open gig beyond cong_free, as a share of the typical fee
     cong_free: int = 3
