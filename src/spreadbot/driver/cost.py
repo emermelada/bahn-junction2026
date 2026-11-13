@@ -40,7 +40,8 @@ def estimate_cost(request: PriceRequest, option: DeliveryOption, state: State) -
         serviceable = False
     if mode == "rescue" and min(drivers_near(state, leg["pickup"]["placeId"]) for leg in request["legs"]) < EASY_DRIVERS:
         serviceable = False
-    fee = round(request["referenceFeeCents"] * FLAGS["fee_open"])  # what dispatch will open the gig at
+    long = FLAGS["fee_open_long"] and slack(request, option, state) >= DAY
+    fee = round(request["referenceFeeCents"] * (FLAGS["fee_open_long"] if long else FLAGS["fee_open"]))  # what dispatch will post
     return CostEstimate(fee_cents=fee, p_on_time=1.0, serviceable=serviceable)
 
 
