@@ -2,6 +2,7 @@
 FLAGS = {
     "fee_open": 1.4,  # opening fee as a multiple of the typical fee; 1.2 booked fewer in time (b5), 1.6 cost more (b3)
     "fee_open_long": 1.0,  # flat fee for a gig posted a day or more before its last pickup; 0 uses fee_open (b15 1.2x, b18 1.0x: median €3.9k -> €6.8k -> €10.5k on rc1)
+    "long_fee_over_weekend": True,  # False: a gig whose last pickup is on the last Monday keeps fee_open (Monday crunch, rc2)
     "fee_open_mid": 0.0,  # flat fee for a gig posted 8-24 hours before its last pickup; 0 uses fee_open
     "fee_top": 1.4,  # the schedule rises to this multiple; <= fee_open means one flat fee, which teaches no waiting
     "raise_lead": 360,  # minutes before lastPickupAt at which a still-open gig gets one raise to fee_raise; 0 is off (b7)
@@ -13,6 +14,7 @@ FLAGS = {
     "skip_trade_in": True,  # decline two-car trade-ins: 32% late on rc1 (18 of 54) against 2-7% dealer to dealer
     "skip_private": True,  # decline private pickups and deliveries: 20-23% late for next_day (b11: rc1 8/9 -> 9/9 ranked)
     "governor": True,  # risk_mode from the projected late share; tight and rescue make serviceability stricter (b7: 3/3 ranked)
+    "orders_per_driver_day": 0.0,  # cap on won orders per last-pickup day, per driver in the world; 0 is off
     "cars_per_driver_day": 0.0,  # cap on cars won per pickup town and ready day, per nearby driver; 0 is off
     "fee_ladder": 0.0,  # lab only: >0 posts every gig at one flat fee, a random multiple of the typical fee in [0.8, 0.8 + fee_ladder]
 }

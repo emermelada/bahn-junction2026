@@ -32,6 +32,9 @@ def estimate_cost(request: PriceRequest, option: DeliveryOption, state: State) -
         serviceable = False
     if FLAGS["min_slack"] and slack(request, option, state) < FLAGS["min_slack"]:
         serviceable = False
+    per_day = FLAGS["orders_per_driver_day"]
+    if per_day and orders_due_on(state, (request["respondBy"] + slack(request, option, state)) // DAY) >= per_day * len(state.ext.get("roster", [])):
+        serviceable = False
     mode = risk_mode(state, state.now)
     cap = FLAGS["max_backlog"] // 2 if mode == "tight" else FLAGS["max_backlog"]
     if cap and backlog(state) >= cap:
@@ -42,7 +45,8 @@ def estimate_cost(request: PriceRequest, option: DeliveryOption, state: State) -
         serviceable = False
     left = slack(request, option, state)
     ratio = FLAGS["fee_open"]  # what dispatch will post, by the time left to the last pickup
-    if FLAGS["fee_open_long"] and left >= DAY:
+    weekend = (request["respondBy"] + left) // DAY >= 5
+    if FLAGS["fee_open_long"] and left >= DAY and (FLAGS["long_fee_over_weekend"] or not weekend):
         ratio = FLAGS["fee_open_long"]
     elif FLAGS["fee_open_mid"] and left >= 8 * 60:
         ratio = FLAGS["fee_open_mid"]
@@ -63,6 +67,11 @@ def slack(request: PriceRequest, option: DeliveryOption, state: State) -> int:
     if delivery["privateAddress"]:
         deadline = min(deadline, delivery["window"]["to"] + 30)  # RULES: a private delivery is due 30 min after its hour
     return deadline - drive - request["respondBy"]
+
+
+def orders_due_on(state: State, day: int) -> int:
+    """Won orders whose last pickup falls on this day: the drivers of that day must move all of them."""
+    return sum(1 for o in state.orders.values() if o["status"] != "cancelled" and o["lastPickupAt"] // DAY == day)
 
 
 def backlog(state: State) -> int:
