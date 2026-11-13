@@ -468,7 +468,11 @@ class Desk:
         avg_price = (self.sum_won_price + 8500 * 10) / (self.n_won_quoted + 10)
         future = rate * remaining * win_share * avg_price
         t = self.trust[dealer]
-        return (0.01 * future if t < 25 else 0.0), 0.01 * (t - t // 2) * future
+        lost = t - t // 2
+        # Each later on-time order wins one point back, so the loss fades: about sum(1..lost)% of one price,
+        # unless the dealer sends too few orders to rebuild it this week.
+        loss = min(0.01 * lost * future, 0.01 * lost * (lost + 1) / 2 * avg_price)
+        return (0.01 * future if t < 25 else 0.0), loss
 
     def backlog(self, place: str) -> int:
         """Our gigs near this pickup that no driver holds yet: the live sign that local drivers are used up."""
