@@ -1,0 +1,7 @@
+.env
+node_modules/
+runs/
+reveal-*/
+*.log
+data/**/events.csv
+data/**/views.csv
