@@ -25,6 +25,11 @@ class Config:
     only_next_if_no_same: bool = False # quote next_day only when we do not quote same_day (next_day cars cost more)
     trust_loss_w: float = 0.0          # charge (1 - P(on time)) x the trust a late car would cost this dealer
     protect_trust_cents: int = 0       # a dealer's trust at stake above this: escalate as normal (x2: as rescue)
+    trust_invest: bool = False         # big dealers under 25 trust: win their safe cars at P(win) ~ invest_pwin (Mon-Wed)
+    invest_share: float = 0.08         # a dealer with at least this share of all requests
+    invest_pwin: float = 0.8
+    invest_p_ok: float = 0.93
+    invest_min_margin_cents: int = 300
     trust_bonus: float = 0.0           # weight of dealer-trust value in the quote (1 = full expected value)
     gate_bonus_cents: int = 0          # value of one more safe on-time order when the projection is under target
     gate_target: float = 0.935

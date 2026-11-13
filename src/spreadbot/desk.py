@@ -436,6 +436,15 @@ class Desk:
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 info.append(f"{kind}:noev")
                 continue
+            if cfg.trust_invest and self.investing(dealer, p_ok):
+                # Build a big dealer's trust fast: win its safe cars with high probability while each still
+                # makes money; once the count is at 25, normal pricing (times 1.25) takes over by itself.
+                place = r["legs"][0]["pickup"]["placeId"]
+                r_inv = self.market.mu_for(dealer, day, place) - math.log(cfg.invest_pwin / (1 - cfg.invest_pwin)) / cfg.win_slope
+                margin_inv = opt["listPriceCents"] * r_inv * tf * (1 - risk_frac) - cost - (cfg.shadow_cents + congestion + load_cost)
+                if cfg.min_ratio <= r_inv < ratio and margin_inv > cfg.invest_min_margin_cents:
+                    ratio = r_inv
+                    info.append("invest")
             prices[kind] = int(round(opt["listPriceCents"] * ratio * tf))
             meta[kind] = p_ok
             info.append(f"{kind}:r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f},L={load:.3f}")
@@ -473,6 +482,12 @@ class Desk:
         """Our orders due on this day (won, not cancelled), over the number of drivers in the world."""
         n = self.due_count.get(day, 0)
         return n / max(1, len(self.roster))
+
+    def investing(self, dealer: str, p_ok: float) -> bool:
+        """A dealer worth building trust with: a big share of the requests, count under 25, a safe car."""
+        total = sum(self.dealer_requests.values())
+        return (self.level >= 8 and total >= 30 and self.trust[dealer] < 25 and p_ok >= self.cfg.invest_p_ok
+                and self.dealer_requests[dealer] / total >= self.cfg.invest_share and self.now < 3 * DAY)
 
     def trust_value(self, dealer: str) -> tuple[float, float]:
         """(gain, loss) in cents: 1% of this dealer's expected revenue for the rest of the week, for one more
