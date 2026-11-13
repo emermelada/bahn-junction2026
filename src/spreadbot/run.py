@@ -198,25 +198,35 @@ def run_live(world, client, geo, cfg: Config, logf, clock) -> bool:
     flush(world, desk, logf)
     last_seq = history[-1]["seq"] if history else -1
     day = desk.now // DAY
-    last_tick = time.time()
-    for e in world.stream(after=last_seq, idle=1.0):
+    last_tick = last_flush = last_event = time.time()
+    for e in world.stream(after=last_seq, idle=0.25):
+        t = time.time()
         if e is not None:
             if e["seq"] <= last_seq:
                 continue
             last_seq = e["seq"]
             desk.now = max(desk.now, e["at"])
             desk.handle(e)
-        if e is None or time.time() - last_tick > 2.0:
-            if e is None:
-                desk.now = max(desk.now, clock())
+            last_event = t
+        elif t - last_event > 2.0:
+            desk.now = max(desk.now, clock())  # a quiet stream: read the clock (one read token)
+            last_event = t
+        if t - last_tick > 2.0:
             desk.tick()
-            last_tick = time.time()
-        flush(world, desk, logf)
+            last_tick = t
+        # Batch: one actions call per 0.3 s at most, or at once when the stream is quiet. A price
+        # request has 4.5 real seconds, so a short wait costs nothing and saves the action bucket.
+        if desk.outbox and (e is None or t - last_flush > 0.3):
+            flush(world, desk, logf)
+            last_flush = time.time()
+        elif desk.log and t - last_flush > 1.0:
+            flush(world, desk, logf)
         if desk.now // DAY > day:
             day = desk.now // DAY
             s = world.score()
             print(f"day {day} margin {s['marginCents']/100:.2f} orders {s['wonOrders']} on-time {s['onTimeShare']:.3f}", flush=True)
         if desk.now >= snapshot["endsAt"]:
+            flush(world, desk, logf)
             return True
     return True
 

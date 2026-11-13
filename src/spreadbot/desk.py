@@ -356,6 +356,9 @@ class Desk:
         tf = self.trust_factor(dealer)
         day = r["respondBy"] // DAY
         bar = self.gov.bar()
+        gate = 0.0
+        if cfg.gate_bonus_cents and self.won_count >= 30:
+            gate = cfg.gate_bonus_cents * min(1.0, max(0.0, (cfg.gate_target - self.gov.projection()) / cfg.gate_span))
         cal = self.gov.calibration() if cfg.calibrate else 1.0
         cost = r["referenceFeeCents"] * self.cost_mult()
         backlog = self.backlog(r["legs"][0]["pickup"]["placeId"])
@@ -376,6 +379,9 @@ class Desk:
             risk_frac = (1 - p_ok) * cfg.late_cost_frac
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain)
+            # Under the on-time target, a safe car is worth more than its margin: it dilutes the late ones.
+            if gate and p_ok >= cfg.gate_safe_p:
+                trust_adj -= gate
             ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, cost, risk_frac, cfg.shadow_cents + congestion + trust_adj)
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 info.append(f"{kind}:noev")
@@ -521,7 +527,7 @@ class Desk:
         if cfg.experiment_fee and not ob.urgent:
             ratio = cfg.exp_fee_ratios[int(h01("f", ob.order["id"]) * len(cfg.exp_fee_ratios))]
             return [{"at": now, "feeCents": max(1, int(round(base * ratio)))}]
-        last = ob.order["lastPickupAt"]
+        last = self.last_pickup(ob, legs)
         if cfg.late_plan and self.is_late(ob, legs):
             # Already late: on-time is lost, only the refund tier and delivery matter. No steep fees.
             return dedupe([{"at": now + int(h * HOUR), "feeCents": max(1, int(round(base * m)))} for h, m in cfg.late_plan])
@@ -545,6 +551,17 @@ class Desk:
             out.append({"at": now + int(span * frac), "feeCents": fee})
             prev = fee
         return dedupe(out)
+
+    def last_pickup(self, ob: OrderBook, legs: list[int]) -> int:
+        """The world's lastPickupAt, made earlier by a note's tighter deadline (the world's does not count it)."""
+        o = ob.order
+        last = o["lastPickupAt"]
+        for l in legs:
+            n = self.leg_note(o["id"], l)
+            if n.deadline and n.deadline < o["deadline"]:
+                L = o["legs"][l]
+                last = min(last, n.deadline - self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) - 20)
+        return last
 
     def is_late(self, ob: OrderBook, legs: list[int]) -> bool:
         """No pickup from now on can make the deadline of these legs."""
@@ -674,6 +691,14 @@ class Desk:
             if ob.order["status"] == "cancelled":
                 continue
             self.dispatch_order(oid, "tick")
+        if self.cfg.own_alarm:
+            for rec in list(self.gigs.values()):
+                if rec.status != "open" or rec.escalated:
+                    continue
+                ob = self.orders.get(rec.legs[0][0])
+                if ob and self.last_pickup(ob, [l for _, l in rec.legs]) - self.now < self.cfg.alarm_minutes:
+                    ob.urgent = True
+                    self.escalate_gig(rec, "alarm")
         if self.cfg.viewer_offers:
             self.offer_viewers()
 

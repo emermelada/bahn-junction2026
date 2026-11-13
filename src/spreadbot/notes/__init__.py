@@ -46,8 +46,8 @@ NOT_BEFORE = _rx(r"(?:\bnot|\bei|\binte|\bej)\s+(?:ennen|before|fore|innan|earli
 PICKUP = _rx(r"haettava\b|\bhaku\b|\bhak[ea]\w*|\bhae\w*|\bnouto\w*|noudettava\b|\bnoud[ae]\w*|\bnout\w*"
              r"|collect\w*|pick ?-?up\w*|\bhamt\w*")
 BEFORE = _rx(r"ennen|\bb[ef]{1,3}o?r?e\b|\bby\b|viim\w*|\bfore\b|innan|senast|latest|mennessa")
-DELIV = _rx(r"\bpe+ril+\w*|vastaan\w*|v\w?staan\w*|\bkohde\w*|\bkohtee\w*|toimit\w*|destin\w*|\br\w{0,2}c\w{0,3}v(?:e|ing|ed)\w*"
-            r"|recipient|deliver\w*|arriv\w*|framme|mottag\w*|lever[ae]\w*|drop.?off|deadline|takaraja"
+DELIV = _rx(r"\bpe+ril+\w*|vastaan\w*|v\w?staan\w*|\bkohde\w*|\bkohtee\w*|toimit\w*|destin\w*"
+            r"|\br\w{0,2}c\w{0,3}v(?:e|ing|ed)\w*|recipient|deliver\w*|arriv\w*|framme|mottag\w*|lever[ae]\w*|drop.?off|deadline|takaraja"
             r"|\bdue\b|be there|on site|needs? (?:it|the car)|tarvit\w*|behov\w*")
 PHONE = _rx(r"\b(?:soita\w*|call\w*|ring|ringa\w*|ilmoita\w*|text|sms|tekstaa)\b.*")
 ANAPHOR = _rx(r"\b(?:sita|sen|that|det|then|silloin|sitten|da)\b")  # 'by then', 'sen jalkeen'
@@ -119,7 +119,7 @@ WORD_SHIFT = {"puoli": -30, "puolta": -30, "half": -30, "halv": -30, "half past"
 NEXT_TIME = (r"\s*(?:klo|kl\b|kello|klockan|at\b|\d{1,2}[.:]\d{2}|\d{1,2}\s*(?:[ap]\.?m\b|alkaen|jalkeen|asti"
              r"|mennessa)|puol\w*|half\b|halv\b|(?:" + "|".join(p for _, p in WORD_NUM) + r")\b)")
 WD_SHORT = _rx(r"\b(tues|thurs|thur|weds|mon|tue|wed|thu|fri|sat|sun|man|tis|ons|tors|tor|fre|lor|son"
-               rf"|ma|ti|ke|to|pe|la|su)\b(\.?)(?={NEXT_TIME}|\s*\d|\s*$)")
+               rf"|ma|ti|ke|to|pe|la|su)\b(\.?)(?={NEXT_TIME}|\s*\d|\s*,|\s*$)")
 
 _TRANS = str.maketrans({"ä": "a", "å": "a", "ö": "o", "–": "-", "—": "-", "’": "'", "é": "e"})
 _ABBR = {"viim", "n", "oik", "t", "klo", "kl", "nro", "esim", "ns", "ca", "noin", "puh", "tel", "nr", "no"}
@@ -288,17 +288,21 @@ def _facts(text: str, arr: int, lang: str) -> tuple[list[tuple], set[str]]:
     flags: set[str] = set()
     arr_day, arr_wd = arr // DAY, (arr // DAY) % 7
     prev: list[str] = []
+    last: tuple[int | None, int] | None = None  # (day, time) of the last piece that named a time
+    orphan: tuple | None = None  # 'uncertain' of a time no fact used yet ('maksaa klo 12.30, luovutus sen jalkeen')
     for sent in _sentences(_norm(text)):
         for m in MANUAL.finditer(sent):
             if not NEG_WORD.search(sent[:m.start()]):
                 flags.add("manual")
         if NOT_AUTO.search(sent):  # 'ei automaatti' = manual
             flags.add("manual")
-        if PAY.search(sent) and HANDOVER.search(sent):  # 'payment pending, handover from 11'
+        paid = bool(PAY.search(sent) and HANDOVER.search(sent))  # 'payment pending, handover from 11'
+        if paid:
             facts.append(("release", None, None, -1))
         if PLATES.search(sent):
             flags.add("plates")
-        if NO_WINTER.search(sent) or WINTER_OFF.search(sent) or (SUMMER.search(sent) and (MOUNTED.search(sent) or not LOOSE.search(sent))):
+        if NO_WINTER.search(sent) or WINTER_OFF.search(sent) \
+                or (SUMMER.search(sent) and (MOUNTED.search(sent) or not LOOSE.search(sent))):
             flags.add("summer")
         pieces = _pieces(sent)
         if prev and pieces and CORR.match(pieces[0]) and _kind(pieces[0]) is None:
@@ -308,6 +312,8 @@ def _facts(text: str, arr: int, lang: str) -> tuple[list[tuple], set[str]]:
             idx = len(prev)
             prev.append(piece)
             kind = _kind(piece)
+            if kind is None and paid and PAY.search(piece):
+                kind = "release"  # 'rahoitus vahvistuu huomenna 13.30': the payment time is the handover time
             site = "delivery" if DELIV.search(piece) else "pickup"
             ranges, rest = _ranges(piece)
             weekday = [r[:2] for r in ranges if not r[2]]
@@ -321,29 +327,35 @@ def _facts(text: str, arr: int, lang: str) -> tuple[list[tuple], set[str]]:
             day = _day(rest, arr_wd, lang)
             if kind == "release":
                 facts.append(("release", None, None, idx))
-            if not times:
+            if times:
+                t = times[-1]  # a correction comes last: 'klo 8, ei kun klo 9'
+                last = (day, t)
+            elif kind in ("ready", "release", "deadline", "close", "open") and last and ANAPHOR.search(rest):
+                day, t = (day if day is not None else last[0]), last[1]  # 'must be there by then'
+                if orphan in facts:
+                    facts.remove(orphan)
+            else:
                 if kind in ("ready", "release", "deadline") and (day or PART_OF_DAY.search(rest)) \
                         and not ANAPHOR.search(rest):
                     facts.append(("uncertain", None, None, idx))
                     if kind != "deadline" and day:  # 'valmis vasta torstaina': not before that day
                         facts.append((kind, None, (arr_day + day) * DAY, idx))
                 continue
-            t = times[-1]  # a correction comes last: 'klo 8, ei kun klo 9'
             if kind in ("ready", "release", "deadline"):
                 facts.append((kind, None, (arr_day + (day or 0)) * DAY + t, idx))
             elif kind in ("close", "open"):
                 facts.append((kind, site, t, idx))
             else:
-                facts.append(("uncertain", None, None, idx))
+                orphan = ("uncertain", None, None, idx)
+                facts.append(orphan)
     return facts, flags
 
 
 def read_note(request: dict) -> list[LegNote]:
     """One LegNote per leg of a PriceRequest (dict as in `price_request`). Never raises.
 
-    Legs: ready time, payment and pickup hours go to the first leg's pickup (and any non-private pickup at
-    the same site); receiving hours to every non-private delivery; the deadline and the car facts (manual,
-    plates, summer tyres) to every leg, the cautious reading for a trade-in."""
+    Every fact goes to the first leg, the dealer's car: in a trade-in the world applies the note to the new
+    car only (reveal of other weeks: plates and pickup hours on leg 0, nothing on the old car's leg)."""
     try:
         return _read(request)
     except Exception:  # fail safe: a note we cannot read must not stop quoting
@@ -379,20 +391,18 @@ def _read(request: dict) -> list[LegNote]:
         else:
             uncertain = True
     uncertain |= after_payment and release is None and ready is None  # paid handover, time unknown
-    first_site = legs[0]["pickup"]["placeId"]
-    for i, (leg, ln) in enumerate(zip(legs, out)):
-        pu, de = leg["pickup"], leg["delivery"]
-        ln.manual, ln.plates, ln.summer_tyres = "manual" in flags, "plates" in flags, "summer" in flags
+    if deadline is not None and (latest is None or deadline < latest):
+        uncertain |= deadline <= request["arrivedAt"]
+    else:
+        deadline = None  # not tighter than every option: the note sets no deadline
+    pu, de = legs[0]["pickup"], legs[0]["delivery"]
+    t = max(x for x in (ready, release, -1) if x is not None)
+    out[0] = LegNote(ready_at=t if t > pu["window"]["from"] else None, after_payment=after_payment,
+                     pickup_hours=_site_hours(pu, hours["pickup"]), delivery_hours=_site_hours(de, hours["delivery"]),
+                     deadline=deadline, manual="manual" in flags, plates="plates" in flags,
+                     summer_tyres="summer" in flags)
+    for ln in out:
         ln.uncertain = uncertain
-        if i == 0 or (pu["placeId"] == first_site and not pu["privateAddress"]):
-            ln.after_payment = after_payment
-            t = max(x for x in (ready, release, -1) if x is not None)
-            ln.ready_at = t if t > pu["window"]["from"] else None
-        ln.pickup_hours = _site_hours(pu, hours["pickup"]) if pu["placeId"] == first_site else None
-        ln.delivery_hours = _site_hours(de, hours["delivery"])
-        if deadline is not None and (latest is None or deadline < latest):
-            ln.deadline = deadline
-            ln.uncertain |= deadline <= request["arrivedAt"]
     return out
 
 

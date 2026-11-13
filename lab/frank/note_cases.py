@@ -168,12 +168,34 @@ CASES = [
     ("fi", "Noudettavissa maanantaina klo 9", dict(ready_at=at(7,9)), {"arr": SAT_ARR}),
     ("en", "Ready Wed 8:00", dict(ready_at=at(9,8)), {"arr": FRI_ARR}),
     ("fi", "Haettava ennen klo 15", dict(), {"ppriv": True}),
-    ("fi", "Vastaanotto klo 16 asti", dict(), {"dpriv": True}),]
+    ("fi", "Vastaanotto klo 16 asti", dict(), {"dpriv": True}),
+    # second round: variants of the holdout patterns, not taken from any note
+    ("en", "must arrive by tommorow 15:00", dict(deadline=at(WED, 15))),
+    ("en", "ready tomorow 11:00", dict(ready_at=at(WED, 11))),
+    ("fi", "valmis huomeenna klo 12", dict(ready_at=at(WED, 12))),
+    ("fi", "Liike sulkee klo 16", dict(pickup_hours=(420, 960))),
+    ("fi", "Vastaanotto sulkeutuu klo 16.30", dict(delivery_hours=(420, 990))),
+    ("fi", "kohde sulkee neljältä", dict(delivery_hours=(420, 960))),
+    ("fi", "haettava ennen puolta neljää", dict(pickup_hours=(420, 930))),
+    ("fi", "valmis to puoli kaksi", dict(ready_at=at(THU, 13, 30))),
+    ("fi", "noudettavissa pe kymmenestä alkaen", dict(ready_at=at(FRI, 10))),
+    ("fi", "Maksu tulee perjantaina klo 10, auton saa sen jälkeen", dict(after_payment=True, ready_at=at(FRI, 10))),
+    ("en", "Financing confirmed tomorrow 11:00, pick up only after that", dict(after_payment=True,
+                                                                               ready_at=at(WED, 11))),
+    ("en", "Customer collects it Friday 15:00, has to be there by then", dict(deadline=at(FRI, 15))),
+    ("fi", "perillä viim. to klo 14. Korjaus: pe.", dict(deadline=at(FRI, 14))),
+    ("en", "recieving weekdays 9-15 only", dict(delivery_hours=(540, 900))),
+    ("en", "No one here after 17:00", dict(pickup_hours=(420, 1020))),
+    ("en", "Winter tyres missing", dict(summer_tyres=True)),
+    ("fi", "Talvirenkaat puuttuu vielä", dict(summer_tyres=True)),
+    ("en", "deliver the day after tomorrow by 2pm", dict(deadline=at(THU, 14))),
+    ("sv", "Ingen brådska", dict()),
+]
 
 
 def trade_in() -> list[str]:
-    """Two legs: new car dealer a -> customer b, old car b -> dealer a. Pickup facts go to the dealer's
-    pickup, receiving hours to the dealer's delivery, deadline and car facts to both legs."""
+    """Two legs: new car dealer a -> customer b, old car b -> dealer a. Every fact belongs to the new car
+    (leg 0), as the reveal of other weeks shows; its delivery is private, so receiving hours drop out."""
     a = at(TUE, 10)
     req = request("Valmis klo 14. Vastaanotto klo 16 asti. Liike kiinni klo 18. Manuaali. "
                   "Perillä huomenna klo 12 mennessä", "fi")
@@ -181,7 +203,7 @@ def trade_in() -> list[str]:
                                               "window": {"from": at(WED, 9), "to": at(WED, 10)}, "hours": None}
     req["legs"] = [{"pickup": dealer, "delivery": home}, {"pickup": home, "delivery": dealer}]
     want = [LegNote(ready_at=a + 240, pickup_hours=(420, 1080), deadline=at(WED, 12), manual=True),
-            LegNote(delivery_hours=(420, 960), deadline=at(WED, 12), manual=True)]
+            LegNote()]
     got = read_note(req)
     return [f"trade-in leg {i}: ours {g} want {w}" for i, (g, w) in enumerate(zip(got, want)) if g != w]
 

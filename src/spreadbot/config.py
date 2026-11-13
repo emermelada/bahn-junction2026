@@ -21,6 +21,10 @@ class Config:
     cost_prior: float = 1.15           # expected fee over typical fee with fee_plan (research: 0.9 books 64% in time)
     cost_prior_n: int = 30
     trust_bonus: float = 0.0           # weight of dealer-trust value in the quote (1 = full expected value)
+    gate_bonus_cents: int = 0          # value of one more safe on-time order when the projection is under target
+    gate_target: float = 0.935
+    gate_span: float = 0.02            # full bonus this far under target
+    gate_safe_p: float = 0.95
     # --- on-time selection
     ontime_fee_assumed: float = 1.6    # the fee the on-time model assumes (fee_plan reaches about this)
     ontime_shift: float = 0.0
@@ -48,7 +52,9 @@ class Config:
     gov_relaxed: float = 0.955         # above this projection, a car is not worth saving at any price
     steep_relaxed: tuple = (1.6, 1.9, 2.2)
     steep_rescue: tuple = (2.0, 2.5, 3.0, 3.5, 4.0)
-    late_plan: tuple = ()              # e.g. ((0, 1.2), (4, 1.5), (12, 2.0)): fees for a car that is late anyway
+    late_plan: tuple = ()
+    own_alarm: bool = False            # escalate 3 h before the effective last pickup (note deadlines included)
+    alarm_minutes: int = 180              # e.g. ((0, 1.2), (4, 1.5), (12, 2.0)): fees for a car that is late anyway
     use_offers: bool = True            # offers to drivers near the pickup on a deadline warning
     viewer_offers: bool = False        # offers to drivers who viewed an unbooked gig
     offer_after: int = 20              # minutes a gig is open before its viewers get offers
