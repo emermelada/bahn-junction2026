@@ -26,6 +26,10 @@ def estimate_cost(request: PriceRequest, option: DeliveryOption, state: State) -
         cap = FLAGS["cars_per_driver_day"]
         if cap and won_cars(state, town, day) + 1 > cap * near:
             serviceable = False
+    if FLAGS["skip_trade_in"] and len(request["legs"]) == 2:
+        serviceable = False
+    if FLAGS["skip_private"] and any(leg["pickup"]["privateAddress"] or leg["delivery"]["privateAddress"] for leg in request["legs"]):
+        serviceable = False
     if FLAGS["min_slack"] and slack(request, option, state) < FLAGS["min_slack"]:
         serviceable = False
     mode = risk_mode(state, state.now)
