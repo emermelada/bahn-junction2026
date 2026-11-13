@@ -73,11 +73,12 @@ def decide(state: State, requests: list[dict]) -> list[Action]:
 
 
 def play(level: int, seed: Optional[str], client: Optional[Client] = None, world_map: Optional[WorldMap] = None,
-         tag: str = "") -> dict[str, Any]:
+         tag: str = "", board: bool = False) -> dict[str, Any]:
     client = client or Client()
     world_map = world_map or client.map()
     started = time.monotonic()
-    world = create_world(client, level, seed)
+    # A ranking run (board) counts in the practice rankings and plays to its end even if deleted: humans start it.
+    world = client.create(level=level, board=True) if board else create_world(client, level, seed)
     run_dir = os.path.join(RUNS, world.id)
     os.makedirs(run_dir, exist_ok=True)
     meta = {"worldId": world.id, "seed": seed, "level": level, "tag": tag, "commit": commit()}
@@ -111,7 +112,8 @@ def play(level: int, seed: Optional[str], client: Optional[Client] = None, world
         score = world.score()
     except BaseException:
         try:
-            world.delete()  # an unfinished world holds one of the team's 8 slots
+            if not board:  # deleting a ranking run does not remove it: it plays to its end without us and counts
+                world.delete()  # an unfinished world holds one of the team's 8 slots
         finally:
             declog.close()
         raise
@@ -154,8 +156,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Play one practice week.")
     parser.add_argument("--level", type=int, default=8, choices=range(1, 9))
     parser.add_argument("--seed")
+    parser.add_argument("--board", action="store_true", help="play the team's next ranking run; it counts on the leaderboard")
     args = parser.parse_args()
-    r = play(args.level, args.seed)
+    r = play(args.level, args.seed, tag="board" if args.board else "", board=args.board)
     print(f"{r['worldId']} seed={r['seed']} L{r['level']}  margin €{r['marginCents'] / 100:,.2f}  on time {r['onTimeShare']:.1%}  "
           f"orders {r['wonOrders']}  ranked={r['ranked']}  {r['steps']} steps {r['seconds']}s  {r['runDir']}")
 

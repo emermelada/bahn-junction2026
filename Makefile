@@ -6,7 +6,7 @@ PY := PYTHONPATH=src .venv/bin/python
 LEVEL ?= 8
 SEED ?= dev-01
 
-.PHONY: setup test check play sweep compare emulate chaos final
+.PHONY: setup test check play board sweep compare emulate chaos final
 SET ?= dev
 TAG ?= adhoc
 N ?= 20
@@ -22,6 +22,10 @@ check: test
 
 play:
 	$(PY) -m spreadbot.runtime.practice_runner --level $(LEVEL) --seed $(SEED)
+
+# The team's next ranking run at LEVEL (default 8). Counts on the leaderboard; cannot be undone. Humans only.
+board:
+	$(PY) -m spreadbot.runtime.practice_runner --level $(LEVEL) --board
 
 sweep:
 	$(PY) harness/sweep.py --set $(SET) --n $(N) --tag $(TAG)
