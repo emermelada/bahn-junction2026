@@ -85,6 +85,7 @@ class Desk:
         self.open_offers: dict[str, int] = defaultdict(int)  # gig -> open offers
         self.offered: set[tuple[str, str]] = set()  # (gig, driver)
         self.gig_viewers: dict[str, list[str]] = {}  # gig -> drivers who viewed it, in order
+        self.bundle_last: dict[str, int] = {}  # order -> last minute to start its bundle
         self.offer_log: list[tuple[str, str, float, int]] = []  # (gig, driver, fee over base, minute)
         self.positions: dict[str, tuple[str, int]] = {}  # driver -> (place, minute), from our gigs
         self.viewers: dict[str, int] = {}  # driver -> last minute seen in the app
@@ -213,7 +214,7 @@ class Desk:
             rec.status, rec.driver, rec.fee = "booked", e["driverId"], e["feeCents"]
             ob = self.orders.get(rec.legs[0][0])
             if ob:
-                self.book_ratios.append(e["feeCents"] / max(1.0, self.base_fee(ob, [l for _, l in rec.legs])))
+                self.book_ratios.append(e["feeCents"] / max(1.0, self.gig_base(rec)))
             self.say("BOOKED", f"{rec.id} {e['driverId']} {e['feeCents']}")
 
     def on_offer_answered(self, e: dict) -> None:
@@ -444,11 +445,94 @@ class Desk:
         legs = [l for l in self.undelivered(oid) if (oid, l) not in self.leg_gig and not self._pending(oid, l)]
         if not legs:
             return
+        if self.cfg.bundle and why == "won" and len(ob.order["legs"]) == 1 and self.try_bundle(ob):
+            return
         groups = [legs]
         if len(legs) == 2 and self.trade_minutes(ob.order) > 12 * HOUR - 10:
             groups = [[l] for l in legs]
         for g in groups:
             self.post(ob, g, why)
+
+    # ------------------------------------------------------------------ bundles
+    def simple(self, ob: OrderBook) -> bool:
+        """One car, dealer sites at both ends, a note that changes nothing: safe to chain."""
+        o = ob.order
+        if len(o["legs"]) != 1 or ob.urgent or ob.retry_from or ob.manual or ob.plates:
+            return False
+        L = o["legs"][0]
+        if L["pickup"]["privateAddress"] or L["delivery"]["privateAddress"]:
+            return False
+        n = self.leg_note(o["id"], 0)
+        return not (n.ready_at or n.after_payment or n.pickup_hours or n.delivery_hours or n.deadline
+                    or n.manual or n.plates or n.summer_tyres or n.uncertain)
+
+    def chain(self, A: OrderBook, B: OrderBook) -> Optional[int]:
+        """If one driver can take A's car and then B's car, both on time with room to spare: the last
+        minute to start the chain. None if not."""
+        cfg, geo = self.cfg, self.geo
+        LA, LB = A.order["legs"][0], B.order["legs"][0]
+        if geo.air(LA["delivery"]["placeId"], LB["pickup"]["placeId"]) > cfg.bundle_km:
+            return None
+        dA = geo.drive(LA["pickup"]["placeId"], LA["delivery"]["placeId"])
+        tr = geo.drive(LA["delivery"]["placeId"], LB["pickup"]["placeId"])
+        dB = geo.drive(LB["pickup"]["placeId"], LB["delivery"]["placeId"])
+        if dA + tr + dB > 12 * HOUR - 30:
+            return None
+        start = max(self.now + cfg.bundle_lead, LA["pickup"]["window"]["from"])
+        a_del = start + dA
+        if a_del > self.deadline(A.order, 0) - cfg.bundle_margin:
+            return None
+        b_pick = max(a_del + tr, LB["pickup"]["window"]["from"])
+        if b_pick > LB["pickup"]["window"]["to"] or b_pick + dB > self.deadline(B.order, 0) - cfg.bundle_margin:
+            return None
+        last = min(self.last_pickup(A, [0]), self.last_pickup(B, [0]) - dA - tr)
+        if last - self.now < cfg.bundle_min_slack:
+            return None
+        return last
+
+    def try_bundle(self, ob: OrderBook) -> bool:
+        if not self.simple(ob):
+            return False
+        best = None
+        for rec in self.gigs.values():
+            if rec.status != "open" or rec.escalated or len(rec.legs) != 1 or self.now - rec.posted_at > self.cfg.bundle_window:
+                continue
+            other = self.orders.get(rec.legs[0][0])
+            if not other or other is ob or not self.simple(other):
+                continue
+            for first, second in ((ob, other), (other, ob)):
+                last = self.chain(first, second)
+                if last is not None and (best is None or last > best[0]):
+                    best = (last, first, second, rec)
+        if not best:
+            return False
+        last, first, second, rec = best
+        self.withdraw(rec.id)
+        stops = self.stops_for(first, 0) + self.stops_for(second, 0)
+        audience = {"experienced": any(x.order["legs"][0]["car"]["premium"] for x in (first, second)), "manualLicence": False}
+        base = (self.base_fee(first, [0]) + self.base_fee(second, [0])) * self.cfg.bundle_mult
+        out = [{"at": self.now, "feeCents": int(round(base * self.cfg.fee_open))}]
+        prev = out[0]["feeCents"]
+        for hours_before, mult in self.cfg.fee_rel:
+            fee = max(prev, int(round(base * mult)))
+            out.append({"at": max(self.now + self.cfg.fee_hold, last - int(hours_before * HOUR)), "feeCents": fee})
+            prev = fee
+        sched = dedupe(sorted(out, key=lambda x: (x["at"], x["feeCents"])))
+        action = {"type": "post", "stops": stops, "audience": audience, "schedule": sched}
+        self.outbox.append(action)
+        self.pending_posts.append((action, "bundle"))
+        self.bundle_last[first.order["id"]] = last
+        self.bundle_last[second.order["id"]] = last
+        self.say("BUNDLE", first.order["id"] + "+" + second.order["id"] + f" last={last} fee0={sched[0]['feeCents']}")
+        return True
+
+    def unbundle(self, rec: GigRec, why: str) -> None:
+        self.say("UNBUNDLE", f"{rec.id} {why}")
+        oids = sorted({o for o, _ in rec.legs})
+        self.withdraw(rec.id)
+        for oid in oids:
+            if oid in self.orders:
+                self.dispatch_order(oid, "unbundle-" + why)
 
     def _pending(self, oid: str, leg: int) -> bool:
         return any(s["orderId"] == oid and s["leg"] == leg for a, _ in self.pending_posts for s in a["stops"])
@@ -515,6 +599,15 @@ class Desk:
         if n.deadline and n.deadline < d:
             d = n.deadline
         return d
+
+    def gig_base(self, rec: GigRec) -> float:
+        """The typical fee of every car in a gig, summed (a bundle carries cars of two orders)."""
+        total = 0.0
+        for oid, leg in rec.legs:
+            r = self.requests.get(oid)
+            if r:
+                total += r["referenceFeeCents"] / len(r["legs"])
+        return total or 5000.0
 
     def base_fee(self, ob: OrderBook, legs: list[int]) -> float:
         r = self.requests.get(ob.order["id"])
@@ -586,6 +679,9 @@ class Desk:
 
     def escalate_gig(self, rec: GigRec, why: str) -> None:
         if rec.status != "open":
+            return
+        if len({o for o, _ in rec.legs}) > 1:
+            self.unbundle(rec, why)
             return
         legs = rec.legs
         oid = legs[0][0]
@@ -691,6 +787,12 @@ class Desk:
             if ob.order["status"] == "cancelled":
                 continue
             self.dispatch_order(oid, "tick")
+        if self.cfg.bundle:
+            for rec in list(self.gigs.values()):
+                if rec.status == "open" and len({o for o, _ in rec.legs}) > 1:
+                    last = min(self.bundle_last.get(o, 0) for o, _ in rec.legs)
+                    if last - self.now < self.cfg.unbundle_minutes:
+                        self.unbundle(rec, "timeout")
         if self.cfg.own_alarm:
             for rec in list(self.gigs.values()):
                 if rec.status != "open" or rec.escalated:

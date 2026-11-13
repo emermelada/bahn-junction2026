@@ -62,6 +62,15 @@ class Config:
     offer_mult_urgent: float = 1.8
     offer_max_km: float = 120.0
     charge_km: float = 190.0           # rule: EV < 30% on a route over 200 km needs charging; margin for road km
+    # --- bundles: two of our cars in one gig, the second picked up near where the first is delivered
+    bundle: bool = False
+    bundle_km: float = 25.0            # straight line from the first delivery to the second pickup
+    bundle_lead: int = 60              # minutes before a driver can start, when checking a chain
+    bundle_margin: int = 60            # minutes to spare before each deadline
+    bundle_min_slack: int = 6 * 60     # a chain needs this long before its last start
+    bundle_window: int = 120           # pair with gigs posted at most this many minutes ago
+    bundle_mult: float = 0.8           # one driver, no trip home in between: the pair costs less than two gigs
+    unbundle_minutes: int = 5 * 60     # unbooked this close to its last start: post the cars alone
     # --- experiments (research runs only)
     experiment_quote: bool = False
     exp_quote_lo: float = 1.0
