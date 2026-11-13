@@ -1,6 +1,7 @@
 """Driver-side switches. Each idea sits behind one, so harness/sweep.py --flag driver.<name>=<value> can ablate it."""
 FLAGS = {
     "fee_open": 1.4,  # opening fee as a multiple of the typical fee; 1.2 booked fewer in time (b5), 1.6 cost more (b3)
+    "fee_open_long": 0.0,  # flat fee for a gig posted a day or more before its last pickup; 0 uses fee_open
     "fee_top": 1.4,  # the schedule rises to this multiple; <= fee_open means one flat fee, which teaches no waiting
     "raise_lead": 360,  # minutes before lastPickupAt at which a still-open gig gets one raise to fee_raise; 0 is off (b7)
     "fee_raise": 1.8,  # that one raise, as a multiple of the typical fee

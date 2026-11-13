@@ -15,7 +15,7 @@ from spreadbot.core.state import State, legs_of
 from spreadbot.driver.flags import FLAGS
 from spreadbot.notes.reader import needs_manual, needs_plates, window_from_note
 
-HOUR = 60
+HOUR, DAY = 60, 24 * 60
 SPLIT_MINUTES = 12 * HOUR  # RULES: a gig with more than one car may plan at most 12 hours of driving
 REFUSED_BACKOFF = 30  # minutes before we try a refused post again; refusals name a window, so the next try usually differs
 
@@ -87,6 +87,8 @@ def fees(state: State, order: Order, cars: int, now: int, raised: bool = False) 
         ratio = 0.8 + rng(state.world_id, order["id"], cars).random() * FLAGS["fee_ladder"]
         return [{"at": now, "feeCents": max(1, int(fee * ratio + 0.5))}]
     lo, hi = FLAGS["fee_open"], FLAGS["fee_top"]
+    if FLAGS["fee_open_long"] and order["lastPickupAt"] - now >= DAY:  # time to wait for the cheaper drivers
+        lo, hi = FLAGS["fee_open_long"], FLAGS["fee_open_long"]
     if order["id"] in state.urgent:  # the top fee or 1.5 times at once, then a quarter more every half hour
         steps = [(k * 30, max(1.5, hi) + k / 4) for k in range(5)]
     elif raised:  # one early raise for a gig still open close to its last pickup, before the deadline warning
