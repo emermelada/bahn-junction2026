@@ -34,7 +34,11 @@ def quote(request: PriceRequest, state: State) -> dict[str, int]:
         cost = costs[o["kind"]]
         price = round(o["listPriceCents"] * trust * (ratio + FLAGS["same_day_extra"] * (o["kind"] == "same_day")))
         floor = FLAGS["min_margin_cents"]
-        if cost.serviceable and (floor is None or price - cost.fee_cents >= floor):
+        if cost.serviceable and floor is not None and price - cost.fee_cents < floor and FLAGS["max_ratio"]:
+            price = max(price, cost.fee_cents + floor)  # price to cost: let the dealer decide instead of declining
+            if price > o["listPriceCents"] * FLAGS["max_ratio"]:
+                price = 0
+        if cost.serviceable and price and (floor is None or price - cost.fee_cents >= floor):
             prices[o["kind"]] = price
         elif cost.serviceable:
             state.log(state.now, "below_floor", request["id"], option=o["kind"], margin=price - cost.fee_cents)
