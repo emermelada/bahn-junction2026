@@ -225,7 +225,22 @@ Rules for the loop (Phase 2): one component at a time; after every milestone run
 - Offer acceptance rates for relay / active / homebound candidates — decides how much capacity the ledger may credit to offers (`ACTIVE80`).
 - Does the server parallelise one team's worlds? (ms/step for 1 vs 4 concurrent runs) — decides whether parallel seeds or the step diet is the throughput lever.
 
+## 12. Estimate (5-week level-8 ranking round, all five weeks ranked)
+
+| Built through | Per week | 5 weeks |
+|---|---|---|
+| M1 (gate, capacity, ladder, governor; list price, starter fees) | €2–5k | €10–25k |
+| M3 (+ flat-then-cliff fees, rescue ladder, competitor interval, trust) | €7–11k | €35–55k |
+| M7 (+ offers/relay, bundles, guards, tuned on the gate seeds) | €11–15k | €55–75k |
+
+Point estimate for Sunday's system: €55–65k; stretch €70k+. Franco's target is €80k+ (€16k/week): above the current leader's average (€14k) but below their best week (€20.8k), so it needs every module in §6 working and the sweeps of M7 landing. The binding risk is one week under 90% on time, which zeroes the round.
+
+## 13. Status at handoff (Sat 00:30)
+
+Done: this plan; docs and kit copies; map and the spread-1 reveal tables; `src/desk-api.ts`, `src/config.ts`, `src/geo.ts`, `src/desk.ts` (starter-faithful, modules unwired), `src/books.ts`, `src/feasibility.ts`, `src/capacity.ts`, `src/governor.ts`. See `HANDOFF.md` for the file-by-file state and `PROMPT.md` for the build session's prompt.
+
 ## Changelog
 
+- 2026-11-14 00:30 — estimate (§12), status (§13), HANDOFF.md and PROMPT.md added; build handed to a new session.
 - 2026-11-13 23:45 — GitHub push works; ACTIVE prior lowered to 0.3 with an online per-pool availability estimate; relay evidence (21% natural chains) added.
 - 2026-11-13 23:20 — v1 of this plan from the rules, handbook, API, kit, the spread-1 level-8 reveal and a five-lens strategy panel with adversarial review (panel consensus folded in: quote-time capacity reservations, marginal governor test, two-sided fee learning, war guard that never lowers prices, pool-keyed capacity, offers as the Hyvinkää fix).
