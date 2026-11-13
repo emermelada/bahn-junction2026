@@ -92,6 +92,8 @@ def fees(state: State, order: Order, cars: int, now: int, raised: bool = False) 
     weekend = order["lastPickupAt"] // DAY >= 5
     if FLAGS["fee_open_long"] and left >= DAY and (FLAGS["long_fee_over_weekend"] or not weekend):  # time to wait for cheaper drivers
         lo, hi = FLAGS["fee_open_long"], FLAGS["fee_open_long"]
+    elif FLAGS["fee_open_weekend"] and weekend:
+        lo, hi = FLAGS["fee_open_weekend"], FLAGS["fee_open_weekend"]
     elif FLAGS["fee_open_mid"] and left >= MID_SLACK:
         lo, hi = FLAGS["fee_open_mid"], FLAGS["fee_open_mid"]
     if order["id"] in state.urgent:  # the top fee or 1.5 times at once, then a quarter more every half hour

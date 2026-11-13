@@ -2,7 +2,8 @@
 FLAGS = {
     "fee_open": 1.4,  # opening fee as a multiple of the typical fee; 1.2 booked fewer in time (b5), 1.6 cost more (b3)
     "fee_open_long": 1.0,  # flat fee for a gig posted a day or more before its last pickup; 0 uses fee_open (b15 1.2x, b18 1.0x: median €3.9k -> €6.8k -> €10.5k on rc1)
-    "long_fee_over_weekend": True,  # False: a gig whose last pickup is on the last Monday keeps fee_open (Monday crunch, rc2)
+    "long_fee_over_weekend": False,  # True lets a gig due after the weekend open at fee_open_long (rc2: 8/12 ranked; False: 12/12)
+    "fee_open_weekend": 0.0,  # flat fee for a gig whose last pickup is after the weekend; 0 uses fee_open
     "fee_open_mid": 0.0,  # flat fee for a gig posted 8-24 hours before its last pickup; 0 uses fee_open
     "fee_top": 1.4,  # the schedule rises to this multiple; <= fee_open means one flat fee, which teaches no waiting
     "raise_lead": 360,  # minutes before lastPickupAt at which a still-open gig gets one raise to fee_raise; 0 is off (b7)

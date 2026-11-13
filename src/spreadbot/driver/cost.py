@@ -48,6 +48,8 @@ def estimate_cost(request: PriceRequest, option: DeliveryOption, state: State) -
     weekend = (request["respondBy"] + left) // DAY >= 5
     if FLAGS["fee_open_long"] and left >= DAY and (FLAGS["long_fee_over_weekend"] or not weekend):
         ratio = FLAGS["fee_open_long"]
+    elif FLAGS["fee_open_weekend"] and weekend:
+        ratio = FLAGS["fee_open_weekend"]
     elif FLAGS["fee_open_mid"] and left >= 8 * 60:
         ratio = FLAGS["fee_open_mid"]
     fee = round(request["referenceFeeCents"] * ratio)
