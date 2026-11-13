@@ -8,6 +8,11 @@ FLAGS = {
     "fee_top": 1.4,  # the schedule rises to this multiple; <= fee_open means one flat fee, which teaches no waiting
     "raise_lead": 360,  # minutes before lastPickupAt at which a still-open gig gets one raise to fee_raise; 0 is off (b7)
     "fee_raise": 1.8,  # that one raise, as a multiple of the typical fee
+    "bundle": False,  # post two single cars as one chain when car A delivers near car B's pickup
+    "bundle_factor": 0.8,  # the chain's fee as a share of the two single fees
+    "bundle_hold": 120,  # minutes a new car waits for a partner before it is posted alone
+    "bundle_slack": 480,  # only cars with at least this many minutes to their last pickup wait for a partner
+    "bundle_gap": 45,  # road minutes at most from car A's delivery to car B's pickup
     "min_drivers_near": 0,  # decline pickups with fewer drivers living within 30 km; 0 is off
     "max_backlog": 15,  # decline new requests while this many won orders due within a day wait for a driver; 0 is off
     "min_slack": 240,  # decline an option whose latest pickup is under this many minutes after we win it; 0 is off (b6: on-time 88->92%)
