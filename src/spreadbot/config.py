@@ -19,6 +19,7 @@ class Config:
     shadow_cents: int = 0              # opportunity cost of one car of driver capacity
     min_ev_cents: int = 200            # expected margin below this is not worth a driver
     late_cost_frac: float = 0.6        # a late car: refund 10-50%, trust halved, the gate at risk
+    drive_cost: bool = False           # expected fee by drive time (table in desk.py), not one average
     cost_prior: float = 1.15           # expected fee over typical fee with fee_plan (research: 0.9 books 64% in time)
     cost_prior_n: int = 30
     only_next_if_no_same: bool = False # quote next_day only when we do not quote same_day (next_day cars cost more)
@@ -52,6 +53,7 @@ class Config:
     adaptive_load: bool = False        # scale load_free by how easily our first posts book this week
     cap_min: float = 0.7
     cap_max: float = 1.4
+    load_flat_cents: int = 0           # load cost per car in cents (every car counts the same for the gate); 0 = one typical fee
     load_slope: float = 1.0            # extra cost, in typical fees, per 0.05 of load above load_free
     # --- fees
     fee_mode: str = "relative"         # "span": fee_plan over the slack; "relative": fee_rel anchored to lastPickupAt

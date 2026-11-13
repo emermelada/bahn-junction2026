@@ -19,6 +19,10 @@ from .policy import Governor, Market, OnTime
 OPTION_ORDER = ("same_day", "next_day", "within_3_days")
 
 
+# (drive minutes under, fee over typical fee) from 3,983 orders of v1aa (lab/frank/pnl.py by drive time).
+DRIVE_COST = ((30, 1.65), (45, 1.38), (60, 1.34), (90, 1.26), (120, 1.16), (180, 1.14), (240, 1.10), (360, 1.14), (10**6, 1.28))
+
+
 def business_hours(a: int, b: int) -> float:
     """Request hours (Mon-Fri 08:00-18:00) between world minutes a and b."""
     total = 0
@@ -89,6 +93,8 @@ class Desk:
         self.morning_drops: dict[int, int] = defaultdict(int)
         self.due_count: dict[int, int] = defaultdict(int)
         self.need_resync = False
+        self.cost_pred_sum = 0.0  # this week's bookings: the table's ratio, summed
+        self.cost_paid_sum = 0.0  # and the ratio they paid
         self._nearby: dict[str, list[tuple[str, float]]] = {}
         self.fast_book: list[tuple[int, bool]] = []  # (posted at, booked within an hour at the opening fee) per first post
         self.first_posts: dict[str, int] = {}  # gig -> posted at, for first posts still being judged
@@ -226,6 +232,14 @@ class Desk:
             ob = self.orders.get(rec.legs[0][0])
             if ob:
                 self.book_ratios.append(e["feeCents"] / max(1.0, self.gig_base(rec)))
+                if len({o for o, _ in rec.legs}) == 1:
+                    o = ob.order
+                    drive = sum(self.geo.drive(o["legs"][l]["pickup"]["placeId"], o["legs"][l]["delivery"]["placeId"]) for _, l in rec.legs)
+                    for limit, mult in DRIVE_COST:
+                        if drive < limit:
+                            break
+                    self.cost_pred_sum += mult
+                    self.cost_paid_sum += e["feeCents"] / max(1.0, self.gig_base(rec))
             self.say("BOOKED", f"{rec.id} {e['driverId']} {e['feeCents']}")
 
     def on_offer_answered(self, e: dict) -> None:
@@ -385,7 +399,8 @@ class Desk:
         if cfg.gate_bonus_cents and self.won_count >= 30:
             gate = cfg.gate_bonus_cents * min(1.0, max(0.0, (cfg.gate_target - self.gov.projection()) / cfg.gate_span))
         cal = self.gov.calibration() if cfg.calibrate else 1.0
-        cost = r["referenceFeeCents"] * self.cost_mult()
+        drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
+        cost = r["referenceFeeCents"] * (self.drive_cost_mult(drive) if cfg.drive_cost else self.cost_mult())
         backlog = self.backlog(r["legs"][0]["pickup"]["placeId"])
         t_gain, t_loss = self.trust_value(dealer)
         congestion = cfg.cong_frac * r["referenceFeeCents"] * max(0, backlog - cfg.cong_free)
@@ -407,7 +422,8 @@ class Desk:
             # Load: our cars already due that day against the world's drivers. Lateness grows with it
             # (lab: 2.7% late under 6% of drivers, 8.7% at 9-12%, 12% above 15%), so a busy day's next car costs more.
             load = self.due_load(self.deadline_day(r, opt))
-            load_cost = cfg.load_slope * r["referenceFeeCents"] * max(0.0, load - cfg.load_free * self.capacity_factor()) / 0.05
+            per_car = cfg.load_flat_cents if cfg.load_flat_cents else r["referenceFeeCents"]
+            load_cost = cfg.load_slope * per_car * max(0.0, load - cfg.load_free * self.capacity_factor()) / 0.05
             risk_frac = (1 - p_ok) * cfg.late_cost_frac
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain) + cfg.trust_loss_w * (1 - p_ok) * t_loss
@@ -487,6 +503,18 @@ class Desk:
             if self.geo.air(p, place) <= self.cfg.cong_radius and o.order["lastPickupAt"] - self.now < self.cfg.cong_horizon:
                 n += 1
         return n
+
+    def drive_cost_mult(self, drive: int) -> float:
+        """Expected fee over typical fee by drive time (lab/frank: 3,983 orders of v1aa), scaled by how this
+        week's bookings compare with the table. Short hops cost most per typical fee: the trips dominate."""
+        base = DRIVE_COST[-1][1]
+        for limit, mult in DRIVE_COST:
+            if drive < limit:
+                base = mult
+                break
+        pred, paid = self.cost_pred_sum, self.cost_paid_sum
+        k = self.cfg.cost_prior_n
+        return base * (paid + k) / (pred + k)
 
     def cost_mult(self) -> float:
         """Expected fee over typical fee: the prior, moved by what our own bookings paid this week."""
