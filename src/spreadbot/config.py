@@ -48,25 +48,25 @@ class Config:
     load_free: float = 0.07            # load under which a car costs nothing extra (1.0 = off)
     load_slope: float = 1.0            # extra cost, in typical fees, per 0.05 of load above load_free
     # --- fees
-    fee_mode: str = "relative"             # "span": fee_plan over the slack; "relative": fee_rel anchored to lastPickupAt
+    fee_mode: str = "relative"         # "span": fee_plan over the slack; "relative": fee_rel anchored to lastPickupAt
     fee_open: float = 0.95
     fee_hold: int = 45                 # minutes the opening fee shows before any raise
     fee_rel: tuple = ((8, 1.25), (5, 1.6))   # (hours before lastPickupAt, fee over typical fee)
     fee_plan: tuple = ((0.0, 0.95), (0.15, 1.15), (0.4, 1.45), (0.7, 1.85))  # (share of slack, fee over typical fee)
     steep_plan: tuple = (1.7, 2.0, 2.3, 2.6)  # after a deadline warning: generous, a late car costs more
     steep_step: int = 30
-    gov_steep: bool = True            # choose the escalation by the projected on-time share
+    gov_steep: bool = True             # choose the escalation by the projected on-time share
     gov_relaxed: float = 0.955         # above this projection, a car is not worth saving at any price
     steep_relaxed: tuple = (1.6, 1.9, 2.2)
     steep_rescue: tuple = (2.0, 2.5, 3.0, 3.5, 4.0)
-    late_plan: tuple = ((0, 1.2), (4, 1.5), (12, 2.0))
+    late_plan: tuple = ((0, 1.2), (4, 1.5), (12, 2.0))  # (hours from now, fee): a car that is late anyway, no steep fees
     crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar
     view_raise_n: int = 0              # this many viewers and no booking: raise to view_raise_mult at once
     view_raise_after: int = 45
     view_raise_mult: float = 1.5
-    own_alarm: bool = True            # escalate 3 h before the effective last pickup (note deadlines included)
-    alarm_minutes: int = 360              # e.g. ((0, 1.2), (4, 1.5), (12, 2.0)): fees for a car that is late anyway
-    use_offers: bool = False            # offers to drivers near the pickup on a deadline warning
+    own_alarm: bool = True             # escalate before the effective last pickup (note deadlines included)
+    alarm_minutes: int = 360           # 6 h: earlier than the world's 3 h warning; ranked 6/6 vs 4/6 (v1i vs v1h)
+    use_offers: bool = False           # offers to drivers near the pickup on a deadline warning
     viewer_offers: bool = False        # offers to drivers who viewed an unbooked gig
     offer_after: int = 20              # minutes a gig is open before its viewers get offers
     offer_mult: float = 1.15           # offer fee over typical fee (or the app fee, if higher)
