@@ -16,9 +16,9 @@ setup:
 test:
 	$(PY) -m unittest discover -s tests -t .
 
-# The merge gate: unit tests, determinism, replay, 3 seed level 8 smoke. Add --require-ranked once a baseline is ranked.
+# The merge gate: unit tests, determinism, replay, and a 3 seed level 8 smoke that must stay ranked.
 check: test
-	$(PY) harness/check.py
+	$(PY) harness/check.py --require-ranked
 
 play:
 	$(PY) -m spreadbot.runtime.practice_runner --level $(LEVEL) --seed $(SEED)
