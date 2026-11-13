@@ -26,7 +26,8 @@ def estimate_cost(request: PriceRequest, option: DeliveryOption, state: State) -
             serviceable = False
     if FLAGS["max_backlog"] and backlog(state) >= FLAGS["max_backlog"]:
         serviceable = False
-    return CostEstimate(fee_cents=request["referenceFeeCents"], p_on_time=1.0, serviceable=serviceable)
+    fee = round(request["referenceFeeCents"] * FLAGS["fee_open"])  # what dispatch will open the gig at
+    return CostEstimate(fee_cents=fee, p_on_time=1.0, serviceable=serviceable)
 
 
 def backlog(state: State) -> int:

@@ -43,7 +43,8 @@ def set_flags(pairs: list[str]) -> dict[str, object]:
         flags = importlib.import_module(f"spreadbot.{side}.flags").FLAGS
         if name not in flags:
             sys.exit(f"unknown flag {key}; known: {sorted(flags)}")
-        flags[name] = type(flags[name])(json.loads(raw)) if not isinstance(flags[name], str) else raw
+        value = json.loads(raw)
+        flags[name] = value if flags[name] is None or value is None else type(flags[name])(value)
         applied[key] = flags[name]
     return applied
 

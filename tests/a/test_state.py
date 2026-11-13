@@ -75,3 +75,15 @@ class StateTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TrustTest(unittest.TestCase):
+    def test_count_rises_and_halves(self):
+        from spreadbot.dealer.trust import trust_count, trust_factor
+        s = State("w", 8, 0, 9000, MAP)
+        for k in range(6):
+            s.orders[f"R{k}"] = {**ORDER, "id": f"R{k}"}
+            s.money[f"R{k}"] = [("revenue", 100)] + ([("late_refund", -10)] if k == 4 else [])
+        s.orders["R6"] = {**ORDER, "id": "R6"}  # not settled
+        self.assertEqual(trust_count(s, "d1"), 3)  # 1,2,3,4 then halved to 2, then 3
+        self.assertAlmostEqual(trust_factor(s, "d1"), 1.03)
