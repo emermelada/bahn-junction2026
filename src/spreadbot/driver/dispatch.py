@@ -13,6 +13,7 @@ from spread.types import Action, FeeStep, Order, StopRef
 from spreadbot.core.rng import rng
 from spreadbot.core.state import State, legs_of
 from spreadbot.driver.flags import FLAGS
+from spreadbot.driver.offers import rescue_offers
 from spreadbot.notes.reader import needs_manual, needs_plates, window_from_note
 
 HOUR, DAY = 60, 24 * 60
@@ -41,6 +42,8 @@ def dispatch(state: State, now: int) -> list[Action]:
                     and gig["scheduledAt"] < due:
                 actions.append({"type": "reprice", "gigId": gid, "schedule": fees(state, order, _cars(gig), now, raised=True)})
                 state.log(now, "reprice_early", gid, order=oid)
+            if oid in state.urgent and gid not in [a.get("gigId") for a in actions if a["type"] == "withdraw"]:
+                actions += rescue_offers(state, order, gid, _cars(gig), now)
         need = [leg for leg in state.undelivered(order) if (oid, leg) not in state.gig_of or leg in freed]
         need = [leg for leg in need if not _backing_off(state, (oid, leg), now)]
         if not need:

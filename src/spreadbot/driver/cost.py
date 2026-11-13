@@ -90,6 +90,16 @@ def drivers_near(state: State, town: str) -> int:
     return cache[town]
 
 
+def drivers_near_ids(state: State, town: str) -> list[str]:
+    """Ids of drivers living within 30 km of a town, nearest first. Cached per world."""
+    cache = state.ext.setdefault("driver", {}).setdefault("near_ids", {})
+    if town not in cache:
+        here = state.places[town]
+        near = [(km(here, state.places[d["homePlaceId"]]), d["id"]) for d in state.ext.get("roster", [])]
+        cache[town] = [driver for dist, driver in sorted(near) if dist <= NOTIFY_KM]
+    return cache[town]
+
+
 def won_cars(state: State, town: str, day: int) -> int:
     """Cars of live won orders that are collected in this town on this day."""
     return sum(1 for o in state.orders.values() if o["status"] != "cancelled"
