@@ -401,6 +401,8 @@ class Desk:
         cal = self.gov.calibration() if cfg.calibrate else 1.0
         drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
         cost = r["referenceFeeCents"] * (self.drive_cost_mult(drive) if cfg.drive_cost else self.cost_mult())
+        if cfg.bundle_price and self.chainable(r):
+            cost *= cfg.bundle_mult  # one of our open gigs ends where this car starts (or the reverse): a driver can take both
         backlog = self.backlog(r["legs"][0]["pickup"]["placeId"])
         t_gain, t_loss = self.trust_value(dealer)
         congestion = cfg.cong_frac * r["referenceFeeCents"] * max(0, backlog - cfg.cong_free)
@@ -546,6 +548,28 @@ class Desk:
             self.post(ob, g, why)
 
     # ------------------------------------------------------------------ bundles
+    def chainable(self, r: dict) -> bool:
+        """A request that could join one of our open single-car gigs as a chain (rough check at quote time)."""
+        if len(r["legs"]) != 1:
+            return False
+        L = r["legs"][0]
+        if L["pickup"]["privateAddress"] or L["delivery"]["privateAddress"]:
+            return False
+        p, d = L["pickup"]["placeId"], L["delivery"]["placeId"]
+        km = self.cfg.bundle_km
+        for rec in self.gigs.values():
+            if rec.status != "open" or rec.escalated or len(rec.legs) != 1 or self.now - rec.posted_at > self.cfg.bundle_window:
+                continue
+            ob = self.orders.get(rec.legs[0][0])
+            if not ob or not self.simple(ob):
+                continue
+            O = ob.order["legs"][0]
+            if ob.order["deadline"] // DAY != r["options"][0]["deadline"] // DAY:
+                continue
+            if self.geo.air(O["delivery"]["placeId"], p) <= km or self.geo.air(d, O["pickup"]["placeId"]) <= km:
+                return True
+        return False
+
     def simple(self, ob: OrderBook) -> bool:
         """One car, dealer sites at both ends, a note that changes nothing: safe to chain."""
         o = ob.order
@@ -909,7 +933,14 @@ class Desk:
 
     # ------------------------------------------------------------------ periodic
     def tick(self) -> None:
-        """Called once per step: posts anything missing, then offers unbooked gigs to drivers who looked at them."""
+        """Called once per step. Never raises: a bug in one part must not stop the desk."""
+        try:
+            self._tick()
+        except Exception as exc:
+            self.say("ERR", f"tick {type(exc).__name__}: {exc}")
+
+    def _tick(self) -> None:
+        """Posts anything missing, unbundles and escalates on time, offers unbooked gigs if enabled."""
         for gid, t0 in list(self.first_posts.items()):
             if self.now - t0 > 60:
                 self.fast_book.append((t0, False))

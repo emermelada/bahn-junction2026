@@ -83,6 +83,7 @@ class Config:
     charge_km: float = 190.0           # rule: EV < 30% on a route over 200 km needs charging; margin for road km
     # --- bundles: two of our cars in one gig, the second picked up near where the first is delivered
     bundle: bool = True
+    bundle_price: bool = False         # quote a car that chains with one of our open gigs at the bundle cost
     bundle_km: float = 25.0            # straight line from the first delivery to the second pickup
     bundle_lead: int = 60              # minutes before a driver can start, when checking a chain
     bundle_margin: int = 60            # minutes to spare before each deadline
