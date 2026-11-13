@@ -8,8 +8,8 @@ FLAGS = {
     "max_backlog": 15,  # decline new requests while this many won orders due within a day wait for a driver; 0 is off
     "min_slack": 240,  # decline an option whose latest pickup is under this many minutes after we win it; 0 is off (b6: on-time 88->92%)
     "read_notes": False,  # set plates, manual licence and stop windows from the note (notes/reader.py)
-    "skip_trade_in": False,  # decline two-car trade-ins: 32% late on rc1 (18 of 54) against 2-7% dealer to dealer
-    "skip_private": False,  # decline private pickups and deliveries: 20-23% late on rc1 for next_day
+    "skip_trade_in": True,  # decline two-car trade-ins: 32% late on rc1 (18 of 54) against 2-7% dealer to dealer
+    "skip_private": True,  # decline private pickups and deliveries: 20-23% late for next_day (b11: rc1 8/9 -> 9/9 ranked)
     "governor": True,  # risk_mode from the projected late share; tight and rescue make serviceability stricter (b7: 3/3 ranked)
     "cars_per_driver_day": 0.0,  # cap on cars won per pickup town and ready day, per nearby driver; 0 is off
     "fee_ladder": 0.0,  # lab only: >0 posts every gig at one flat fee, a random multiple of the typical fee in [0.8, 0.8 + fee_ladder]
