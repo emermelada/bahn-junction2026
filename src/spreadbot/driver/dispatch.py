@@ -13,6 +13,7 @@ from spread.types import Action, FeeStep, Order, StopRef
 from spreadbot.core.rng import rng
 from spreadbot.core.state import State, legs_of
 from spreadbot.driver.flags import FLAGS
+from spreadbot.notes.reader import needs_manual, needs_plates, window_from_note
 
 HOUR = 60
 SPLIT_MINUTES = 12 * HOUR  # RULES: a gig with more than one car may plan at most 12 hours of driving
@@ -54,17 +55,27 @@ def dispatch(state: State, now: int) -> list[Action]:
 def post(state: State, order: Order, legs: list[int], now: int) -> Action:
     oid = order["id"]
     reasons = [r for leg in legs for r in state.failures.get((oid, leg), [])]
-    audience = {"experienced": any(leg["car"]["premium"] for leg in order["legs"]), "manualLicence": "licence" in reasons}
+    note = state.requests[oid]["note"] if FLAGS["read_notes"] else None
+    audience = {"experienced": any(leg["car"]["premium"] for leg in order["legs"]),
+                "manualLicence": "licence" in reasons or needs_manual(note)}
     stops: list[StopRef] = []
     for leg in legs:
-        car, pickup = order["legs"][leg]["car"], order["legs"][leg]["pickup"]
-        first: StopRef = {"orderId": oid, "leg": leg, "kind": "pickup", "withPlates": "no_plates" in reasons,
+        car, pickup, delivery = order["legs"][leg]["car"], order["legs"][leg]["pickup"], order["legs"][leg]["delivery"]
+        first: StopRef = {"orderId": oid, "leg": leg, "kind": "pickup", "withPlates": "no_plates" in reasons or needs_plates(note),
                           "withCharging": bool(car["electric"] and car["chargePercent"] is not None and car["chargePercent"] < 30)}
+        second: StopRef = {"orderId": oid, "leg": leg, "kind": "delivery"}
+        noted = window_from_note(note, pickup["window"], "pickup")
+        if noted != pickup["window"]:
+            first["window"] = noted
+        base = {"from": delivery["window"]["from"], "to": max(delivery["window"]["from"], order["deadline"])}
+        noted = window_from_note(note, base, "delivery")
+        if noted != base:
+            second["window"] = noted
         last = state.failures.get((oid, leg), [None])[-1]
         if last in ("not_ready", "closed"):
-            start = retry_from(state, order, leg, now)
+            start = max(retry_from(state, order, leg, now), first.get("window", pickup["window"])["from"])
             first["window"] = {"from": start, "to": max(pickup["window"]["to"], start)}
-        stops += [first, {"orderId": oid, "leg": leg, "kind": "delivery"}]
+        stops += [first, second]
     expired = any((oid, leg) in state.expired for leg in legs)
     stops = without_windows(stops, float("inf") if expired else now)
     return {"type": "post", "stops": stops, "audience": audience, "schedule": fees(state, order, len(legs), now)}
