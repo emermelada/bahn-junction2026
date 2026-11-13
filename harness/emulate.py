@@ -16,6 +16,7 @@ import time
 from spread.client import Client
 
 from spreadbot.runtime.live_runner import play_live
+from spreadbot.runtime.practice_runner import create_world
 
 TICK = 0.3  # real seconds between advances; one weekday minute at final speed
 DAY, HOUR = 1440, 60
@@ -53,7 +54,7 @@ def main() -> None:
     p.add_argument("--speed", type=float, default=1.0, help="2.0 plays twice as fast as the final")
     args = p.parse_args()
     client = Client()
-    world = client.create(level=args.level, seed=args.seed)
+    world = create_world(client, args.level, args.seed)
     print(f"emulating {world.id} seed {args.seed}", flush=True)
     if args.from_minute:
         world.advance(to=args.from_minute)  # no bot yet: requests before this minute go unanswered

@@ -13,7 +13,7 @@ import subprocess
 import time
 from typing import Any, Optional
 
-from spread.client import Client
+from spread.client import Client, SpreadError, World
 from spread.types import Action, DeskEventKind, WorldMap
 
 from spreadbot.core.declog import DecLog
@@ -77,7 +77,7 @@ def play(level: int, seed: Optional[str], client: Optional[Client] = None, world
     client = client or Client()
     world_map = world_map or client.map()
     started = time.monotonic()
-    world = client.create(level=level, seed=seed)
+    world = create_world(client, level, seed)
     run_dir = os.path.join(RUNS, world.id)
     os.makedirs(run_dir, exist_ok=True)
     meta = {"worldId": world.id, "seed": seed, "level": level, "tag": tag, "commit": commit()}
@@ -120,6 +120,18 @@ def play(level: int, seed: Optional[str], client: Optional[Client] = None, world
     write_json(os.path.join(run_dir, "summary.json"), summary)
     write_json(os.path.join(run_dir, "score.json"), score)
     return {**meta, **score, "runDir": run_dir, "digest": summary["digest"], "steps": steps, "seconds": summary["seconds"]}
+
+
+def create_world(client: Client, level: int, seed: Optional[str]) -> World:
+    """A new practice world. The team's 8 slots are shared with teammates: while they are full, wait."""
+    for attempt in range(90):
+        try:
+            return client.create(level=level, seed=seed)
+        except SpreadError as error:
+            if error.status != 409 or "8 practice worlds" not in str(error) or attempt == 89:
+                raise
+            time.sleep(20)
+    raise AssertionError("unreachable")
 
 
 def commit() -> str:

@@ -16,11 +16,10 @@ import json
 import os
 import statistics
 import sys
-import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
-from spread.client import Client, SpreadError
+from spread.client import Client
 
 from spreadbot.runtime.practice_runner import play
 
@@ -64,15 +63,11 @@ def sweep(seeds: list[str], level: int, tag: str, flags: dict) -> list[dict]:
     path = os.path.join(RESULTS, f"{tag}.jsonl")
 
     def one(seed: str) -> Optional[dict]:
-        for attempt in range(30):
-            try:
-                r = play(level, seed, world_map=world_map, tag=tag)
-                break
-            except SpreadError as error:  # 8 practice slots are shared with the team: wait for one
-                if error.status != 409 or attempt == 29:
-                    print(f"{seed:<10} FAILED {error}", flush=True)
-                    return None
-                time.sleep(20)
+        try:
+            r = play(level, seed, world_map=world_map, tag=tag)
+        except Exception as error:  # noqa: BLE001 - one failed seed must not end the sweep
+            print(f"{seed:<10} FAILED {error!r}", flush=True)
+            return None
         row = {k: r[k] for k in ("seed", "level", "worldId", "commit", "marginCents", "revenueCents", "onTimeShare",
                                  "undeliveredShare", "wonOrders", "ranked", "steps", "seconds")}
         row["flags"] = flags
