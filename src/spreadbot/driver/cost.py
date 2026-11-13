@@ -40,8 +40,13 @@ def estimate_cost(request: PriceRequest, option: DeliveryOption, state: State) -
         serviceable = False
     if mode == "rescue" and min(drivers_near(state, leg["pickup"]["placeId"]) for leg in request["legs"]) < EASY_DRIVERS:
         serviceable = False
-    long = FLAGS["fee_open_long"] and slack(request, option, state) >= DAY
-    fee = round(request["referenceFeeCents"] * (FLAGS["fee_open_long"] if long else FLAGS["fee_open"]))  # what dispatch will post
+    left = slack(request, option, state)
+    ratio = FLAGS["fee_open"]  # what dispatch will post, by the time left to the last pickup
+    if FLAGS["fee_open_long"] and left >= DAY:
+        ratio = FLAGS["fee_open_long"]
+    elif FLAGS["fee_open_mid"] and left >= 8 * 60:
+        ratio = FLAGS["fee_open_mid"]
+    fee = round(request["referenceFeeCents"] * ratio)
     return CostEstimate(fee_cents=fee, p_on_time=1.0, serviceable=serviceable)
 
 
@@ -87,16 +92,6 @@ def drivers_near(state: State, town: str) -> int:
             homes[d["homePlaceId"]] = homes.get(d["homePlaceId"], 0) + 1
         here = state.places[town]
         cache[town] = sum(n for h, n in homes.items() if km(here, state.places[h]) <= NOTIFY_KM)
-    return cache[town]
-
-
-def drivers_near_ids(state: State, town: str) -> list[str]:
-    """Ids of drivers living within 30 km of a town, nearest first. Cached per world."""
-    cache = state.ext.setdefault("driver", {}).setdefault("near_ids", {})
-    if town not in cache:
-        here = state.places[town]
-        near = [(km(here, state.places[d["homePlaceId"]]), d["id"]) for d in state.ext.get("roster", [])]
-        cache[town] = [driver for dist, driver in sorted(near) if dist <= NOTIFY_KM]
     return cache[town]
 
 

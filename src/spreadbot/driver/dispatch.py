@@ -13,10 +13,10 @@ from spread.types import Action, FeeStep, Order, StopRef
 from spreadbot.core.rng import rng
 from spreadbot.core.state import State, legs_of
 from spreadbot.driver.flags import FLAGS
-from spreadbot.driver.offers import rescue_offers
 from spreadbot.notes.reader import needs_manual, needs_plates, window_from_note
 
 HOUR, DAY = 60, 24 * 60
+MID_SLACK = 8 * HOUR  # fee ladder: with 8-24 h to the last pickup, gigs near the typical fee still booked in time
 SPLIT_MINUTES = 12 * HOUR  # RULES: a gig with more than one car may plan at most 12 hours of driving
 REFUSED_BACKOFF = 30  # minutes before we try a refused post again; refusals name a window, so the next try usually differs
 
@@ -42,8 +42,6 @@ def dispatch(state: State, now: int) -> list[Action]:
                     and gig["scheduledAt"] < due:
                 actions.append({"type": "reprice", "gigId": gid, "schedule": fees(state, order, _cars(gig), now, raised=True)})
                 state.log(now, "reprice_early", gid, order=oid)
-            if oid in state.urgent and gid not in [a.get("gigId") for a in actions if a["type"] == "withdraw"]:
-                actions += rescue_offers(state, order, gid, _cars(gig), now)
         need = [leg for leg in state.undelivered(order) if (oid, leg) not in state.gig_of or leg in freed]
         need = [leg for leg in need if not _backing_off(state, (oid, leg), now)]
         if not need:
@@ -90,8 +88,11 @@ def fees(state: State, order: Order, cars: int, now: int, raised: bool = False) 
         ratio = 0.8 + rng(state.world_id, order["id"], cars).random() * FLAGS["fee_ladder"]
         return [{"at": now, "feeCents": max(1, int(fee * ratio + 0.5))}]
     lo, hi = FLAGS["fee_open"], FLAGS["fee_top"]
-    if FLAGS["fee_open_long"] and order["lastPickupAt"] - now >= DAY:  # time to wait for the cheaper drivers
+    left = order["lastPickupAt"] - now
+    if FLAGS["fee_open_long"] and left >= DAY:  # time to wait for the cheaper drivers
         lo, hi = FLAGS["fee_open_long"], FLAGS["fee_open_long"]
+    elif FLAGS["fee_open_mid"] and left >= MID_SLACK:
+        lo, hi = FLAGS["fee_open_mid"], FLAGS["fee_open_mid"]
     if order["id"] in state.urgent:  # the top fee or 1.5 times at once, then a quarter more every half hour
         steps = [(k * 30, max(1.5, hi) + k / 4) for k in range(5)]
     elif raised:  # one early raise for a gig still open close to its last pickup, before the deadline warning
