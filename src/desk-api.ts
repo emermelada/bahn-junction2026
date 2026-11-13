@@ -12,6 +12,10 @@ export type DeskContext = {
   map: WorldMap
   roster: DriverProfile[]
   endsAt: number
+  /** Sends actions to the world NOW (world.act) and returns their results. The desk uses it only where the
+   * kit's starter does (a trade-in post whose result decides a fallback, a withdraw that needs the gig id);
+   * everything else goes to the outbox and travels with the next advance. */
+  act: (actions: Action[]) => Promise<ActionResult[]>
   /** Decision-log sink: one JSON object per decision (quote, fee, offer, mode change). May be undefined. */
   log?: (line: Record<string, unknown>) => void
 }
@@ -20,11 +24,11 @@ export interface Desk {
   /** The desk's idea of the current world minute (set by rejoin/handle/tick). */
   readonly now: number
   /** Rebuild all books from a snapshot and the full event history, then answer what was missed. */
-  rejoin(snapshot: DeskSnapshot, history: DeskEvent[]): void
-  /** Ingest one event. The caller has already dropped repeats by seq. */
-  handle(event: DeskEvent): void
-  /** Time-based work (at-risk sweeps, scheduled offers). Called at every stop of the clock. */
-  tick(now: number): void
+  rejoin(snapshot: DeskSnapshot, history: DeskEvent[]): Promise<void>
+  /** Ingest one event. The caller has already dropped repeats by seq. Await it: it may call ctx.act. */
+  handle(event: DeskEvent): Promise<void>
+  /** Time-based work (at-risk sweeps, scheduled offers). Called at every stop of the clock, after the events. */
+  tick(now: number): Promise<void>
   /** Take every pending action. The caller sends them with the next advance (practice) or at once (final). */
   drain(): Action[]
   /** Results of a drained batch, in order. The desk records the gig ids of accepted posts. */
