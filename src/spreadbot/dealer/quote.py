@@ -40,11 +40,13 @@ def quote(request: PriceRequest, state: State) -> dict[str, int]:
 
 
 def best_ratio(request: PriceRequest, state: State, trust: float, costs: dict) -> float:
-    """The ratio that maximises P(win) x (price - fee) on the request's slowest serviceable option."""
+    """The ratio that maximises P(win) x (price - fee - floor) on the request's slowest serviceable option.
+    Drivers, not requests, are scarce: the margin floor stands in for the price of using one up."""
     options = [o for o in request["options"] if costs[o["kind"]].serviceable] or request["options"]
     o = options[-1]
     c = curve(state)
-    return max(CANDIDATES, key=lambda r: c.p(r, state.now) * (r * trust * o["listPriceCents"] - costs[o["kind"]].fee_cents))
+    cost = costs[o["kind"]].fee_cents + (FLAGS["min_margin_cents"] or 0)
+    return max(CANDIDATES, key=lambda r: c.p(r, state.now) * (r * trust * o["listPriceCents"] - cost))
 
 
 def decline(request: PriceRequest) -> dict[str, int]:
