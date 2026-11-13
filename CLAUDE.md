@@ -38,17 +38,17 @@ before building on it. If the docs and an experiment disagree, stop and tell
 your human.
 
 ## Who you work for
-Your human tells you at the start whether you work for Person A or Person B.
-- Person A owns: src/spreadbot/runtime/, src/spreadbot/dealer/, harness/,
+Change of plan (13 Nov): one human and one session do the work of both
+Person A and Person B on main. A teammate builds a separate solution on his
+own branch; never touch that branch.
+- Person A paths: src/spreadbot/runtime/, src/spreadbot/dealer/, harness/,
   Makefile, lab/a/, tests/a/.
-- Person B owns: src/spreadbot/driver/, src/spreadbot/notes/,
+- Person B paths: src/spreadbot/driver/, src/spreadbot/notes/,
   src/spreadbot/governor.py, lab/b/, tests/b/.
-- Frozen for both after tag v0: src/spreadbot/core/ and CLAUDE.md.
-Edit only the paths of the person you work for. If you need a change
-anywhere else, write it as docs/requests/<a or b>-<short name>.md, tell your
-human, and carry on with a workaround inside your own paths. This rule is
-what keeps our merges free of conflicts, so hold to it even when a one line
-fix elsewhere looks harmless.
+- Frozen after tag v0: src/spreadbot/core/ and CLAUDE.md. Change them only
+  with your human's yes, in one small commit.
+The folders still say whose job a file does. Keep each side's logic in its
+own paths; they meet only through core/interfaces.py.
 
 ## Rules of the code
 - Nothing fitted to a seed. Whatever depends on the week (competitor price
