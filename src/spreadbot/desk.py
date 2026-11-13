@@ -89,6 +89,7 @@ class Desk:
         self.morning_drops: dict[int, int] = defaultdict(int)
         self.due_count: dict[int, int] = defaultdict(int)
         self.need_resync = False
+        self._nearby: dict[str, list[tuple[str, float]]] = {}
         self.fast_book: list[tuple[int, bool]] = []  # (posted at, booked within an hour at the opening fee) per first post
         self.first_posts: dict[str, int] = {}  # gig -> posted at, for first posts still being judged
         self.crunch_day = -1
@@ -175,7 +176,7 @@ class Desk:
             return
         ratios = [q[o["kind"]] / o["listPriceCents"] for o in r["options"] if o["kind"] in q and q[o["kind"]] < 3 * o["listPriceCents"]]
         if ratios:
-            self.market.observe(at, r["dealerId"], min(ratios) / self.trust_factor(r["dealerId"]), won)
+            self.market.observe(at, r["dealerId"], min(ratios) / self.trust_factor(r["dealerId"]), won, r["legs"][0]["pickup"]["placeId"])
             self.n_quoted_outcomes += 1
             if won:
                 self.n_won_quoted += 1
@@ -413,7 +414,7 @@ class Desk:
             # Under the on-time target, a safe car is worth more than its margin: it dilutes the late ones.
             if gate and p_ok >= cfg.gate_safe_p:
                 trust_adj -= gate
-            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, cost, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost)
+            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, cost, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"])
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 info.append(f"{kind}:noev")
                 continue
@@ -421,7 +422,7 @@ class Desk:
             meta[kind] = p_ok
             info.append(f"{kind}:r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f},L={load:.3f}")
         self.quote_meta[r["id"]] = meta
-        head = f"bar={bar:.2f} bl={backlog} tg={t_gain/100:.0f} tf={tf:.2f} mu={self.market.mu_for(dealer, day):.3f} cost={cost/100:.0f}"
+        head = f"bar={bar:.2f} bl={backlog} tg={t_gain/100:.0f} tf={tf:.2f} mu={self.market.mu_for(dealer, day, r["legs"][0]["pickup"]["placeId"]):.3f} cost={cost/100:.0f}"
         if not prices:
             return decline_prices(r), f"DECLINE {head} {' '.join(info)}"
         return prices, f"{head} {' '.join(info)}"
@@ -432,6 +433,12 @@ class Desk:
         if ns and ns[0].deadline:
             d = min(d, ns[0].deadline)
         return d // DAY
+
+    def nearby(self, place: str) -> list[tuple[str, float]]:
+        """Places within 80 km (the outage radius in RULES.md), weighted 1 at the place down to 0.3 at 80 km."""
+        if place not in self._nearby:
+            self._nearby[place] = [(p, 1.0 - 0.7 * self.geo.air(place, p) / 80.0) for p in self.geo.ids if self.geo.air(place, p) <= 80.0]
+        return self._nearby[place]
 
     def capacity_factor(self) -> float:
         """How easily our gigs find drivers this week: the share of first posts booked within an hour at the

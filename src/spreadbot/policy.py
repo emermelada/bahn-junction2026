@@ -82,36 +82,42 @@ class Market:
         self.mu = self.cfg.mu_prior          # world level: competitor price over list
         self.day_shift: dict[int, float] = defaultdict(float)   # today's day factor, price war
         self.dealer_shift: dict[str, float] = defaultdict(float)  # competitor's answer to our wins per dealer
+        self.place_shift: dict[tuple[str, int], float] = {}  # (pickup place, day): the outage region
         self.n_obs = 0
         self.day_obs: dict[int, list[bool]] = defaultdict(list)
 
-    def mu_for(self, dealer: str, day: int) -> float:
-        return self.mu + self.day_shift[day] + self.dealer_shift[dealer]
+    def mu_for(self, dealer: str, day: int, place: str = "") -> float:
+        return self.mu + self.day_shift[day] + self.dealer_shift[dealer] + self.place_shift.get((place, day), 0.0)
 
-    def p_win(self, ratio_eff: float, dealer: str, day: int) -> float:
-        return sigmoid(self.cfg.win_slope * (self.mu_for(dealer, day) - ratio_eff))
+    def p_win(self, ratio_eff: float, dealer: str, day: int, place: str = "") -> float:
+        return sigmoid(self.cfg.win_slope * (self.mu_for(dealer, day, place) - ratio_eff))
 
-    def observe(self, at: int, dealer: str, ratio_eff: float, won: bool) -> None:
+    def observe(self, at: int, dealer: str, ratio_eff: float, won: bool, place: str = "") -> None:
         day = at // DAY
-        g = (1.0 if won else 0.0) - self.p_win(ratio_eff, dealer, day)
+        g = (1.0 if won else 0.0) - self.p_win(ratio_eff, dealer, day, place)
         k = self.cfg.win_slope
         self.mu += self.cfg.mu_lr * k * g
         self.day_shift[day] += self.cfg.day_lr * k * g
         self.dealer_shift[dealer] += self.cfg.dealer_lr * k * g
+        if self.cfg.place_lr and place:
+            # The outage: one region's dealers pay ~30% more for a day. Each place nearby learns from this result.
+            for other, w in self.desk.nearby(place):
+                key = (other, day)
+                self.place_shift[key] = min(0.45, max(-0.3, self.place_shift.get(key, 0.0) + self.cfg.place_lr * w * k * g))
         self.mu = min(max(self.mu, 0.95), 1.9)
         self.day_shift[day] = min(max(self.day_shift[day], -0.4), 0.4)
         self.dealer_shift[dealer] = min(max(self.dealer_shift[dealer], -0.3), 0.3)
         self.n_obs += 1
         self.day_obs[day].append(won)
 
-    def best_ratio(self, dealer: str, day: int, list_cents: int, tf: float, cost: float, risk_frac: float, shadow: float) -> tuple[float, float]:
+    def best_ratio(self, dealer: str, day: int, list_cents: int, tf: float, cost: float, risk_frac: float, shadow: float, place: str = "") -> tuple[float, float]:
         """The ratio over list (before trust) with the best expected margin, and that margin."""
         cfg = self.cfg
         best, best_ev = 0.0, 0.0
         r = cfg.min_ratio
         while r <= cfg.max_ratio + 1e-9:
             price = list_cents * r * tf
-            ev = self.p_win(r, dealer, day) * (price * (1 - risk_frac) - cost - shadow)
+            ev = self.p_win(r, dealer, day, place) * (price * (1 - risk_frac) - cost - shadow)
             if ev > best_ev:
                 best, best_ev = r, ev
             r += 0.01

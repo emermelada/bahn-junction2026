@@ -12,6 +12,7 @@ class Config:
     win_slope: float = 6.7             # same fit: win 0.87 at 1.0, 0.19 at 1.5
     mu_lr: float = 0.004               # world level: slow, ~100 quotes to move a lot
     day_lr: float = 0.012              # today's shift: fast, the day factor and the price war are per day
+    place_lr: float = 0.0              # per (pickup place, day) shift, spread over 80 km: the outage (0 = off)
     dealer_lr: float = 0.006           # per dealer: the competitor cuts where we win most
     min_ratio: float = 1.00            # never quote under list
     max_ratio: float = 1.80
