@@ -17,32 +17,9 @@ NOTIFY_KM = 30  # RULES: the app notifies drivers whose home is within 30 km of 
 
 
 def estimate_cost(request: PriceRequest, option: DeliveryOption, state: State) -> CostEstimate:
-    serviceable = True
-    for leg in request["legs"]:
-        town, day = leg["pickup"]["placeId"], leg["pickup"]["window"]["from"] // DAY
-        near = drivers_near(state, town)
-        if near < FLAGS["min_drivers_near"]:
-            serviceable = False
-        cap = FLAGS["cars_per_driver_day"]
-        if cap and won_cars(state, town, day) + 1 > cap * near:
-            serviceable = False
-    if FLAGS["skip_trade_in"] and len(request["legs"]) == 2:
-        serviceable = False
-    if FLAGS["skip_private"] and any(leg["pickup"]["privateAddress"] or leg["delivery"]["privateAddress"] for leg in request["legs"]):
-        serviceable = False
-    if FLAGS["min_slack"] and slack(request, option, state) < FLAGS["min_slack"]:
-        serviceable = False
-    per_day = FLAGS["orders_per_driver_day"]
-    if per_day and orders_due_on(state, (request["respondBy"] + slack(request, option, state)) // DAY) >= per_day * len(state.ext.get("roster", [])):
-        serviceable = False
-    mode = risk_mode(state, state.now)
-    cap = FLAGS["max_backlog"] // 2 if mode == "tight" else FLAGS["max_backlog"]
-    if cap and backlog(state) >= cap:
-        serviceable = False
-    if mode != "normal" and option["kind"] == "same_day":
-        serviceable = False
-    if mode == "rescue" and min(drivers_near(state, leg["pickup"]["placeId"]) for leg in request["legs"]) < EASY_DRIVERS:
-        serviceable = False
+    why = unserviceable(request, option, state)
+    if why:
+        state.log(state.now, "unserviceable", request["id"], option=option["kind"], why=why)
     left = slack(request, option, state)
     ratio = FLAGS["fee_open"]  # what dispatch will post, by the time left to the last pickup
     weekend = (request["respondBy"] + left) // DAY >= 5
@@ -53,7 +30,38 @@ def estimate_cost(request: PriceRequest, option: DeliveryOption, state: State) -
     elif FLAGS["fee_open_mid"] and left >= 8 * 60:
         ratio = FLAGS["fee_open_mid"]
     fee = round(request["referenceFeeCents"] * ratio)
-    return CostEstimate(fee_cents=fee, p_on_time=1.0, serviceable=serviceable)
+    return CostEstimate(fee_cents=fee, p_on_time=1.0, serviceable=not why)
+
+
+def unserviceable(request: PriceRequest, option: DeliveryOption, state: State) -> list[str]:
+    """Every reason we cannot move this option on time; empty when we can."""
+    why = []
+    for leg in request["legs"]:
+        town, day = leg["pickup"]["placeId"], leg["pickup"]["window"]["from"] // DAY
+        near = drivers_near(state, town)
+        if near < FLAGS["min_drivers_near"]:
+            why.append("few_drivers")
+        cap = FLAGS["cars_per_driver_day"]
+        if cap and won_cars(state, town, day) + 1 > cap * near:
+            why.append("town_full")
+    if FLAGS["skip_trade_in"] and len(request["legs"]) == 2:
+        why.append("trade_in")
+    if FLAGS["skip_private"] and any(leg["pickup"]["privateAddress"] or leg["delivery"]["privateAddress"] for leg in request["legs"]):
+        why.append("private")
+    if FLAGS["min_slack"] and slack(request, option, state) < FLAGS["min_slack"]:
+        why.append("slack")
+    per_day = FLAGS["orders_per_driver_day"]
+    if per_day and orders_due_on(state, (request["respondBy"] + slack(request, option, state)) // DAY) >= per_day * len(state.ext.get("roster", [])):
+        why.append("day_full")
+    mode = risk_mode(state, state.now)
+    cap = FLAGS["max_backlog"] // 2 if mode == "tight" else FLAGS["max_backlog"]
+    if cap and backlog(state) >= cap:
+        why.append("backlog")
+    if mode != "normal" and option["kind"] == "same_day":
+        why.append(f"{mode}_same_day")
+    if mode == "rescue" and min(drivers_near(state, leg["pickup"]["placeId"]) for leg in request["legs"]) < EASY_DRIVERS:
+        why.append("rescue_hard")
+    return why
 
 
 def slack(request: PriceRequest, option: DeliveryOption, state: State) -> int:

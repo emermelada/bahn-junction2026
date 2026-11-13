@@ -36,6 +36,8 @@ def quote(request: PriceRequest, state: State) -> dict[str, int]:
         floor = FLAGS["min_margin_cents"]
         if cost.serviceable and (floor is None or price - cost.fee_cents >= floor):
             prices[o["kind"]] = price
+        elif cost.serviceable:
+            state.log(state.now, "below_floor", request["id"], option=o["kind"], margin=price - cost.fee_cents)
     return prices or decline(request)
 
 
