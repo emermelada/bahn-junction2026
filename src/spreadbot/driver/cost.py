@@ -9,8 +9,10 @@ from spread.types import DeliveryOption, PriceRequest
 from spreadbot.core.interfaces import CostEstimate
 from spreadbot.core.state import State
 from spreadbot.driver.flags import FLAGS
+from spreadbot.governor import risk_mode
 
 DAY = 24 * 60
+EASY_DRIVERS = 30  # in rescue mode, only pickups with this many drivers living within 30 km count as easy
 NOTIFY_KM = 30  # RULES: the app notifies drivers whose home is within 30 km of the first pickup, in a straight line
 
 
@@ -24,10 +26,33 @@ def estimate_cost(request: PriceRequest, option: DeliveryOption, state: State) -
         cap = FLAGS["cars_per_driver_day"]
         if cap and won_cars(state, town, day) + 1 > cap * near:
             serviceable = False
-    if FLAGS["max_backlog"] and backlog(state) >= FLAGS["max_backlog"]:
+    if FLAGS["min_slack"] and slack(request, option, state) < FLAGS["min_slack"]:
+        serviceable = False
+    mode = risk_mode(state, state.now)
+    cap = FLAGS["max_backlog"] // 2 if mode == "tight" else FLAGS["max_backlog"]
+    if cap and backlog(state) >= cap:
+        serviceable = False
+    if mode != "normal" and option["kind"] == "same_day":
+        serviceable = False
+    if mode == "rescue" and min(drivers_near(state, leg["pickup"]["placeId"]) for leg in request["legs"]) < EASY_DRIVERS:
         serviceable = False
     fee = round(request["referenceFeeCents"] * FLAGS["fee_open"])  # what dispatch will open the gig at
     return CostEstimate(fee_cents=fee, p_on_time=1.0, serviceable=serviceable)
+
+
+def slack(request: PriceRequest, option: DeliveryOption, state: State) -> int:
+    """Minutes from the moment we would win the order to its latest pickup by road time. A gig posted
+    with under 3 hours of this left almost never found a driver in time (dev-02, 1 of 36)."""
+    legs = request["legs"]
+    drive = sum(state.minutes(leg["pickup"]["placeId"], leg["delivery"]["placeId"]) for leg in legs)
+    drive += sum(40 for leg in legs if leg["car"]["electric"] and (leg["car"]["chargePercent"] or 100) < 30)
+    if len(legs) == 2:
+        drive += state.minutes(legs[0]["delivery"]["placeId"], legs[1]["pickup"]["placeId"])
+    deadline = option["deadline"]
+    delivery = legs[-1]["delivery"]
+    if delivery["privateAddress"]:
+        deadline = min(deadline, delivery["window"]["to"] + 30)  # RULES: a private delivery is due 30 min after its hour
+    return deadline - drive - request["respondBy"]
 
 
 def backlog(state: State) -> int:
