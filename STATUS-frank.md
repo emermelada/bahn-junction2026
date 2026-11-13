@@ -1,6 +1,6 @@
 # v1 (branch-v1-frank) — status and commands
 
-## Where it stands (Sat 14 Nov, early morning)
+## Where it stands (Fri 13 Nov, 23:59 Helsinki)
 - Level 8, 12 seeds (dev-07..18): ranked 11/12, worst on-time 0.896, median €8.7k, mean €9.0k per week.
 - Top of the Friday 20:01 board: Juhus ~€14.0k/week, House best ~€12.1k/week (5 runs each).
 - Biggest measured gains so far: per-day load pricing (+€1.6k/week, ranked 9→11 of 12), fees anchored to the last pickup time + cheap plan for already-late cars, bundling two chained cars in one gig (+€1.1k/week), the refit on-time model.

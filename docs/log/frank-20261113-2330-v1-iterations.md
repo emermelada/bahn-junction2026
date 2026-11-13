@@ -1,4 +1,4 @@
-# v1 iterations, Fri night (level 8, seeds dev-01..06)
+# v1 iterations, Fri 13 Nov evening (level 8, seeds dev-01..06)
 
 Each row is the same seeds, same code except the change. Margin is € per week; on-time is the worst week.
 
