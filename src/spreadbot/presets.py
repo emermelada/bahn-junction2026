@@ -191,3 +191,6 @@ PRESETS["kdcl-ls"] = PRESETS["k-safe-dcl"] + ["load_slope=0.5"]  # control for k
 PRESETS["kdcl-fma-ls"] = PRESETS["kdcl-fm-ls"] + ["fee_model_abs=true"]
 PRESETS["kdcl-fma"] = PRESETS["kdcl-fm"] + ["fee_model_abs=true"]
 PRESETS["kdcl-hold"] = PRESETS["k-safe-dcl"] + ["quote_cost_hold=1.05"]  # control: the quote cost level fixed at its k-safe-dcl mean
+# re-market's measured over-reaction of mu's parts (PRICING.md: day 0.65, dealer 0.33-0.49, lane 0.56-0.63), killed at 14:00 after one week:
+# judged here on the floor (cheap-competitor weeks) on all 35 tuning weeks.
+PRESETS["kdcl-muw"] = PRESETS["k-safe-dcl"] + ["mu_w=(0.65,0.4,0.6)"]
