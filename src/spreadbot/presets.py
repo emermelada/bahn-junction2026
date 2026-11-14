@@ -137,3 +137,4 @@ PRESETS["k-safe"] = PRESETS["c3g"] + MON2S + ["fee_open_rule=((24,0,0.92),(12,80
 # re-drivers arms on the new bar k-safe: its fee part swapped for d-fee2d's deeper openings (d-fee2d vs c3g +732/+710).
 KSAFE_BASE = PRESETS["c3g"] + MON2S + ["desert_n=11", "desert_alarm=720"]
 PRESETS["k-safe-f2"] = KSAFE_BASE + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92))"]
+PRESETS["k-safe-pf"] = PRESETS["k-safe"] + ["bundle_open_dense=(12,80,0.76)"]  # + cheaper pairs that end where many drivers live
