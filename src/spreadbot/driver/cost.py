@@ -58,10 +58,10 @@ def unserviceable(request: PriceRequest, option: DeliveryOption, state: State) -
     if per_day and orders_due_on(state, (request["respondBy"] + slack(request, option, state)) // DAY) >= per_day * len(state.ext.get("roster", [])):
         why.append("day_full")
     mode = risk_mode(state, state.now)
-    cap = FLAGS["max_backlog"] // 2 if mode == "tight" else FLAGS["max_backlog"]
+    cap = {"tight": FLAGS["max_backlog"] // 2, "loose": round(FLAGS["max_backlog"] * FLAGS["loose_backlog"])}.get(mode, FLAGS["max_backlog"])
     if cap and backlog(state) >= cap:
         why.append("backlog")
-    if mode != "normal" and option["kind"] == "same_day":
+    if mode in ("tight", "rescue") and option["kind"] == "same_day":
         why.append(f"{mode}_same_day")
     if mode == "rescue" and min(drivers_near(state, leg["pickup"]["placeId"]) for leg in request["legs"]) < EASY_DRIVERS:
         why.append("rescue_hard")

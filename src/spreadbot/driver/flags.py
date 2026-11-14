@@ -24,6 +24,8 @@ FLAGS = {
     "skip_private": True,  # decline private pickups and deliveries: 20-23% late for next_day (b11: rc1 8/9 -> 9/9 ranked)
     "gov_tight": 0.05,  # projected late share above which the governor goes tight (plan: budget 5%)
     "gov_rescue": 0.08,  # and above which it goes to rescue (never spend 10%)
+    "gov_loose": 0.0,  # projected late share under which Monday-Wednesday goes loose (more backlog); 0 is off
+    "loose_backlog": 1.6,  # backlog cap multiplier in loose mode
     "governor": True,  # risk_mode from the projected late share; tight and rescue make serviceability stricter (b7: 3/3 ranked)
     "max_per_batch": 6,  # decline once we hold this many orders from one batchId (a yard sending many cars); 0 is off (rc4 10/12 -> 12/12, rc5 12/12)
     "orders_per_driver_day": 0.0,  # cap on won orders per last-pickup day, per driver in the world; 0 is off

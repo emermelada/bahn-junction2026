@@ -10,6 +10,8 @@ from spreadbot.driver.flags import FLAGS
 
 # Plan: treat lateness as a budget, plan for 5%, never spend 10%. Thresholds on the projected late share are
 # FLAGS["gov_tight"] (above it, win only cars that are easy to move) and FLAGS["gov_rescue"] (win almost nothing).
+DAY = 24 * 60
+LOOSE_LAST_DAY = 2  # loosen only Monday to Wednesday: lateness from Thursday and Friday wins shows only after the requests end
 MIN_ORDERS = 40  # early in the week one late car is not 100% late: divide by at least this many orders
 
 
@@ -40,5 +42,8 @@ def risk_mode(state: State, now: int) -> str:
     cache = state.ext.setdefault("driver", {})
     if cache.get("mode_at") != now:
         share = projected_late_share(state, now)
-        cache["mode_at"], cache["mode"] = now, "rescue" if share > FLAGS["gov_rescue"] else "tight" if share > FLAGS["gov_tight"] else "normal"
+        mode = "rescue" if share > FLAGS["gov_rescue"] else "tight" if share > FLAGS["gov_tight"] else "normal"
+        if mode == "normal" and share < FLAGS["gov_loose"] and now // DAY <= LOOSE_LAST_DAY:
+            mode = "loose"  # lateness budget unspent early in the week: take on more
+        cache["mode_at"], cache["mode"] = now, mode
     return cache["mode"]
