@@ -7,7 +7,7 @@ Javier moves to another challenge. Everything we found is on branch **`a/frank-p
 | Commit | What | Evidence |
 |---|---|---|
 | 629708e | preset `chains_plus` = `chains` (k18) + `max_per_batch=6` | rc10, 12 fresh weeks: mean €11,041 vs €10,791, ranked 12/12 vs 12/12, min on-time 91.8% vs 90.1% |
-| 48a67ba | flag `bundle_price_strict` (default off): chain-aware quoting only when the planner's own chain test passes against a held car | see "Chain-aware quoting" below |
+| 48a67ba | flag `bundle_price_strict` (default off): chain-aware quoting only when the planner's own chain test passes against a held car | rejected, keep off: on chains_plus, rc10 mean €10,889 vs €11,041, worst week €3,745 vs €6,731 (rc10-07) |
 
 To take them: `git fetch && git checkout branch-v1-frank && git merge origin/a/frank-plus` (or cherry-pick the two commits). Then play with `--preset chains_plus`. On Linux from Javier's repo: `make final-frank` (final or test final) and `make board-frank` (one ranking run) run `chains_plus` from a worktree `../frank-plus`.
 
@@ -59,7 +59,7 @@ The cost model is not biased: on 3,920 single-car gigs, booked fee / modelled co
 ## Plan (in order)
 
 1. Done: `max_per_batch=6` confirmed on all 12 rc10 weeks (mean 11,041 vs 10,791, 12/12, min on-time 0.918 vs 0.901); preset `chains_plus` on branch `a/frank-plus`.
-2. Chain-aware quoting (above): price a request at chain cost when it fits a car we hold; measure orders a week, chains a week, mean and min on-time on rc10 against k18.
+2. Chain-aware quoting: tested and rejected twice. `bundle_price` on k18: +€406 mean, +31 orders a week, but rc10-07 €4,629 vs €6,731 (76 more cars priced as chain partners, only 8 more chains). `bundle_price_strict` on chains_plus: -€152 mean, rc10-07 €3,745. In driver-short weeks chains do not book; pricing for them buys late singles. Next idea there: make the chain discount depend on how often chains actually book this week (learned live), not on geometry alone.
 3. Escalation cost: your own log shows 66 escalated singles costing €2.5k a week above typical. Measure which of them were predictable at quote time (slack, town supply, hour) and price or decline those.
 4. The thinnest week (rc10-02, 90.1%): find what went late there before loosening anything.
 5. Make the emulator survive `Unreachable` so the live rehearsal runs to the end.
