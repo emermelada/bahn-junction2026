@@ -194,7 +194,7 @@ class Governor:
         return (ontime + open_p) / total if total else 1.0
 
     def bar(self) -> float:
-        cfg = self.desk.cfg
+        cfg = self.desk.gov_cfg()
         proj = self.projection()
         if proj < cfg.gov_rescue:
             if cfg.dilute:

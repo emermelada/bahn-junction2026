@@ -133,6 +133,8 @@ class Desk:
         self.gov = Governor(self)
         self.book_ratios: list[float] = []
         self.gov_logged = -1
+        self.warned: set[str] = set()  # orders that had a deadline warning
+        self._strict_cfg: Optional[Config] = None
 
     # ------------------------------------------------------------------ helpers
     def say(self, code: str, detail: str = "") -> None:
@@ -383,6 +385,7 @@ class Desk:
             return
         ob.urgent = True
         ob.order["lastPickupAt"] = e["lastPickupAt"]
+        self.warned.add(e["orderId"])
         self.say("DEADLINE_CLOSE", f"{e['orderId']} lastPickupAt={e['lastPickupAt']}")
         self.dispatch_order(e["orderId"], "deadline_close")
         for leg in self.undelivered(e["orderId"]):
@@ -1125,10 +1128,28 @@ class Desk:
                 return True
         return False
 
+    def strict(self) -> bool:
+        """A hard week: many of our cars needed a deadline warning. The governor then takes y4's strict settings."""
+        c = self.cfg
+        if self._strict_cfg is None and not (c.strict_warn and self.won_count >= c.strict_after and len(self.warned) >= c.strict_warn * self.won_count):
+            return False
+        return True  # once strict, strict for the rest of the week
+
+    def gov_cfg(self) -> Config:
+        """The config the governor uses now: the normal one, or the strict one in a hard week."""
+        if not self.strict():
+            return self.cfg
+        if self._strict_cfg is None:
+            c, (t, r, rel, th) = self.cfg, self.cfg.strict_gov
+            self._strict_cfg = c.with_(gov_tight=max(c.gov_tight, t), gov_rescue=max(c.gov_rescue, r), gov_relaxed=max(c.gov_relaxed, rel),
+                                       theta=max(c.theta, th), steep_relaxed=(1.4, 1.6, 1.8))
+            self.say("STRICT", f"warned {len(self.warned)} of {self.won_count} orders: strict governor from now on")
+        return self._strict_cfg
+
     def steep_plan_now(self, ob: Optional[OrderBook] = None) -> tuple:
         """How much to pay to save a car: little while the on-time budget is comfortable, a lot near the gate,
         and more for a dealer whose trust a late car would halve."""
-        cfg = self.cfg
+        cfg = self.gov_cfg()
         if not cfg.gov_steep:
             return cfg.steep_plan
         proj = self.gov.projection()

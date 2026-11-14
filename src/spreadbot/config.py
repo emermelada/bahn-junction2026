@@ -56,6 +56,9 @@ class Config:
     theta_rescue: float = 0.93
     gov_tight: float = 0.95            # projected on-time share under which the bar tightens (v1w: min on-time 0.932 vs 0.919)
     gov_rescue: float = 0.93 
+    strict_warn: float = 0.0           # when this share of our orders has had a deadline warning, switch to the strict governor (0 = off):
+    strict_after: int = 60             # (judged once we hold this many orders) dev-43: c1 had 20 warnings by Thursday (8%), normal weeks 2-5%
+    strict_gov: tuple = (0.95, 0.93, 0.95, 0.80)  # strict (gov_tight, gov_rescue, gov_relaxed, theta) = y4's, the only config ranked on dev-43
     # --- congestion: open gigs near the pickup make the next car there dearer
     cong_frac: float = 0.0             # extra cost per open gig beyond cong_free, as a share of the typical fee
     cong_free: int = 3
