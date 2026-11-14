@@ -97,13 +97,28 @@ export class V2Desk implements Desk {
     let z = -Infinity
     const dDay = Math.floor(option.deadline / DAY)
     const fri = dDay % 7 === 4 || dDay === 7 ? 1 : 0
+    const bl = K.bl ? K.bl * Math.log1p(this.backlog(request.legs[0]!.pickup.placeId)) : 0
     for (const leg of request.legs) {
       const a = leg.pickup.placeId, b = leg.delivery.placeId
       const km = this.geo.km(a, b) / 100
       const s = slack < 4 ? K.s4 : slack < 8 ? K.s8 : slack < 16 ? K.s16 : 0
-      z = Math.max(z, K.b0 + K.sp * Math.log1p(this.geo.supply(a)) + K.sd * Math.log1p(this.geo.supply(b)) + K.km * km + s + (option.kind === "same_day" ? K.sameDay : 0) + fri * (K.fri + K.friKm * km))
+      z = Math.max(z, K.b0 + K.sp * Math.log1p(this.geo.supply(a)) + K.sd * Math.log1p(this.geo.supply(b)) + K.km * km + s + (option.kind === "same_day" ? K.sameDay : 0) + fri * (K.fri + K.friKm * km) + bl)
     }
     return Math.min(0.95, K.scale / (1 + Math.exp(-z)))
+  }
+
+  /** Our won cars with a pickup within 30 km of `place`, not delivered, no driver holding them, last pickup ahead. */
+  backlog(place: string): number {
+    const pool = new Set(this.geo.pool(place))
+    let n = 0
+    for (const o of this.orders.values()) {
+      if (o.status === "cancelled" || o.lastPickupAt < this.now || !pool.has(o.legs[0]!.pickup.placeId)) continue
+      if (o.deliveredAt.every((t) => t !== null)) continue
+      const gigs = this.gigsOf(o.id)
+      if (gigs.length > 0 && gigs.every((g) => this.booked.has(g))) continue
+      n++
+    }
+    return n
   }
 
   // ------------------------------------------------------------------ lifecycle
