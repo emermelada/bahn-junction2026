@@ -212,3 +212,6 @@ PRESETS["k-f1h5fV1"] = PRESETS["k-f1h5f"] + ["load_bundle_w=0.6"]  # as on claud
 PRESETS["k-f1h5fV2"] = PRESETS["k-f1h5fV1"] + ["load_free=0.12", "load_slope=2"]
 PRESETS["v5q2V"] = PRESETS["k-f1h5fV2"] + ["long_warn_distinct=true"] + SCARCITY + [
     "scarce_set=(('load_free',0.07),('load_slope',1.0),('load_bundle_w',1.0))"]
+# v5q2f: the switch on the fee signal alone, checked Tue 24:00 - Wed 12:00, no long declines (QUOTE_BUILD.md: the spec rule fires on 70%
+# of normal fee1 weeks by Thu 00:00, mostly via warned/won >= 0.06; fee >= 1.08 alone to Wed 12:00: 72% of bad weeks, 20% of normal).
+PRESETS["v5q2f"] = PRESETS["v5q1"] + ["scarcity=(1.08,9.0)", "scarcity_until=3600", "scarcity_risk=1.5"]
