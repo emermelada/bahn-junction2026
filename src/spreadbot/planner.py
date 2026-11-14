@@ -277,7 +277,10 @@ class SupplyStub:
 
     def hours(self, region: str, day: int) -> float:
         share = 0.45 if day % 7 < 5 else 0.2  # weekend: few work
-        return self._homes.get(region, 0) * share * 3.0 * self.desk.cfg.v2_supply_scale
+        # drivers travel: a region's hours are 60% its residents and 40% an equal share of everyone (east Finland has
+        # few homes but sees drivers finishing gigs there)
+        n = 0.6 * self._homes.get(region, 0) + 0.4 * len(self.desk.roster) / len(_HUBS)
+        return n * share * 3.0 * self.desk.cfg.v2_supply_scale
 
     def on_event(self, e: dict) -> None:
         return None

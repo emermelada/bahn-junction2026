@@ -59,9 +59,10 @@ class Config:
     v2_req_per_hour: float = 21.0      # requests per request hour in a level 8 week (1,040 a week over 50 hours)
     v2_hours_per_car: float = 3.5      # average driver-hours of a won car (drive + handling), from the reveals
     v2_supply_scale: float = 1.0       # scale on the stub supply (until supply.py lands)
-    v2_fee_per_min: float = 18.0       # stub clearing fee: cents per driving minute (typical fee ~ EUR 60 for 3 h)
+    v2_fee_per_min: float = 39.0       # stub clearing fee prior: cents per driving minute after the fixed part (reveals: typical fee 7,392 c per leg of 152 min)
     v2_fee_fixed: float = 1500.0       # stub clearing fee: cents per car
     v2_fee_mult: float = 1.1           # stub: flat fee over that base that books the day before (1.08-1.10 in the reveals)
+    v2_fee_rel: tuple = (8, 1.3)       # one insurance raise (hours before last pickup, x flat fee) when the flat fee has not booked
     # --- on-time selection
     ontime_fee_assumed: float = 1.6    # the fee the on-time model assumes (fee_plan reaches about this)
     ontime_shift: float = 0.0

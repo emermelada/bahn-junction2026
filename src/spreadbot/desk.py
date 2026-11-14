@@ -14,6 +14,7 @@ from typing import Any, Optional
 from .config import Config
 from .geo import DAY, HOUR, Geo, open_intervals
 from .notes_safe import LegNote, read_note_safe
+from .planner import FeesStub, Planner, SupplyStub
 from .policy import Governor, Market, OnTime
 
 OPTION_ORDER = ("same_day", "next_day", "within_3_days")
@@ -132,6 +133,19 @@ class Desk:
         self.ontime = OnTime(self)
         self.gov = Governor(self)
         self.book_ratios: list[float] = []
+        self.planner: Optional[Planner] = None
+        if cfg.v2:
+            # V2: a3's Supply and a4's Fees when their modules exist, the prior-only stubs until then (same signatures).
+            try:
+                from .supply import Supply as _Supply  # type: ignore
+            except ImportError:
+                _Supply = SupplyStub
+            try:
+                from .fees import Fees as _Fees  # type: ignore
+            except ImportError:
+                _Fees = FeesStub
+            self.supply, self.fees = _Supply(self), _Fees(self)
+            self.planner = Planner(self, self.supply, self.fees)
         self.gov_logged = -1
         self.warned: set[str] = set()  # orders that had a deadline warning
         self._strict_cfg: Optional[Config] = None
@@ -156,6 +170,12 @@ class Desk:
     # ------------------------------------------------------------------ events
     def handle(self, e: dict) -> None:
         k = e["kind"]
+        if self.planner is not None:
+            for part in (self.supply, self.fees):
+                try:
+                    part.on_event(e)
+                except Exception as exc:
+                    self.say("ERR", f"{type(part).__name__} {k} {type(exc).__name__}: {exc}")
         try:
             fn = getattr(self, "on_" + k, None)
             if fn:
@@ -171,6 +191,8 @@ class Desk:
         if r["id"] not in self.requests:
             self.dealer_requests[r["dealerId"]] += 1
         self.requests[r["id"]] = r
+        if self.planner is not None:
+            self.planner.on_request(r)
         prices, why = self.price(r)
         self.quoted[r["id"]] = prices
         self.outbox.append({"type": "quote", "requestId": r["id"], "prices": prices})
@@ -190,7 +212,7 @@ class Desk:
         self.orders[o["id"]] = ob
         self.won_count += 1
         self.observe_outcome(o["id"], e["at"], True)
-        if self.cfg.hold:
+        if self.cfg.hold and self.planner is None:
             rel = self.release_at(ob)
             if rel is not None:
                 self.held[o["id"]] = rel
@@ -478,13 +500,23 @@ class Desk:
             load = self.due_load(self.deadline_day(r, opt))
             per_car = cfg.load_flat_cents if cfg.load_flat_cents else r["referenceFeeCents"]
             load_cost = cfg.load_slope * per_car * max(0.0, load - cfg.load_free * self.capacity_factor()) / 0.05
+            dday = self.deadline_day(r, opt)
+            v2_cost = cost
+            if self.planner is not None:
+                # V2: the car costs its predicted clearing fee plus the shadow price of its driver-hours on the day the
+                # planner would move it (free while that day has idle hours). No load charge: lam is the load.
+                pday = self.planner.planned_day(r, min(opt["deadline"], dday * DAY + DAY - 1))
+                region = self.supply.region(r["legs"][0]["pickup"]["placeId"])
+                v2_cost = self.fees.clearing(region, pday, 8, drive, 1)
+                load_cost = self.planner.lam(region, pday) * 100.0 * self.planner.hours_of(r)
+                load = pday
             risk_frac = (1 - p_ok) * cfg.late_cost_frac * self.pl_factor(drive)
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain) + cfg.trust_loss_w * (1 - p_ok) * t_loss
             # Under the on-time target, a safe car is worth more than its margin: it dilutes the late ones.
             if gate and p_ok >= cfg.gate_safe_p:
                 trust_adj -= gate
-            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, cost, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
+            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, v2_cost, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 info.append(f"{kind}:noev")
                 continue
@@ -653,6 +685,9 @@ class Desk:
         legs = [l for l in self.undelivered(oid) if (oid, l) not in self.leg_gig and not self._pending(oid, l)]
         if not legs:
             return
+        if self.planner is not None:
+            self.dispatch_v2(ob, legs, why)
+            return
         if self.cfg.bundle and self.cfg.hold_minutes and (why == "won" or oid in self.chain_held) and legs == [0] and len(ob.order["legs"]) == 1 and self.simple(ob):
             # Chain planner: hold the car a while. Most cars are won hours before they are ready, and a partner whose
             # pickup is near this car's delivery lets one driver take both for less than two gigs.
@@ -669,6 +704,54 @@ class Desk:
             groups = [[l] for l in legs]
         for g in groups:
             self.post(ob, g, why)
+
+    # ------------------------------------------------------------------ V2 dispatch: the plan's chains at a flat fee
+    def dispatch_v2(self, ob: OrderBook, legs: list[int], why: str) -> None:
+        """A car waits until the evening (hold_hour) before its planned day, then its whole chain is posted at the
+        predicted clearing fee, flat (one insurance raise). Cars whose last pickup is near go at once on c3's ladder."""
+        pl, oid, cfg = self.planner, ob.order["id"], self.cfg
+        if oid not in pl.day_of:
+            pl.replan(self.now)
+        day = pl.day_of.get(oid, self.now // DAY)
+        release = (day - 1) * DAY + cfg.hold_hour * 60
+        last = self.last_pickup(ob, legs)
+        if self.now < release and last - self.now > cfg.alarm_minutes + 2 * HOUR and not ob.urgent:
+            return
+        if ob.urgent or last - self.now < 2 * HOUR:
+            self.post(ob, legs, why)  # the plan missed: c3's steep ladder saves the car
+            return
+        chain = [(o, l) for o, l in pl.chain_for(oid) if o in self.orders and self.orders[o].order["status"] != "cancelled"
+                 and (o, l) not in self.leg_gig and not self._pending(o, l) and l in self.undelivered(o)]
+        if len(chain) < 2 or not all(self.simple(self.orders[o]) for o, _ in chain):
+            chain = [(oid, l) for l in legs]
+        drive, prev = 0, None
+        for o, l in chain:
+            L = self.orders[o].order["legs"][l]
+            if prev:
+                drive += self.geo.drive(prev, L["pickup"]["placeId"])
+            drive += self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"])
+            prev = L["delivery"]["placeId"]
+        region = self.supply.region(self.orders[chain[0][0]].order["legs"][chain[0][1]]["pickup"]["placeId"])
+        fee = max(1, int(round(self.fees.clearing(region, day, 8, drive, len(chain)))))
+        stops = []
+        for o, l in chain:
+            stops += self.stops_for(self.orders[o], l)
+        audience = {"experienced": any(self.orders[o].order["legs"][l]["car"]["premium"] for o, l in chain),
+                    "manualLicence": any(self.orders[o].manual or self.leg_note(o, l).manual for o, l in chain)}
+        sched = [{"at": self.now, "feeCents": fee}]
+        if cfg.v2_fee_rel:
+            sched.append({"at": max(self.now + cfg.fee_hold, last - int(cfg.v2_fee_rel[0] * HOUR)), "feeCents": int(round(fee * cfg.v2_fee_rel[1]))})
+        action = {"type": "post", "stops": stops, "audience": audience, "schedule": dedupe(sched)}
+        self.outbox.append(action)
+        self.pending_posts.append((action, "chain" if len(chain) > 1 else why))
+        if len(chain) > 1:
+            lastc = min(self.last_pickup(self.orders[o], [l]) for o, l in chain)
+            for o, _ in chain:
+                self.bundle_last[o] = lastc
+        for o, _ in chain:
+            if self.orders[o].first_post_at is None:
+                self.orders[o].first_post_at = self.now
+        self.say("V2POST", "+".join(o for o, _ in chain) + f" day={day} fee={fee} {why}")
 
     # ------------------------------------------------------------------ bundles
     def chainable(self, r: dict) -> bool:
@@ -1396,7 +1479,11 @@ class Desk:
             if self.now - t0 > 60:
                 self.fast_book.append((t0, False))
                 del self.first_posts[gid]
-        if self.held:
+        if self.planner is not None and self.now - self.planner.last_replan >= HOUR:
+            self.planner.replan(self.now)
+            st = self.planner.state()
+            self.say("PLAN", f"chains={st['chains']} unplanned={st['unplanned']} lam=" + str({k: v for k, v in st["lam"].items() if v}))
+        if self.held and self.planner is None:
             self.release_held()  # before the loop below, which would post released cars one by one
         for oid in list(self.orders):
             ob = self.orders[oid]
