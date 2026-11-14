@@ -1672,7 +1672,10 @@ class Desk:
         if self.cfg.relook_minutes:
             self.relook()
         if self.cfg.fee1 and self.cfg.fee1_repick:
-            self.fee1_repick()
+            try:
+                self.fee1_repick()
+            except Exception as exc:  # never skip the alarm escalation below
+                self.say("ERR", f"fee1_repick {type(exc).__name__}: {exc}")
         if self.cfg.offer_home_n:
             self.offer_home()
         if self.cfg.view_raise_n:
