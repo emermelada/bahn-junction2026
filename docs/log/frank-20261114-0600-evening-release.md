@@ -27,3 +27,15 @@ hold16 vs base by seed: +1792, +3179, -666, +2631, +1218, +1315, -35, +833, -169
 18:00 was too late: release pairs left unbooked into the night (no notifications 23:00-07:00) were split by the 6 h alarm the next day. About 105 cars/week rode in release pairs (offline estimate: 110-165).
 
 **Keep or kill.** Keep, at 16:00 or earlier; 14:00 looks better still (incomplete). Next: finish 14:00 and 12:00, then bundle_keep, hold_price, hold_km, bundle_mult, then a fresh check on dev-19..30 against rc2.
+
+## Fresh check, dev-19..30 (never used for tuning), `hold=true hold_hour=16` vs rc2
+
+| | Ranked | Min on-time | p10 | Median | Mean | Orders |
+|---|---|---|---|---|---|---|
+| rc2 | 12/12 | 0.935 | 5,394 | 8,868 | 9,364 | 311 |
+| **hold 16:00** | **12/12** | 0.930 | **5,605** | **10,463** | **10,707** | 312 |
+
++1,343/week (+14%). Up on 9 of 12 weeks; the three worst weeks all improve (5,394 -> 5,605, 6,704 -> 8,661, 6,854 -> 8,746).
+By seed: +1655, +699, +211, -868, +1957, -1932, +4941, +3476, -655, +459, +1892, +4273.
+
+**Keep.** `hold=true hold_hour=16` is the candidate default for rc3.
