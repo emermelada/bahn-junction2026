@@ -1,6 +1,6 @@
 """Score tags by what the board pays: margin counts only on weeks at >= 90% on time.
 
-usage: python lab/frank/gated.py TAG [TAG ...]   (paired on the seeds all tags share)
+usage: python lab/frank/gated.py TAG[+TAG] [TAG ...]   (paired on the seeds all tags share)
 """
 import glob
 import json
@@ -9,9 +9,9 @@ import statistics
 import sys
 
 
-def load(tag):
+def load(tags):
     out = {}
-    for p in glob.glob(os.path.join("data", "runs", tag, "*", "summary.json")):
+    for p in [p for tag in tags.split("+") for p in glob.glob(os.path.join("data", "runs", tag, "*", "summary.json"))]:
         s = json.load(open(p))
         out[s["seed"]] = s["score"]
     return out

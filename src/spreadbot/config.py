@@ -105,6 +105,8 @@ class Config:
     unbundle_minutes: int = 5 * 60     # unbooked this close to its last start: post the cars alone
     bundle_max_drive: int = 12 * 60 - 30  # road minutes of a chain; k5: 74% booked under 4 h, 17% at 10-12 h
     bundle_min_lead: int = 0           # minutes from now to the chain's start; k5: 46% booked under 2 h, 70% at 18-30 h
+    bundle_short: bool = False         # pick the partner that makes the shortest chain (short chains book more often), not the one with most slack
+    bundle_keep_drop: bool = False     # a dropped bundle with time to spare stays in the app as a bundle (split later if still unbooked)
     bundle_rel: tuple = ()             # ((hours before the chain's last start, fee as a share of the two typical fees), ...); () = fee_rel on the bundle fee
     hold_minutes: int = 0              # hold a won car up to this long, unposted, to find a chain partner (0 = post at once)
     hold_lead: int = 12 * 60           # post a held car at the latest this long before its pickup window opens

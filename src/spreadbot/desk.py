@@ -680,6 +680,14 @@ class Desk:
         L = ob.order["legs"][0]
         return min(self.now + cfg.hold_minutes, L["pickup"]["window"]["from"] - cfg.hold_lead, self.last_pickup(ob, [0]) - cfg.hold_slack)
 
+    def chain_key(self, last: int, first: OrderBook, second: OrderBook) -> float:
+        if not self.cfg.bundle_short:
+            return last
+        A, B = first.order["legs"][0], second.order["legs"][0]
+        g = self.geo
+        return -(g.drive(A["pickup"]["placeId"], A["delivery"]["placeId"]) + g.drive(A["delivery"]["placeId"], B["pickup"]["placeId"])
+                 + g.drive(B["pickup"]["placeId"], B["delivery"]["placeId"]))
+
     def try_bundle(self, ob: OrderBook) -> bool:
         if not self.simple(ob):
             return False
@@ -692,7 +700,7 @@ class Desk:
                 continue
             for first, second in ((ob, other), (other, ob)):
                 last = self.chain(first, second)
-                if last is not None and (best is None or last > best[0]):
+                if last is not None and (best is None or self.chain_key(last, first, second) > self.chain_key(best[0], best[1], best[2])):
                     best = (last, first, second, None)
         for rec in self.gigs.values():
             if rec.status != "open" or rec.escalated or len(rec.legs) != 1 or self.now - rec.posted_at > self.cfg.bundle_window:
@@ -702,7 +710,7 @@ class Desk:
                 continue
             for first, second in ((ob, other), (other, ob)):
                 last = self.chain(first, second)
-                if last is not None and (best is None or last > best[0]):
+                if last is not None and (best is None or self.chain_key(last, first, second) > self.chain_key(best[0], best[1], best[2])):
                     best = (last, first, second, rec)
         if not best:
             return False
@@ -892,6 +900,9 @@ class Desk:
         if rec.status != "open":
             return
         if len({o for o, _ in rec.legs}) > 1:
+            last = min(self.bundle_last.get(o, 0) for o, _ in rec.legs)
+            if self.cfg.bundle_keep_drop and why == "dropped" and last - self.now >= self.cfg.unbundle_minutes:
+                return
             self.unbundle(rec, why)
             return
         legs = rec.legs

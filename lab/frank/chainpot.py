@@ -6,7 +6,7 @@ import gzip, json, sys
 sys.path.insert(0, "src")
 from spreadbot.geo import Geo
 geo = Geo(json.load(open("data/map.json")))
-KM = float(sys.argv[1])
+KM = float(sys.argv[1]); MAXD = int(sys.argv[2]); LEAD = int(sys.argv[3]); del sys.argv[2:4]
 tot_cars = tot_pair = 0
 save = 0.0
 for run in sys.argv[2:]:
@@ -27,14 +27,14 @@ for run in sys.argv[2:]:
         if geo.air(A["q"], B["p"]) > KM:
             return None
         post = max(A["at"], B["at"]) + 30
-        start = max(post + 60, A["f"])
+        start = max(post + LEAD, A["f"])
         a_del = start + A["dr"]
-        if a_del > A["dl"] - 60:
+        if a_del > A["dl"] - 60 or A["priv"]:
             return None
         bp = max(a_del + geo.drive(A["q"], B["p"]), B["f"])
         if bp > B["t"] or bp + B["dr"] > B["dl"] - 60:
             return None
-        if bp - start + B["dr"] > 720 or bp - a_del > 180:  # chain must be one working day, little waiting
+        if A["dr"] + geo.drive(A["q"], B["p"]) + B["dr"] > MAXD or bp - a_del > 180:  # chain must be one working day, little waiting
             return None
         return A["ref"] + B["ref"]
     pairs = []

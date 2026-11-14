@@ -8,4 +8,13 @@ PRESETS = {
         "steep_relaxed=(1.2,1.4)",                        # pay little to rescue a car: a late refund is 10-25%
         "load_free=0.07",                                 # more cars per day; money peaks at 0.06-0.07
     ],
+    # k18: money settings with an on-time guard at 92%, plus the hold-and-pair chain planner.
+    # Gated mean (weeks under 90% count 0): 11,268 on dev-07..18 and 11,534 on dev-19..30, ranked 24/24, min on-time 0.907.
+    "chains": [
+        "gov_tight=0.92", "gov_rescue=0.92", "gov_relaxed=0.93",  # governor only near the gate: dilution bar and steep fees under 92%
+        "theta=0.7", "lane_w=1.0", "steep_relaxed=(1.2,1.4)", "load_free=0.07",
+        "hold_minutes=480", "hold_lead=900",              # hold a won car up to 8 h (posted 15 h before pickup) to find a chain partner
+        "unbundle_minutes=480",                           # an unbooked chain splits 8 h before its last start
+        "bundle_max_drive=300", "bundle_min_lead=360",    # chains under 5 h of driving, formed 6 h ahead: 85% booked
+    ],
 }
