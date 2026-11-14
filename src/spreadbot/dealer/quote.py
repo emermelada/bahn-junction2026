@@ -12,7 +12,7 @@ from spread.types import PriceRequest
 from spreadbot.core.rng import rng
 from spreadbot.core.state import State
 from spreadbot.dealer.flags import FLAGS
-from spreadbot.dealer import week_level
+from spreadbot.dealer import dealer_level, week_level
 from spreadbot.dealer.trust import CAP as TRUST_FULL, trust_count, trust_factor
 from spreadbot.dealer.win_model import curve, record_quote
 from spreadbot.driver.cost import estimate_cost
@@ -22,6 +22,7 @@ CANDIDATES = [1.10 + 0.02 * k for k in range(31)]  # 1.10 .. 1.70
 JITTER = 0.04
 BIG_SHARE = 0.10  # rc5: the top dealer sends ~30% of requests, the second ~15%, the third ~8%
 MIN_SEEN = 30  # requests seen before any dealer counts as big
+DEALER_CAP = 0.2  # a dealer's ratio stays within this of the week's: the competitor moves a few steps at most
 WEEK_CAP = 0.25  # the level runs 26-54% above list at level 8: never move more than about that spread
 LANE_CAP = 0.35  # no lane moves the ratio more than this: the table's p10-p90 is -0.30 to +0.25  # exploration around the chosen ratio, so the curve sees both sides of it
 
@@ -37,6 +38,9 @@ def quote(request: PriceRequest, state: State) -> dict[str, int]:
     ratio = FLAGS["quote_ratio"] + FLAGS["lane_weight"] * lane_shift(request)
     if FLAGS["trust_invest"] and big_dealer(state, request["dealerId"]) and trust_count(state, request["dealerId"]) < TRUST_FULL:
         ratio -= FLAGS["trust_invest"]  # win this dealer's early orders cheaper: each on-time one lifts all its later prices 1%
+    if FLAGS["dealer_level"]:
+        ratio += max(-DEALER_CAP, min(DEALER_CAP, FLAGS["dealer_level"] * dealer_level.shift(state, request["dealerId"])))
+        dealer_level.record(state, request["id"], request["dealerId"])
     if FLAGS["week_level"]:
         ratio += max(-WEEK_CAP, min(WEEK_CAP, FLAGS["week_level"] * week_level.shift(state)))
         week_level.record(state, request["id"], ratio)  # the ratio the dealer sees, before trust and the same_day extra
