@@ -20,6 +20,7 @@ HOUR, DAY = 60, 24 * 60
 MID_SLACK = 8 * HOUR  # fee ladder: with 8-24 h to the last pickup, gigs near the typical fee still booked in time
 SPLIT_MINUTES = 12 * HOUR  # RULES: a gig with more than one car may plan at most 12 hours of driving
 EXPLICIT_MIN = 30  # a pickup window shorter than this is not worth posting: no driver could plan around it
+DROP_RAISE_LEAD = 12 * HOUR  # a gig given back with less than this to its last pickup is repriced at once
 BUNDLE_REPOST_AGE = 180  # minutes: an open single this young has shown few drivers its fee, so re-posting it as a chain costs little
 BUNDLE_BUFFER = 60  # minutes of spare time a chain keeps before each car's deadline, for real driving times
 REFUSED_BACKOFF = 30  # minutes before we try a refused post again; refusals name a window, so the next try usually differs
@@ -43,6 +44,11 @@ def dispatch(state: State, now: int) -> list[Action]:
             elif oid in state.urgent and gig["scheduledAt"] < state.urgent[oid]:
                 actions.append({"type": "reprice", "gigId": gid, "schedule": fees(state, order, _cars(gig), now, base=gig_base(state, gig))})
                 state.log(now, "reprice_urgent", gid, order=oid)
+            elif FLAGS["drop_raise"] and oid not in state.urgent and dropped_at(state, gid) > gig["scheduledAt"] \
+                    and order["lastPickupAt"] - now < DROP_RAISE_LEAD:
+                actions.append({"type": "reprice", "gigId": gid, "schedule": fees(state, order, _cars(gig), now, raised=FLAGS["drop_raise"],
+                                                                                  base=gig_base(state, gig))})
+                state.log(now, "reprice_dropped", gid, order=oid)
             elif oid not in state.urgent and (ratio := raise_due(order, gig, now)):
                 actions.append({"type": "reprice", "gigId": gid, "schedule": fees(state, order, _cars(gig), now, raised=ratio,
                                                                                   base=gig_base(state, gig))})
@@ -133,6 +139,17 @@ def fees(state: State, order: Order, cars: int, now: int, raised: float = 0.0, b
     if state.level == 1:
         steps = steps[:1]
     return [{"at": now + dt, "feeCents": max(1, int(fee * f + 0.5))} for dt, f in steps]
+
+
+def dropped_at(state: State, gig_id: str) -> int:
+    """The minute a driver last gave this gig back (drop or no-show), or -1."""
+    return state.ext.get("driver", {}).get("dropped", {}).get(gig_id, -1)
+
+
+def observe(event, state: State) -> None:
+    """Remembers when a booked driver gave a gig back: it reopens at a fee that already failed to hold a driver."""
+    if event["kind"] in ("gig_dropped", "no_show"):
+        state.ext.setdefault("driver", {}).setdefault("dropped", {})[event["gigId"]] = event["at"]
 
 
 def raise_due(order: Order, gig, now: int) -> float:

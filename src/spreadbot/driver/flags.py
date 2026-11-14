@@ -8,6 +8,7 @@ FLAGS = {
     "fee_top": 1.4,  # the schedule rises to this multiple; <= fee_open means one flat fee, which teaches no waiting
     "raise_lead": 360,  # minutes before lastPickupAt at which a still-open gig gets one raise to fee_raise; 0 is off (b7)
     "fee_raise": 1.8,  # that one raise, as a multiple of the typical fee
+    "drop_raise": 0.0,  # reprice a gig given back (drop, no-show) near its last pickup to this multiple; 0 is off
     "raise_mid_lead": 0,  # minutes before lastPickupAt for an earlier, smaller raise to fee_raise_mid; 0 is off
     "fee_raise_mid": 1.1,  # the earlier raise, for gigs opened low (fee_open_long below 1)
     "chain_offer": 0.0,  # offer an open gig to a booked driver finishing near its pickup, at this multiple of the typical fee; 0 is off

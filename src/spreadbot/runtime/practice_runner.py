@@ -21,6 +21,7 @@ from spreadbot.core.state import State
 from spreadbot.dealer import dealer_level, events, week_level, win_model
 from spreadbot.dealer.quote import decline, quote
 from spreadbot.driver import chains
+from spreadbot.driver import dispatch as dispatch_module
 from spreadbot.driver.dispatch import dispatch
 
 # Outside request hours: wake on the events that need an answer, and at least every hour.
@@ -42,7 +43,7 @@ def next_stop(now: int, ends_at: int) -> dict[str, Any]:
     return {"until": WAKE_ON, "max": min(ends_at, now + TICK)}
 
 
-OBSERVERS = [win_model.observe, week_level.observe, dealer_level.observe, events.observe, chains.observe]  # each side's trackers, fed every new event after State has folded it
+OBSERVERS = [win_model.observe, week_level.observe, dealer_level.observe, events.observe, chains.observe, dispatch_module.observe]  # each side's trackers, fed every new event after State has folded it
 
 
 def observe(event: dict, state: State) -> None:
