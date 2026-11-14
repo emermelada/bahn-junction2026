@@ -51,6 +51,6 @@ PRESETS["c3bprl"] = PRESETS["c3bp"] + ["relook_minutes=360"]
 # The lateness model from all our weeks (late_gbm.py, AUC 0.897 vs 0.737) in place of the logistic: the main line since Sat 14 Nov.
 PRESETS["c3g"] = PRESETS["c3"] + ["ontime_model=gbm"]
 # re-market: menu pricing (one effective price, slower options cheaper by the dealer's speed value, every option at one margin).
-PRESETS["c3gm"] = PRESETS["c3g"] + ["menu=true"]
+PRESETS["m1menu"] = PRESETS["c3g"] + ["menu=true"]
 # re-market: no load charge on cars due the last Monday (Friday noev is the load charge; Mon2 cars are our safest).
-PRESETS["c3gf"] = PRESETS["c3g"] + ["load_free_mon2=0.2"]
+PRESETS["m2mon2"] = PRESETS["c3g"] + ["load_free_mon2=0.2"]
