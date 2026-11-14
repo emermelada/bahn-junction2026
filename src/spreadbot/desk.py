@@ -615,6 +615,8 @@ class Desk:
             return False
         p, d = L["pickup"]["placeId"], L["delivery"]["placeId"]
         km = self.cfg.bundle_km
+        if self.cfg.bundle_price_strict:
+            return self.chainable_strict(r)
         for oid2 in self.held:
             ob = self.orders.get(oid2)
             if not ob or not self.simple(ob):
@@ -635,6 +637,40 @@ class Desk:
                 continue
             if self.geo.air(O["delivery"]["placeId"], p) <= km or self.geo.air(d, O["pickup"]["placeId"]) <= km:
                 return True
+        return False
+
+    def chainable_strict(self, r: dict) -> bool:
+        """The planner's own test, at quote time: a held car (one the planner will try to pair) that this car can
+        follow or precede within the chain driving cap, with both deadlines met. On rc10-07 the loose test priced
+        76 more cars at chain cost but only 8 more chains formed; the rest went out as discounted singles."""
+        cfg, geo = self.cfg, self.geo
+        L = r["legs"][0]
+        p, d = L["pickup"]["placeId"], L["delivery"]["placeId"]
+        dR = geo.drive(p, d)
+        r_ready = L["pickup"]["window"]["from"]
+        r_deadline = min(o["deadline"] for o in r["options"])
+        for oid2 in self.held:
+            ob = self.orders.get(oid2)
+            if not ob or not self.simple(ob):
+                continue
+            O = ob.order["legs"][0]
+            op, od = O["pickup"]["placeId"], O["delivery"]["placeId"]
+            dO = geo.drive(op, od)
+            # held car first, then this one
+            if geo.air(od, p) <= cfg.bundle_km and dO + geo.drive(od, p) + dR <= cfg.bundle_max_drive:
+                start = max(self.now + cfg.bundle_lead, O["pickup"]["window"]["from"])
+                a_del = start + dO
+                b_pick = max(a_del + geo.drive(od, p), r_ready)
+                if a_del <= self.deadline(ob.order, 0) - cfg.bundle_margin and b_pick + dR <= r_deadline - cfg.bundle_margin:
+                    return True
+            # this car first, then the held one
+            if geo.air(d, op) <= cfg.bundle_km and dR + geo.drive(d, op) + dO <= cfg.bundle_max_drive:
+                start = max(self.now + cfg.bundle_lead, r_ready)
+                a_del = start + dR
+                b_pick = max(a_del + geo.drive(d, op), O["pickup"]["window"]["from"])
+                if a_del <= r_deadline - cfg.bundle_margin and b_pick <= O["pickup"]["window"]["to"] \
+                        and b_pick + dO <= self.deadline(ob.order, 0) - cfg.bundle_margin:
+                    return True
         return False
 
     def simple(self, ob: OrderBook) -> bool:
