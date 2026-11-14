@@ -58,6 +58,8 @@ class Config:
     theta_rescue: float = 0.93
     gov_tight: float = 0.95            # projected on-time share under which the bar tightens (v1w: min on-time 0.932 vs 0.919)
     gov_rescue: float = 0.93 
+    gov_stuck_p: float = 0.0           # projection: an order whose gig is posted but unbooked for gov_stuck_age minutes counts as this likely
+    gov_stuck_age: int = 60            # on time (0 = off). Such orders end late 40-55% of the time in every week (lab/build/openstate.py, 13 weeks)
     strict_warn: float = 0.0           # when this share of our orders has had a deadline warning, switch to the strict governor (0 = off):
     strict_after: int = 60             # (judged once we hold this many orders) dev-43: c1 had 20 warnings by Thursday (8%), normal weeks 2-5%
     strict_gov: tuple = (0.95, 0.93, 0.95, 0.80)  # strict (gov_tight, gov_rescue, gov_relaxed, theta) = y4's, the only config ranked on dev-43

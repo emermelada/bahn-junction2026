@@ -189,6 +189,9 @@ class Governor:
                 p = 0.45
             else:
                 p = ob.p_ok * cal
+                if d.cfg.gov_stuck_p and any((g := d.leg_gig.get((oid, l))) and d.gigs[g].status == "open"
+                                             and d.now - d.gigs[g].posted_at >= d.cfg.gov_stuck_age for l in legs):
+                    p = min(p, d.cfg.gov_stuck_p)  # nobody booked it for an hour: about a coin flip
             open_p += p
         total = ontime + late + n_open
         return (ontime + open_p) / total if total else 1.0
