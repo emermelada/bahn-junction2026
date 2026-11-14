@@ -11,7 +11,18 @@ try {
 } catch {}
 const { values: args } = parseArgs({ options: { seed: { type: "string" }, world: { type: "string" }, level: { type: "string", default: "8" }, speed: { type: "string", default: "1" } } })
 const client = new Client()
-const world = args.world ? client.world(args.world) : await client.create(Number(args.level) as 8, { seed: args.seed })
+// A full team (409 at create) waits for a free slot instead of failing.
+async function create() {
+  for (;;) {
+    try {
+      return await client.create(Number(args.level) as 8, { seed: args.seed })
+    } catch (error) {
+      if (!String((error as Error).message).includes("8 practice worlds")) throw error
+      await new Promise((done) => setTimeout(done, 20_000))
+    }
+  }
+}
+const world = args.world ? client.world(args.world) : await create()
 console.log(`ticker world ${world.id}`)
 if (!args.world) process.once("SIGINT", async () => (await world.delete().catch(() => {}), process.exit(130)))
 const speed = Number(args.speed)
