@@ -23,6 +23,8 @@ export type Cfg = {
     tierA: { slackHours: number; reach30Pickup: number; reach30Delivery: number }
     tierB: { slackHours: number; reach30Pickup: number; reach80Pickup: number; reach30Delivery: number }
     sameDay: { maxDriveMin: number; slackHours: number; reach30Pickup: number }
+    nextDay: { maxDriveMin: number }               // next_day with a longer drive is tier C (measured 82-85% on time at 4h+)
+    poolBrake: { warnings: number; windowMin: number } // a pickup pool with this many deadline warnings on unbooked cars in the window: tier A only; warnings 0 = off
     reachMarginMin: number                         // minutes a driver needs to see a gig and get to the pickup
     snowFactor: number
   }
@@ -58,6 +60,8 @@ export const DEFAULT_CFG: Cfg = {
     tierA: { slackHours: 24, reach30Pickup: 3, reach30Delivery: 10 },
     tierB: { slackHours: 8, reach30Pickup: 1, reach80Pickup: 20, reach30Delivery: 3 },
     sameDay: { maxDriveMin: 180, slackHours: 4, reach30Pickup: 5 },
+    nextDay: { maxDriveMin: 100000 },
+    poolBrake: { warnings: 0, windowMin: 1440 },
     reachMarginMin: 90,
     snowFactor: 1.3,
   },

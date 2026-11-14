@@ -69,6 +69,8 @@ export class Quoter {
         let tier: Tier = flags.gate ? f.tier : "A"
         let why = ""
         if (flags.gate && tier === "C") why = "tier C"
+        if (!why && flags.gate && option.kind === "next_day" && f.drive > this.cfg.gate.nextDay.maxDriveMin) (tier = "C"), (why = "long next_day")
+        if (!why && flags.gate && tier === "B" && this.braked(pickup, now)) (tier = "C"), (why = "pool brake")
         if (!why && flags.governor && maxTier === "A" && tier === "B") (tier = "C"), (why = "calendar")
         let day: number | null = dayOf(Math.max(now, f.readyFrom))
         if (!why && flags.capacity) {
@@ -116,6 +118,19 @@ export class Quoter {
       log?.({ at: now, kind: "quote", id: request.id, dealer: request.dealerId, batch: request.batchId, pickup, mode, headroom: Math.round(headroom * 1000) / 1000, opts: decisions })
     }
     return out
+  }
+
+  /** Pool brake: this pickup pool had >= poolBrake.warnings deadline warnings in the window on orders not yet delivered. */
+  braked(pickup: string, now: number): boolean {
+    const b = this.cfg.gate.poolBrake
+    if (b.warnings <= 0) return false
+    const pool = this.geo.poolId(pickup)
+    let n = 0
+    for (const book of this.books.orders.values()) {
+      if (book.lastWarnAt < 0 || now - book.lastWarnAt > b.windowMin) continue
+      if (this.geo.poolId(book.order.legs[0]!.pickup.placeId) === pool) n++
+    }
+    return n >= b.warnings
   }
 
   /** Expected late cars and wins among quotes sent whose outcome is not known yet. */

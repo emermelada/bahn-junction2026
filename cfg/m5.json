@@ -1,0 +1,1 @@
+{ "name": "m5", "flags": { "gate": true, "capacity": true, "ladder": true, "governor": true, "fees": true, "triage": true, "pricing": true, "trust": true }, "pricing": { "clamp": { "lo": 1.05, "hi": 1.75 } } }

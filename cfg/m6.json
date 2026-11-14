@@ -1,0 +1,3 @@
+{ "name": "m6", "flags": { "gate": true, "capacity": true, "ladder": true, "governor": true, "fees": true, "triage": true, "pricing": true, "trust": true },
+  "pricing": { "clamp": { "lo": 1.05, "hi": 1.75 } },
+  "gate": { "nextDay": { "maxDriveMin": 240 }, "poolBrake": { "warnings": 2, "windowMin": 1440 } } }

@@ -39,6 +39,7 @@ export type OrderBook = {
   fees: number
   deliveredAll: boolean
   warnings: number
+  lastWarnAt: number
 }
 
 export const dayOf = (t: number): number => Math.floor(t / DAY)
@@ -132,7 +133,7 @@ export class Books {
         const request = this.requests.get(event.order.id)
         if (!request) break
         if (!this.orders.has(event.order.id)) {
-          this.orders.set(event.order.id, { order: event.order, request, wonAt: event.at, late: false, lateReason: "", revenue: 0, refund: 0, fees: 0, deliveredAll: false, warnings: 0 })
+          this.orders.set(event.order.id, { order: event.order, request, wonAt: event.at, late: false, lateReason: "", revenue: 0, refund: 0, fees: 0, deliveredAll: false, warnings: 0, lastWarnAt: -1 })
           this.wonCount++
           const key = `${event.order.dealerId}|${dayOf(request.arrivedAt)}`
           const d = this.dealerDay.get(key) ?? { requests: 0, wins: 0, losses: 0 }
@@ -245,7 +246,7 @@ export class Books {
       }
       case "deadline_close": {
         const book = this.orders.get(event.orderId)
-        if (book) book.warnings++
+        if (book) (book.warnings++, (book.lastWarnAt = event.at))
         break
       }
       case "forecast":

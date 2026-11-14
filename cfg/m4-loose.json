@@ -1,0 +1,1 @@
+{ "name": "m4-loose", "flags": { "gate": true, "capacity": true, "ladder": true, "governor": true, "fees": true, "triage": true, "pricing": true, "trust": true }, "pricing": { "clamp": { "lo": 1.05, "hi": 2.2 } }, "gate": { "sameDay": { "maxDriveMin": 240, "slackHours": 3, "reach30Pickup": 3 } } }
