@@ -80,3 +80,7 @@ PRESETS["k-s2"] = PRESETS["k-s1"] + ["load_free_mon2=0.15"]
 # k-s1 with the governor tightened by its measured error: projection at the last win is up to +0.021 above the final share
 # (research/re/projerr.py, 69 high-volume weeks), so the bar tightens under 0.945 to keep the worst week >= 0.93.
 PRESETS["k-s1g"] = PRESETS["k-s1"] + ["gov_tight=0.945", "gov_rescue=0.93", "gov_relaxed=0.95"]
+# k-s3: the safer stack. load_slope 0.5 (34/34 ranked, worst 0.929) + re-drivers' d-feer (opening rule + 90-min look back to 1.05,
+# worst 0.936-0.947) + re-market's last-Monday room at 0.15 (Mon2 late 1-3% up to load 0.12, 5-6% at 0.14-0.16; dev-43..50 +1,271, 8/8).
+PRESETS["k-s3"] = PRESETS["c3g"] + ["load_slope=0.5", "fee_open_rule=((24,0,0.92),(12,80,0.95))", "relook_minutes=90", "relook_mult=1.05",
+                                    "load_free_mon2=0.15"]
