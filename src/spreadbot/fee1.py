@@ -153,6 +153,9 @@ class Fee1:
         drive = sum(d.geo.drive(ob.order["legs"][l]["pickup"]["placeId"], ob.order["legs"][l]["delivery"]["placeId"]) for l in legs)
         if cfg.fee1_long_ladder and cfg.fee1_long and drive >= cfg.fee1_long[0]:
             return None  # long cars keep the ladder: long_warn was built on how they book under it (k-f1h5's bad weeks: +12..+83 long declines)
+        if cfg.fee1_only and ((last - d.now) / 60 < cfg.fee1_only[0]
+                              or d.home_near_delivery(ob.order["legs"][legs[-1]]["delivery"]["placeId"], 30) < cfg.fee1_only[1]):
+            return None  # narrow fee1: only cars with time and drivers near the delivery (where its cheap fees are); the rest keep the ladder
         floor = max(cfg.fee1_desert_floor if desert else 0.0, cfg.fee1_long[1] if cfg.fee1_long and drive >= cfg.fee1_long[0] else 0.0)
         grid = [m for m in cfg.fee1_grid if m >= floor] or [max(cfg.fee1_grid)]
         mu1 = self.mu(ob, legs, d.now) + self.delta

@@ -196,3 +196,6 @@ PRESETS["k-f1h5f"] = PRESETS["k-f1h5"] + ["quote_cost_floor=true"]  # MARKET: qu
 PRESETS["k-f1h6"] = PRESETS["k-f1h5f"] + ["fee1_sigma=0.30"]  # on MARKET's quote floor
 # fee1 v7: long cars (>= 4 h) leave fee1 for the old ladder (k-f1h5's worst weeks lost 11-28 orders to +12..+83 long_warn declines).
 PRESETS["k-f1h7"] = PRESETS["k-f1h6"] + ["fee1_long_ladder=true"]
+# fee1 v8, narrow: only cars with >= 20 h to the last pickup and >= 30 drivers near the delivery (not long), one re-pick, no last call:
+# fewer extra fresh posts (k-f1h7: long gigs got fewer views, long_warn declines +11/wk).
+PRESETS["k-f1h8"] = PRESETS["k-f1h7"] + ["fee1_only=(20,30)", "fee1_max_posts=2", "fee1_last_call=0"]
