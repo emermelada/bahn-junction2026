@@ -153,3 +153,5 @@ PRESETS["m11out"] = PRESETS["k-safe"] + ["outage_z=4.5", "outage_up=0.3"]
 PRESETS["m12dist"] = PRESETS["k-safe"] + ["dist_lr=0.002"]
 # re-market: quote the fee rule's cheaper opening as the cost (wins the cars drivers near the delivery take cheaply), on k-safe.
 PRESETS["m13mc"] = PRESETS["k-safe"] + ["quote_move_cost=true"]
+# re-market: safe cars (gbm P(on time) >= 0.97) pay no second load charge, on k-safe.
+PRESETS["m14safe"] = PRESETS["k-safe"] + ["safe_load_p=0.97"]
