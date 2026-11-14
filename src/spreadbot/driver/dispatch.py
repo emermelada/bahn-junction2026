@@ -19,6 +19,7 @@ from spreadbot.notes.reader import needs_manual, needs_plates, window_from_note
 HOUR, DAY = 60, 24 * 60
 MID_SLACK = 8 * HOUR  # fee ladder: with 8-24 h to the last pickup, gigs near the typical fee still booked in time
 SPLIT_MINUTES = 12 * HOUR  # RULES: a gig with more than one car may plan at most 12 hours of driving
+EXPLICIT_MIN = 30  # a pickup window shorter than this is not worth posting: no driver could plan around it
 BUNDLE_BUFFER = 60  # minutes of spare time a chain keeps before each car's deadline, for real driving times
 REFUSED_BACKOFF = 30  # minutes before we try a refused post again; refusals name a window, so the next try usually differs
 
@@ -82,9 +83,19 @@ def post(state: State, order: Order, legs: list[int], now: int) -> Action:
         if last in ("not_ready", "closed"):
             start = max(retry_from(state, order, leg, now), first.get("window", pickup["window"])["from"])
             first["window"] = {"from": start, "to": max(pickup["window"]["to"], start)}
+        w = first.get("window", pickup["window"])
+        if FLAGS["explicit_windows"] and not pickup["privateAddress"] and order["lastPickupAt"] > max(now, w["from"] + EXPLICIT_MIN):
+            # Without its own window the pickup closes with the site on the ready day and the gig expires, though the
+            # car could still be collected later and arrive on time; a re-post without windows then lets a driver
+            # come after lastPickupAt (rc7/rc8: 3 of 163 next_day re-posts booked in time). Keep the gig open exactly
+            # as long as an on-time delivery is possible, and only for drivers who can make it.
+            first["window"] = {"from": w["from"], "to": max(w["from"], min(order["lastPickupAt"], first.get("window", {}).get("to", order["lastPickupAt"])))}
+            d = second.get("window", base)
+            second["window"] = {"from": d["from"], "to": max(d["from"], min(d["to"], order["deadline"]))}
         stops += [first, second]
     expired = any((oid, leg) in state.expired for leg in legs)
-    stops = without_windows(stops, float("inf") if expired else now)
+    keep = FLAGS["explicit_windows"] and order["lastPickupAt"] > now
+    stops = without_windows(stops, now if keep or not expired else float("inf"))
     return {"type": "post", "stops": stops, "audience": audience, "schedule": fees(state, order, len(legs), now)}
 
 
