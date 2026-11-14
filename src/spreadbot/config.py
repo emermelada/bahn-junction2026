@@ -137,6 +137,8 @@ class Config:
     fee_plan: tuple = ((0.0, 0.95), (0.15, 1.15), (0.4, 1.45), (0.7, 1.85))  # (share of slack, fee over typical fee)
     steep_plan: tuple = (1.7, 2.0, 2.3, 2.6)  # after a deadline warning: generous, a late car costs more
     steep_step: int = 30
+    rescue_cap: tuple = ()             # (min projection, max margin cents at the plan's top fee, capped plan): a single whose margin at rescue fees
+                                       # would be under this, in a week projected comfortably on time, gets the capped plan instead (() = off)
     gov_steep: bool = True             # choose the escalation by the projected on-time share
     gov_relaxed: float = 0.95          # above this projection, a car is not worth saving at any price
     steep_relaxed: tuple = (1.4, 1.6, 1.8)  # v1aa: p10 margin 6,773 vs 5,594, same mean

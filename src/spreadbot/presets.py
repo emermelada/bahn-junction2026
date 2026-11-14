@@ -316,3 +316,5 @@ PRESETS["v5La-R1"] = PRESETS["v5La"] + R1
 # R2, batch dispatch: cars with >= 12 h left after the next 07:00 / 12:00 / 16:00 batch wait for it and are paired against the
 # whole pool (held + open singles); pairs now buy volume (load_bundle_w 0.6 in v5La). Pair radius 40 km (km50 raised pairs +3-7 pts).
 PRESETS["v5La-R2"] = PRESETS["v5La"] + ["batch_hours=(7,12,16)", "bundle_km=40"]
+# (B) governor-capped rescue (Franco): projection >= 0.935 and margin at the steep plan's top under EUR 20 -> plan (1.15, 1.25).
+PRESETS["v5La-B"] = PRESETS["v5La"] + ["rescue_cap=(0.935,2000,(1.15,1.25))"]
