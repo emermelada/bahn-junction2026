@@ -51,7 +51,7 @@ Gate seeds: `spread-1, v2-g1..v2-g4`. Gate rule: every seed ranked at ≥ 93% on
 - Stride loop deterministic to the cent (M8 spread-1 twice: €7,962.02).
 - Final loop rehearsal (`src/run-final.ts` + `src/ticker.ts`, 2× final pace, two `kill -9` restarts): ranked 96.3%, €5,780; rebuild from 4,523 events in 29 ms; quote lag 0 world minutes; the world refuses duplicate gigs. Same seed under the stride loop: €6,637 (the gap is the requests lost during the two forced outages).
 
-## Final-config choice: m18 = M8 + batch cap scaled by pickup reach (Sat 05:30)
+## Final-config choice: m18 = M8 + batch cap scaled by pickup reach (Sat ~03:15)
 
 The bulk order (33–38 cars from one yard) and other 10–25-car batches appear in every world. In held-out `v2-h2`, 12 within_3_days cars from one Oulu yard all waited for the last day and 10 went late: M8 fell to **90.2%** on time. Cap: at most `max(4, 0.1 × reach30(pickup))` admitted requests per batch (Helsinki pool ≈ uncapped, Oulu 6, Lahti 4).
 
@@ -64,7 +64,7 @@ Adopted for the final: about −€100 to −€500/week for a 5-point higher fl
 
 More rejected arms: price floor 1.65 (v2-g1 €1.9k with 41 wins), floor 1.45, steeper ladder (mean €5,732), higher price prior (€6,077), admit tier C via governor (v2-g1 92.3%, FAIL), higher fee bands (€5,317), stronger evening step, bundles (16/week, mean €6,425, 2/5), flat batch cap 6 / plan-day cliff (−€500–1,000).
 
-## Notes reader adopted: m19 = m18 + notes (Sat ~06:00)
+## Notes reader adopted: m19 = m18 + notes (Sat ~03:40)
 
 `src/notes.ts` (fi/sv/en, typo-tolerant, corrections and denials) scores 0 false positives / 0 misses on all 2,297 revealed notes with truth (`node src/tools/notes-validate.ts --all`). Used for the pickup's earliest minute, the note's delivery deadline, plates and the manual-licence audience.
 
