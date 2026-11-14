@@ -21,3 +21,4 @@
 ## After the summary
 
 - Drop raise (`driver.drop_raise` 1.4: a gig given back by a driver, or after a no-show, with under 12 h to its last pickup is repriced to 1.4x at once): rc7-rc9 ranked 35 vs 35, +€93 mean, 18/36 up, worst three weeks €114 / €1,627 / €3,037 against -€345 / €1,627 / €2,503. rc10: 11/12 vs 11/12, -€38 mean, worst week €1,295 against €1,399. Noise; not adopted.
+- The three near-misses together (fee_raise 1.5, monday_extra -0.05, drop_raise 1.4) on rc7-rc10 (48 weeks): ranked 45 vs 46, +€138 mean, 29/48 up, but the worst week -€2,396 against -€345 and p10 €2,741 against €3,037. Rejected: each helps on average, together they hurt the bad weeks. rc5 stays.
