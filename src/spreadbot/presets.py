@@ -321,3 +321,10 @@ PRESETS["v5La-B"] = PRESETS["v5La"] + ["rescue_cap=(0.935,2000,(1.15,1.25))"]
 # B fired 23-85x/wk (margin judged at the plan's top 1.8x: nearly every car): SCAR -260, fresh-07 -50 orders. B2: judged at the
 # realised rescue fee 1.39x, only cars that lose money there, only when projected >= 0.945.
 PRESETS["v5La-B2"] = PRESETS["v5La"] + ["rescue_cap=(0.945,0,(1.15,1.25),1.39)"]
+# Franco's harsh-week switch (FLEET directive): sticky, from Tue 24:00, standardized sum of Tuesday's booked fee/typ and warned/won
+# (z >= 2.5: 35% of bad weeks at 4% false alarms on PROBE's 228 labelled weeks; AND at best 28% / 4%). Safe mode = the release's knobs.
+SWZ = ["scarcity=(9.0,9.0)", "scarcity_z=(1.002,0.044,0.037,0.029,2.5)"]
+# bold arm V2 (FLEET: +702 H1 / +999 H3 but nf-04 0.846) behind the switch: back to the release's load knobs once scarce
+PRESETS["k-f1h5fV2z"] = PRESETS["k-f1h5fV2"] + SWZ + ["scarce_set=(('load_free',0.07),('load_slope',1.0),('load_bundle_w',1.0))"]
+# bold arm lw5 (k-f1h5f + long_warn (240,5,1440): +540 H1 / +552 H3, nf-04 0.884) behind the switch: long_warn back to (240,3,1440)
+PRESETS["k-f1h5f-lw5z"] = PRESETS["k-f1h5f"] + ["long_warn=(240,5,1440)"] + SWZ + ["scarce_set=(('long_warn',(240,3,1440)),)"]

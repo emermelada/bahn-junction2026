@@ -298,6 +298,8 @@ class Config:
     scarcity: tuple = ()               # (fee_typ, warned_share): the week is scarce once, from Tue 24:00, the last 24 h's booked single-gig
                                        # fee/typical >= fee_typ or warned/won >= warned_share (probe/SCARCITY.md: Tue fee >= 1.08 flags 24% of bad
                                        # weeks at 3% false alarms; warned/won median 0.063 bad vs 0.031 normal); () = off
+    scarcity_z: tuple = ()             # (fee mean, fee sd, warned mean, warned sd, threshold) of normal Tuesdays: flip when the standardized sum of both
+                                       # >= threshold instead of the OR of scarcity's limits (() = OR). PROBE weeks: (1.002, 0.044, 0.037, 0.029, 2.5)
     scarcity_from: int = 2880          # first check at Tue 24:00: no Monday signal exists (SCARCITY.md, AUC 0.51-0.55)
     scarcity_until: int = 4320         # last hourly check before Thu 00:00: a later flip guards little (Friday has the Friday guard)
     scarcity_min_n: int = 20           # bookings and wins in the 24 h window needed for a ratio (a normal Tuesday has ~100 of each)

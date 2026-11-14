@@ -731,7 +731,14 @@ class Desk:
             fee = sum(fees) / len(fees) if len(fees) >= cfg.scarcity_min_n else 0.0
             share = warned / won if won >= cfg.scarcity_min_n else 0.0
             f_lim, w_lim = cfg.scarcity
-            if fee >= f_lim or share >= w_lim:
+            if cfg.scarcity_z:
+                # Standardized sum of both Tuesday signals against normal weeks (PROBE's 228 labelled weeks: z >= 2.5 flags 35% of
+                # bad weeks at 4% false alarms; fee AND warned at best 28% / 4%, fee OR warned 37% / 11%; research/re/fleet/scar_rules.out).
+                mf, sf, mw, sw, thr = cfg.scarcity_z
+                hit = fee > 0 and won >= cfg.scarcity_min_n and (fee - mf) / sf + (share - mw) / sw >= thr
+            else:
+                hit = fee >= f_lim or share >= w_lim
+            if hit:
                 self.scarce = True
                 self.say("SCARCE", f"at {H}: fee/typ={fee:.3f} (n={len(fees)}, >= {f_lim}) warned/won={warned}/{won}={share:.3f} (>= {w_lim})"
                          f": no safe_admit, long >= {cfg.scarcity_long} declined, risk x{cfg.scarcity_risk}, set {dict(cfg.scarce_set)}")
