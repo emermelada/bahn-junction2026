@@ -293,14 +293,21 @@ class FeesStub:
     def __init__(self, desk: "Desk") -> None:
         self.desk = desk
         self.ref_sum, self.drive_sum = 0.0, 0.0
+        self.adj_sum, self.adj_n = 0.0, 0.0  # this week's bookings: paid over our opening fee (an expiry counts as 1.5)
 
     def clearing(self, region: str, day: int, hour: int, drive: int, n_cars: int) -> float:
         cfg = self.desk.cfg
         per_min = (self.ref_sum + cfg.v2_fee_per_min * 600.0) / (self.drive_sum + 600.0)
-        return (drive * per_min + n_cars * cfg.v2_fee_fixed) * cfg.v2_fee_mult
+        adj = (self.adj_sum + 1.0 * 10.0) / (self.adj_n + 10.0)
+        return (drive * per_min + n_cars * cfg.v2_fee_fixed) * cfg.v2_fee_mult * min(1.6, max(0.8, adj))
 
     def on_event(self, e: dict) -> None:
         if e["kind"] == "price_request":
             r = e["request"]
             self.ref_sum += r["referenceFeeCents"] - self.desk.cfg.v2_fee_fixed * len(r["legs"])
             self.drive_sum += sum(self.desk.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
+        elif e["kind"] in ("gig_booked", "gig_expired"):
+            rec = self.desk.gigs.get(e["gigId"])
+            if rec and rec.schedule and rec.status == "open":
+                self.adj_sum += e["feeCents"] / max(1.0, rec.schedule[0]["feeCents"]) if e["kind"] == "gig_booked" else 1.5
+                self.adj_n += 1

@@ -724,6 +724,10 @@ class Desk:
                  and (o, l) not in self.leg_gig and not self._pending(o, l) and l in self.undelivered(o)]
         if len(chain) < 2 or not all(self.simple(self.orders[o]) for o, _ in chain):
             chain = [(oid, l) for l in legs]
+            if len(legs) == 2 and self.trade_minutes(ob.order) > 12 * HOUR - 10:
+                for l in legs:  # a trade-in too long for one driver's day: two gigs
+                    self.dispatch_v2(ob, [l], why)
+                return
         drive, prev = 0, None
         for o, l in chain:
             L = self.orders[o].order["legs"][l]
@@ -744,14 +748,14 @@ class Desk:
         action = {"type": "post", "stops": stops, "audience": audience, "schedule": dedupe(sched)}
         self.outbox.append(action)
         self.pending_posts.append((action, "chain" if len(chain) > 1 else why))
-        if len(chain) > 1:
+        if len({o for o, _ in chain}) > 1:
             lastc = min(self.last_pickup(self.orders[o], [l]) for o, l in chain)
             for o, _ in chain:
                 self.bundle_last[o] = lastc
         for o, _ in chain:
             if self.orders[o].first_post_at is None:
                 self.orders[o].first_post_at = self.now
-        self.say("V2POST", "+".join(o for o, _ in chain) + f" day={day} fee={fee} {why}")
+        self.say("V2POST", "+".join(f"{o}/{l}" for o, l in chain) + f" day={day} fee={fee} {why}")
 
     # ------------------------------------------------------------------ bundles
     def chainable(self, r: dict) -> bool:
