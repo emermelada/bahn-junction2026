@@ -12,6 +12,7 @@ from spread.types import Action, FeeStep, Order, StopRef
 
 from spreadbot.core.rng import rng
 from spreadbot.core.state import State, legs_of
+from spreadbot.driver.chains import chain_offers
 from spreadbot.driver.flags import FLAGS
 from spreadbot.notes.reader import needs_manual, needs_plates, window_from_note
 
@@ -55,7 +56,7 @@ def dispatch(state: State, now: int) -> list[Action]:
         for legs in groups:
             actions.append(post(state, order, legs, now))
             state.log(now, "post", oid, legs=legs, retry=any((oid, leg) in state.failures for leg in legs))
-    return actions + bundles(state, waiting, now)
+    return actions + bundles(state, waiting, now) + chain_offers(state, now)
 
 
 def post(state: State, order: Order, legs: list[int], now: int) -> Action:

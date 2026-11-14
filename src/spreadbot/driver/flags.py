@@ -10,6 +10,7 @@ FLAGS = {
     "fee_raise": 1.8,  # that one raise, as a multiple of the typical fee
     "raise_mid_lead": 0,  # minutes before lastPickupAt for an earlier, smaller raise to fee_raise_mid; 0 is off
     "fee_raise_mid": 1.1,  # the earlier raise, for gigs opened low (fee_open_long below 1)
+    "chain_offer": 0.0,  # offer an open gig to a booked driver finishing near its pickup, at this multiple of the typical fee; 0 is off
     "bundle": False,  # post two single cars as one chain when car A delivers near car B's pickup
     "bundle_factor": 0.8,  # the chain's fee as a share of the two single fees
     "bundle_hold": 120,  # minutes a new car waits for a partner before it is posted alone
