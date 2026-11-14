@@ -15,8 +15,9 @@ from spreadbot.dealer.flags import FLAGS
 from spreadbot.dealer import dealer_level, events, week_level
 from spreadbot.dealer.trust import CAP as TRUST_FULL, trust_count, trust_factor
 from spreadbot.dealer.win_model import curve, record_quote
-from spreadbot.driver.cost import estimate_cost
+from spreadbot.driver.cost import estimate_cost, slack
 
+DAY = 24 * 60
 DECLINE_RATIO = 5  # RULES: a quote far above list loses and costs nothing; 5x list is far above the 26-54% range
 CANDIDATES = [1.10 + 0.02 * k for k in range(31)]  # 1.10 .. 1.70
 JITTER = 0.04
@@ -54,7 +55,10 @@ def quote(request: PriceRequest, state: State) -> dict[str, int]:
     for o in request["options"]:
         cost = costs[o["kind"]]
         steer = o["kind"] == "same_day" and (not FLAGS["steer_only"] or len(request["options"]) > 1)
-        price = round(o["listPriceCents"] * trust * (ratio + FLAGS["same_day_extra"] * steer))
+        r = ratio + FLAGS["same_day_extra"] * steer
+        if FLAGS["ratio_long"]:  # cheap, safe work (a day or more to the last pickup) priced to win; the rest priced up
+            r += FLAGS["ratio_long"] if slack(request, o, state) >= DAY else FLAGS["ratio_short"]
+        price = round(o["listPriceCents"] * trust * r)
         floor = FLAGS["min_margin_cents"]
         if cost.serviceable and floor is not None and price - cost.fee_cents < floor and FLAGS["max_ratio"]:
             price = max(price, cost.fee_cents + floor)  # price to cost: let the dealer decide instead of declining
