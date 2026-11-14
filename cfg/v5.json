@@ -1,0 +1,62 @@
+{
+ "name": "v5-model-fri-relaxB",
+ "flags": {
+  "gate": true,
+  "capacity": true,
+  "ladder": true,
+  "governor": true,
+  "fees": true,
+  "triage": true,
+  "pricing": true,
+  "trust": true,
+  "notes": true
+ },
+ "pricing": {
+  "clamp": {
+   "lo": 1.05,
+   "hi": 1.75
+  },
+  "model": {
+   "on": true
+  }
+ },
+ "governor": {
+  "fridayTierAOnlyFrom": 100000
+ },
+ "gate": {
+  "nextDay": {
+   "maxDriveMin": 100000
+  },
+  "poolBrake": {
+   "warnings": 2,
+   "windowMin": 1440
+  },
+  "sameDay": {
+   "maxDriveMin": 240,
+   "slackHours": 3,
+   "reach30Pickup": 3
+  },
+  "downgrades": [
+   "unparsed_note"
+  ],
+  "tierB": {
+   "slackHours": 4,
+   "reach30Pickup": 0,
+   "reach80Pickup": 0,
+   "reach30Delivery": 0
+  }
+ },
+ "capacity": {
+  "batchMax": 4,
+  "batchPerReach": 0.1,
+  "dayMult": [
+   1,
+   1,
+   1,
+   1,
+   0.5,
+   1,
+   1
+  ]
+ }
+}

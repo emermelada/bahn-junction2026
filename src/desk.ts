@@ -71,7 +71,13 @@ export class V2Desk implements Desk {
     this.fees = new Fees(cfg, this.geo, ctx.log)
     this.pricing = new Pricing(cfg, this.geo, this.books)
     this.offers = new Offers(cfg, this.geo, this.books)
-    if (f.pricing) this.quoter.ratio = (request, option) => this.pricing.quoteRatio(request, option, this.now, f.capacity ? this.capacity.dealerPenalty(request.dealerId, this.now) : 0, this.fees.estimate(request) / option.listPriceCents)
+    if (f.pricing) this.quoter.ratio = (request, option, feas) => {
+      // Model pricing cost: the expected fee, plus the expected late loss of the option's tier (refund + rescue fees).
+      const M = cfg.pricing.model
+      const pLate = feas && f.gate ? 1 - cfg.governor.pOnTime[feas.tier] : 0
+      const cost = this.fees.estimate(request) / option.listPriceCents + pLate * M.lateLoss
+      return this.pricing.quoteRatio(request, option, this.now, f.capacity ? this.capacity.dealerPenalty(request.dealerId, this.now) : 0, cost)
+    }
   }
 
   // ------------------------------------------------------------------ lifecycle

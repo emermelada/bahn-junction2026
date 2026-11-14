@@ -75,9 +75,14 @@ export class Pricing {
   totalSeen = 0
   readonly modelSent = new Map<string, { y: number; keys: string[]; day: number }>()
 
-  modelKeys(request: PriceRequest, option: DeliveryOption): string[] {
+  modelKeys(request: PriceRequest, option: DeliveryOption, day = -1): string[] {
     const leg = request.legs[0]!
-    return [`k|${option.kind}`, `l|${this.geo.poolId(leg.pickup.placeId)}|${this.geo.poolId(leg.delivery.placeId)}`, `d|${request.dealerId}`]
+    const p = this.geo.poolId(leg.pickup.placeId)
+    const keys = [`k|${option.kind}`, `l|${p}|${this.geo.poolId(leg.delivery.placeId)}`, `d|${request.dealerId}`]
+    // A fast pickup-pool offset for today only: the competitor's outage (one region, one working day) shows as a run of
+    // wins at high ratios there, and lifts that pool's prices within hours instead of days.
+    if (this.cfg.pricing.model.etaRegion > 0 && day >= 0) keys.push(`r|${p}|${day}`)
+    return keys
   }
 
   mu(keys: string[], day: number): number {
@@ -102,7 +107,7 @@ export class Pricing {
     const M = this.cfg.pricing.model
     const C = this.cfg.pricing.clamp
     const day = dayOf(now)
-    const keys = this.modelKeys(request, option)
+    const keys = this.modelKeys(request, option, day)
     const mu = this.mu(keys, day)
     const t = this.trustMult(request.dealerId)
     const seen = (this.dealerSeen.get(request.dealerId) ?? 0) + 1
@@ -142,9 +147,11 @@ export class Pricing {
     this.worldMu += step(M.etaWorld)
     this.dayMu.set(s.day, (this.dayMu.get(s.day) ?? 0) + step(M.etaDay))
     for (const k of s.keys) {
-      const eta = k.startsWith("l|") ? M.etaLane : k.startsWith("d|") ? M.etaDealer : M.etaKind
-      const o = (this.offsets.get(k) ?? 0) * (1 - M.shrink) + step(eta)
-      this.offsets.set(k, Math.max(-M.maxOffset, Math.min(M.maxOffset, o)))
+      const eta = k.startsWith("l|") ? M.etaLane : k.startsWith("d|") ? M.etaDealer : k.startsWith("r|") ? M.etaRegion : M.etaKind
+      const o = (this.offsets.get(k) ?? 0) * (k.startsWith("r|") ? 1 : 1 - M.shrink) + step(eta)
+      // The region-day offset only rises (an outage); a bad day is the day term's job, and noise must not cut prices.
+      const lo = k.startsWith("r|") ? 0 : -M.maxOffset
+      this.offsets.set(k, Math.max(lo, Math.min(M.maxOffset, o)))
     }
   }
 
