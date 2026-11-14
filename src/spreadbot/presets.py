@@ -268,3 +268,14 @@ PRESETS["v5L14"] = PRESETS["v5L"] + ["load_free=0.14"]                   # bolde
 PRESETS["v5h1"] = PRESETS["v5La"] + ["pair_end=(2.0,0)"]
 PRESETS["v5h2"] = PRESETS["v5h1"] + ["pair_long_empty=(240,10)"]  # + R2: no chain > 4 h of road into an end with nd30 <= 10 (18.5% warned)
 PRESETS["v5h3"] = PRESETS["v5La"] + ["pair_long_empty=(240,10)"]  # R2 alone
+# ARCHIVE: RoutePulse's climbing pair fee on v5La. Our pairs book at once at the 0.84 opening (59% within 10 min, 95% at the opening);
+# a low first step catches the instant bookers cheaper and is back at 0.84 within ~75-110 min (research/re/archive/c_pairbook.py).
+PRESETS["v5La-pc1"] = PRESETS["v5La"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0.80))"]
+PRESETS["v5La-pc2"] = PRESETS["v5La"] + ["bundle_climb=((0,0.60),(27,0.67),(54,0.74),(81,0.80))"]
+# The barrier's other direction: v5La96 (target 0.96) lost -202 with 14 fewer orders; 0.95 lets more volume through it.
+PRESETS["v5La95"] = PRESETS["v5aV2"] + ["late_barrier=(0.95,300,4,20)"]
+# pc1b: pc1's 0.68 start, back at the usual 0.84 by +50 min (pc1: +75): pc1 split 27% vs 23% and instant bookings 34% vs 59% (c_pairdrop.py).
+PRESETS["v5La-pc1b"] = PRESETS["v5La"] + ["bundle_climb=((0,0.68),(25,0.76))"]
+# V5 stack (V5, 23:05): the shipped v5La + end-at-hub pairs (v5h2: +134 se 167 vs v5La, worst 0.926, dev-05 no collapse) + ARCHIVE's climbing
+# pair fee (pc1: +379 se 132 vs v5La, MARKET's arm). Both touch pairs (which partner / at what fee): tested together before holdouts.
+PRESETS["v5S"] = PRESETS["v5h2"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0.80))"]

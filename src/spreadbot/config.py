@@ -188,6 +188,11 @@ class Config:
     bundle_min_slack: int = 6 * 60     # a chain needs this long before its last start
     bundle_window: int = 120           # pair with gigs posted at most this many minutes ago
     bundle_mult: float = 0.8           # one driver, no trip home in between: the pair costs less than two gigs
+    bundle_climb: tuple = ()           # ((minutes after posting, fee as a share of the two typical fees), ...): a pair with >= bundle_climb_slack
+                                       # hours to its last start opens low and climbs to the usual opening (RoutePulse bundling.ts:186-213:
+                                       # 0.53-0.61 stepping every 25-30 min). Our pairs: 59% book within 10 min, 95% at the opening 0.84
+                                       # (research/re/archive/c_pairbook.py): the opening is often above what drivers take. () = off
+    bundle_climb_slack: int = 8        # hours to the pair's last start below which the climb is skipped (RoutePulse: slack >= 8 h)
     unbundle_minutes: int = 5 * 60     # unbooked this close to its last start: post the cars alone
     # --- chain planner (branch-v1-frank, preset chains): hold a won car a few hours, unposted, to find a chain partner
     bundle_max_drive: int = 12 * 60 - 30  # road minutes of a chain; k5: 74% booked under 4 h, 17% at 10-12 h
