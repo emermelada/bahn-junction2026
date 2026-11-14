@@ -191,3 +191,5 @@ PRESETS["k-f1h"] = PRESETS["k-f1"] + ["quote_cost_hold=1.05"]
 # relative weight 0.05 (PROBE's causal forks, research/re/probe/relstat.py).
 PRESETS["k-f1h5"] = PRESETS["k-f1h"] + ["fee1_long=(240,1.0)", "fee1_last_call=150", "fee1_rel_share=0.05"]
 PRESETS["k-f1h5f"] = PRESETS["k-f1h5"] + ["quote_cost_floor=true"]  # MARKET: quote cost = max(1.05, cost_mult): fee1 savings only stop the fall below 1.05
+# MARKET: + price up only the cars our fleet moves far above the usual fee (fee_gbm shape > 1.1): fee paid is the money (ARCHIVE c_costfee)
+PRESETS["k-f1h5f-top"] = PRESETS["k-f1h5f"] + ["fee_model=1.0", "fee_model_knee=1.1"]
