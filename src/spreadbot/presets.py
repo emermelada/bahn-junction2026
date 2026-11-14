@@ -71,3 +71,9 @@ PRESETS["m2mon2"] = PRESETS["c3g"] + ["load_free_mon2=0.2"]
 # re-market: same_day capped at next_day + €9 (the dealer's speed value), and pricing with damped mu parts.
 PRESETS["m3scap"] = PRESETS["c3g"] + ["s_cap_cents=900"]
 PRESETS["m4muw"] = PRESETS["c3g"] + ["mu_w=(0.65,0.4,0.6)"]
+# re-capacity: load charge as a barrier at the measured knee (fee/typical flat 1.11-1.12 up to day load 0.12, then 1.16/1.24;
+# late 5% -> 12%; research/re/feeload.py). dev-07..18 +944 (se 246) 11/12 vs c3g, min on-time 0.929.
+PRESETS["k-load"] = PRESETS["c3g"] + ["load_free=0.12", "load_slope=2"]
+# Stacks: + re-drivers' opening-fee rule (d-fee), + re-market's last-Monday load room (m2mon2 at a gentler 0.15).
+PRESETS["k-s1"] = PRESETS["k-load"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))"]
+PRESETS["k-s2"] = PRESETS["k-s1"] + ["load_free_mon2=0.15"]
