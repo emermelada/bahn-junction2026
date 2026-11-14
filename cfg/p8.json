@@ -1,5 +1,5 @@
 {
- "name": "p8-p7-fri10",
+ "name": "p8-p3-fri10",
  "flags": {
   "gate": true,
   "capacity": true,
@@ -18,11 +18,6 @@
   },
   "model": {
    "on": true
-  },
-  "optionMult": {
-   "within_3_days": 1,
-   "next_day": 1.05,
-   "same_day": 1.3
   }
  },
  "governor": {
