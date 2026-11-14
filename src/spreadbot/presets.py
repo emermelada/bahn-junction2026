@@ -84,3 +84,7 @@ PRESETS["d-safe"] = PRESETS["c3g"] + ["fee_open_day=((0,3,81,24,0.85),(0,6,41,24
                                       "relook_minutes=90", "relook_mult=1.05"]
 # Cuts in sparse towns pay (d-fee3 +65, d-safe +149/+248 vs d-feer +309/+344): widen d-feer's 12-24 h step to every town.
 PRESETS["d-feer4"] = PRESETS["c3g"] + ["fee_open_rule=((24,0,0.92),(12,0,0.95))", "relook_minutes=90", "relook_mult=1.05"]
+# Every team above us opens at 0.80-0.92 (Halal flat avg 0.93, alignas 0.90, RoutePulse 0.85-0.89 floor 0.74, umarbek 0.80; TOP_TEAMS.md).
+PRESETS["d-low"] = PRESETS["c3g"] + ["fee_open_rule=((24,80,0.80),(12,0,0.88))", "desert_n=11", "desert_alarm=720"]
+# ... and with no scheduled raises (drivers wait for raises they have seen; Halal: one flat fee per gig): only the own alarm escalates.
+PRESETS["d-flat"] = PRESETS["d-low"] + ["fee_rel=()"]
