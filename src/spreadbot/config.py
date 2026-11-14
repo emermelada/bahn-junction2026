@@ -21,6 +21,13 @@ class Config:
     lane_w: float = 0.0                # weight of the cross-world lane table (Javier's lanes.json) in the competitor level
     max_per_batch: int = 0             # decline once we hold this many orders from one batch (a yard sending many cars)
     place_lr: float = 0.0              # per (pickup place, day) shift, spread over 80 km: the outage (0 = off)
+    outage_z: float = 0.0              # the outage (HANDBOOK: one pickup region = town + 80 km, 08-18, one non-war day, backup ~30% dearer): flag the
+                                       # region once the log-likelihood of +outage_up there reaches this, then price it up until 18:00 (0 = off)
+    outage_up: float = 0.25            # the flagged region's competitor level, times (1 + this)
+    outage_min: int = 4                # results in the region before it can be flagged
+    quote_move_cost: bool = False      # quote each option at move_cost (the fee rule's opening: 0.92-0.95x where drivers live near the delivery), not the flat cost
+    dist_lr: float = 0.0               # the competitor's price list changes shape once a week (HANDBOOK): learn a slope of its level on ln(km),
+                                       # c3g residuals show a lasting step of ~0.14 ratio per ln km on one Tue-Thu morning (PRICE_EVENTS.md) (0 = off)
     learn_fastest: bool = False        # learn the competitor only from requests where we quoted the fastest option: with only a slower
                                        # option quoted the dealer often wants speed (win 0.31 vs 0.52 at the same ratio, 16,818 quotes), which drags mu down
     dealer_lr: float = 0.006           # per dealer: the competitor cuts where we win most
@@ -132,6 +139,14 @@ class Config:
     steep_relaxed: tuple = (1.4, 1.6, 1.8)  # v1aa: p10 margin 6,773 vs 5,594, same mean
     steep_rescue: tuple = (2.0, 2.5, 3.0, 3.5, 4.0)
     late_plan: tuple = ((0, 1.2), (4, 1.5), (12, 2.0))  # (hours from now, fee): a car that is late anyway, no steep fees
+    flu_drops: int = 0                 # this many of our gigs dropped 00:00-01:00 = a flu night (0 = off): on tuning weeks, nights with
+                                       # >= 8 such drops (125 of 752) make that day's cars 8.9% late vs 4.7% (research/re/flu.py; Halal idea 14)
+    flu_mult: float = 1.9              # P(late) multiplier for cars due on a flu day, at quote time and in the projection (8.9 / 4.7)
+    repost_past_last: int = 0          # minutes after an open gig's last pickup to withdraw and post it again without the order's windows
+                                       # (0 = off): till then no driver can book it (research/re/external/RIVAL_FEES.md #5)
+    long_warn: tuple = ()              # (drive min, n, window min): decline cars with drive >= this while >= n of our long cars got a
+                                       # deadline warning in the last window min (() = off). Both unranked fresh weeks: 2-3x the usual long
+                                       # cars, 36-39% late, warned 5x as often, P(on time) at quote ~0.94 as usual (research/re/H2_AUTOPSY.md)
     crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar
     view_raise_n: int = 0              # this many viewers and no booking: raise to view_raise_mult at once
     view_raise_after: int = 45
@@ -194,6 +209,9 @@ class Config:
     hold_km: float = 0.0               # air km from A's delivery to B's pickup for a release pair (0 = bundle_km)
     hold_weekend: bool = False         # a held car whose last pickup is on the last Monday is released Sunday at hold_hour (not before Friday):
                                        # bookings made 2+ days ahead are a third dropped and a fifth late (RESEARCH_2 round 2), Mon2 drivers are idle
+    drop_calm_hours: float = 0.0       # a single dropped with more than this many hours to its last pickup is posted again at the opening
+                                       # fee instead of escalated (k-safe, 35 weeks: 25 of 35 drops/wk had > 16 h left, rebooked at
+                                       # 1.24-1.31x typical, 2-4% late); 0 = off
     repair_pairs: bool = False         # a car won during the day may pair with any open unbooked single of ours, not only one posted in the last bundle_window
     repair_drive: int = 300            # such a pair drives at most this many minutes (k18: chains under 5 h book 85%)
     repair_lead: int = 360             # and starts at least this long from now (k18: pairs formed under 2 h ahead book 46%)

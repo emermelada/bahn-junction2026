@@ -106,6 +106,9 @@ class Desk:
         self.chain_held: dict[str, int] = {}  # order -> minute to stop holding it for a chain partner and post it alone (chain planner)
         self.bundle_soon: set[str] = set()  # orders in a chain posted at short notice (split later, at bundle_soon_slack)
         self.morning_drops: dict[int, int] = defaultdict(int)
+        self.night_drops: dict[int, int] = defaultdict(int)  # drops 00:00-01:00 per day (flu nights)
+        self.flu_days: set = set()
+        self.long_warns: list[int] = []  # minutes of deadline warnings on our long-drive orders (long_warn)
         self.due_count: dict[int, int] = defaultdict(int)
         self.batch_won: dict[str, int] = defaultdict(int)
         self.need_resync = False
@@ -292,6 +295,19 @@ class Desk:
     def on_gig_dropped(self, e: dict) -> None:
         self._reopen(e["gigId"], "dropped")
         day, h = e["at"] // DAY, (e["at"] % DAY) // 60
+        if h == 0 and self.cfg.flu_drops:
+            self.night_drops[day] += 1
+            if self.night_drops[day] == self.cfg.flu_drops:
+                # A flu night: drivers give back that day's bookings at once; cars due that day end late ~1.9x as often.
+                self.flu_days.add(day)
+                n = 0
+                for oid in sorted(self.orders):
+                    ob = self.orders[oid]
+                    if oid in self.ontime_orders or oid in self.late_orders:
+                        continue
+                    if max(self.deadline(ob.order, l) for l in range(len(ob.order["legs"]))) // DAY == day:
+                        ob.p_ok = max(0.0, 1 - (1 - ob.p_ok) * self.cfg.flu_mult); n += 1
+                self.say("FLU", f"day {day}: {self.night_drops[day]} drops 00-01h; {n} open orders due today reweighted")
         if 5 <= h < 13:
             self.morning_drops[day] += 1
             if self.cfg.crunch_drops and self.morning_drops[day] == self.cfg.crunch_drops:
@@ -321,6 +337,16 @@ class Desk:
                 rec.schedule = dedupe([{"at": self.now, "feeCents": fee}] + [x for x in rec.schedule if x["at"] > self.now and x["feeCents"] > fee])
                 self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": rec.schedule})
                 self.say("KEEP_BUNDLE", f"{gid} fee={fee}")
+                return
+        if self.cfg.drop_calm_hours and why == "dropped" and len({o for o, _ in rec.legs}) == 1:
+            ob = self.orders.get(rec.legs[0][0])
+            legs = [l for _, l in rec.legs]
+            if ob and not ob.urgent and self.last_pickup(ob, legs) - self.now > self.cfg.drop_calm_hours * HOUR:
+                # Plenty of time left: post it again at the opening fee. A new post notifies nearby drivers (~10 views
+                # in 30 min); escalating paid 1.24-1.31x typical for drops with > 16 h left that were only 2-4% late.
+                self.withdraw(gid)
+                self.dispatch_order(ob.order["id"], "drop-repost")
+                self.say("DROP_REPOST", f"{gid} {ob.order['id']} left={(self.last_pickup(ob, legs) - self.now) // 60}h")
                 return
         # The gig is in the app again with its old schedule: make sure it can still find a driver.
         self.escalate_gig(rec, why)
@@ -402,6 +428,10 @@ class Desk:
         ob.urgent = True
         ob.order["lastPickupAt"] = e["lastPickupAt"]
         self.warned.add(e["orderId"])
+        if self.cfg.long_warn:
+            o = ob.order
+            if sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in o["legs"]) >= self.cfg.long_warn[0]:
+                self.long_warns.append(e["at"])
         self.say("DEADLINE_CLOSE", f"{e['orderId']} lastPickupAt={e['lastPickupAt']}")
         self.dispatch_order(e["orderId"], "deadline_close")
         for leg in self.undelivered(e["orderId"]):
@@ -463,6 +493,11 @@ class Desk:
             gate = cfg.gate_bonus_cents * min(1.0, max(0.0, (cfg.gate_target - self.gov.projection()) / cfg.gate_span))
         cal = self.gov.calibration() if cfg.calibrate else 1.0
         drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
+        if cfg.long_warn and drive >= cfg.long_warn[0]:
+            recent = sum(1 for t in self.long_warns if t >= self.now - cfg.long_warn[2])
+            if recent >= cfg.long_warn[1]:
+                # Our long cars are going unbooked this week: a new long car would wait for drivers who are not there.
+                return decline_prices(r), f"DECLINE long {drive} min: {recent} long cars warned in {cfg.long_warn[2]} min"
         cost = r["referenceFeeCents"] * (self.drive_cost_mult(drive) if cfg.drive_cost else self.cost_mult())
         if cfg.hold_price and self.pairs_with_held(r):
             cost *= cfg.bundle_mult  # a held car for the same day starts or ends near this one: the evening release pairs them
@@ -484,6 +519,8 @@ class Desk:
                 continue
             p_ok, slack = self.ontime.p_ok(r, opt["deadline"], kind)
             p_ok = min(0.99, p_ok * cal)
+            if self.flu_days and self.deadline_day(r, opt) in self.flu_days:
+                p_ok = max(0.0, 1 - (1 - p_ok) * cfg.flu_mult)  # due on a flu day (see on_gig_dropped)
             if p_ok < bar or slack < cfg.min_slack_h:
                 info.append(f"{kind}:skip(p={p_ok:.2f},s={slack:.1f})")
                 continue
@@ -519,7 +556,11 @@ class Desk:
                 meta[kind] = p_ok
                 info.append(f"{kind}:p={p_ok:.2f},L={load:.3f}")
                 continue
-            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, cost, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
+            c_opt = cost
+            if cfg.quote_move_cost:
+                # The fee rule opens cheap where drivers live near the delivery and the pickup is far off: quote that cost.
+                c_opt = cost * self.move_cost(r, opt) / max(1.0, r["referenceFeeCents"] * self.cost_mult())
+            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, c_opt, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 info.append(f"{kind}:noev")
                 continue
@@ -1460,6 +1501,26 @@ class Desk:
         self.offered.add((g.id, driver))
         self.say("BOFFER", f"{g.id} {driver} {fee} x{fee / max(1.0, base):.2f} tr={tr} from={rec.id}")
 
+    def repost_past_last(self) -> None:
+        """An open gig whose order's last pickup has passed keeps the order's windows it was posted with, so no driver can
+        book it until it expires (RULES: a driver must reach every stop inside its window; w-c3g: 13.9 gig_expired/week).
+        Posted again now, its stops run to the end of the world: a driver books it at once and the car is less late
+        (refund 10% within 2 h vs 25% after; research/re/external/RIVAL_FEES.md #5)."""
+        for gid in sorted(self.gigs):
+            rec = self.gigs[gid]
+            if rec.status != "open":
+                continue
+            oids = sorted({o for o, _ in rec.legs})
+            if len(oids) != 1 or oids[0] not in self.orders:
+                continue
+            ob = self.orders[oids[0]]
+            legs = sorted(l for _, l in rec.legs)
+            last = self.last_pickup(ob, legs)
+            if rec.posted_at < last <= self.now - self.cfg.repost_past_last:
+                self.say("REPOST_PASTLAST", f"{gid} {oids[0]} last pickup {last}, now {self.now}")
+                self.withdraw(gid)
+                self.post(ob, legs, "past-last")
+
     def withdraw(self, gid: str) -> None:
         rec = self.gigs[gid]
         rec.status = "withdrawn"
@@ -1556,6 +1617,8 @@ class Desk:
             if self.now - t0 > 60:
                 self.fast_book.append((t0, False))
                 del self.first_posts[gid]
+        if self.cfg.repost_past_last:
+            self.repost_past_last()
         if self.held:
             self.release_held()  # before the loop below, which would post released cars one by one
         for oid in list(self.orders):

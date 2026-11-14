@@ -134,6 +134,11 @@ PRESETS["k-s5c15"] = PRESETS["k-s5"] + ["load_cap=0.15"]
 # re-market m8mon2s (Mon2 room for drives < 4 h: +594/+834/+519, 34/34, worst 0.944-0.948) + re-drivers d-feerd (worst 0.938-0.941).
 PRESETS["k-safe"] = PRESETS["c3g"] + MON2S + ["fee_open_rule=((24,0,0.92),(12,80,0.95))", "relook_minutes=90", "relook_mult=1.05",
                                               "desert_n=11", "desert_alarm=720"]
+# Flu nights (>= 8 drops 00-01h): cars due that day priced and projected at 1.9x P(late).
+FLU = ["flu_drops=8", "flu_mult=1.9"]
+PRESETS["k-safef"] = PRESETS["k-safe"] + FLU
+PRESETS["k-s5f"] = PRESETS["k-s5"] + FLU
+PRESETS["c3gf8"] = PRESETS["c3g"] + FLU
 # re-drivers arms on the new bar k-safe: its fee part swapped for d-fee2d's deeper openings (d-fee2d vs c3g +732/+710).
 KSAFE_BASE = PRESETS["c3g"] + MON2S + ["desert_n=11", "desert_alarm=720"]
 PRESETS["k-safe-f2"] = KSAFE_BASE + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92))"]
@@ -142,6 +147,20 @@ PRESETS["k-safe-pf"] = PRESETS["k-safe"] + ["bundle_open_dense=(12,80,0.76)"]  #
 PRESETS["k-safe-f5"] = PRESETS["k-safe"] + ["fee_open_rule=((24,80,0.85),(24,0,0.92),(12,80,0.95))"]
 # Pairs: k-safe pays 0.85x for paired cars (31% of cars); bahn67 0.76x (49-58% paired), Halal 0.70x for two new cars (GITHUB_LEADS.md 6-7).
 PRESETS["k-safe-pm"] = PRESETS["k-safe"] + ["bundle_mult=0.72"]  # pair opening 0.72 x 1.05 = 0.76 of the two typical fees
+# re-market: the outage detector (pickup region, 08-18, flagged at log-likelihood 4.5 of +30%, priced +30%), on the k-safe bar.
+PRESETS["m11out"] = PRESETS["k-safe"] + ["outage_z=4.5", "outage_up=0.3"]
+# re-market: the weekly change of shape of the competitor's price list, as a slope on ln(km), on the k-safe bar.
+PRESETS["m12dist"] = PRESETS["k-safe"] + ["dist_lr=0.002"]
+# re-market: quote the fee rule's cheaper opening as the cost (wins the cars drivers near the delivery take cheaply), on k-safe.
+PRESETS["m13mc"] = PRESETS["k-safe"] + ["quote_move_cost=true"]
+
+# Drops with time to spare: post again at the opening fee instead of escalating (claude/spec-drops).
+PRESETS["k-safe-dc"] = PRESETS["k-safe"] + ["drop_calm_hours=16"]
+# k-safe-dc + repost an unbooked gig 1 min after its last pickup, so a driver can book the late car at once (Burger Han).
+PRESETS["k-safe-dcr"] = PRESETS["k-safe-dc"] + ["repost_past_last=1"]
+# + decline long (>= 4 h) cars while >= 3 of our long cars were warned in the last 24 h (H2 autopsy rule 1).
+PRESETS["k-safe-dcl"] = PRESETS["k-safe-dc"] + ["long_warn=(240,3,1440)"]
+PRESETS["k-safe-dcrl"] = PRESETS["k-safe-dcr"] + ["long_warn=(240,3,1440)"]
 # Fee push (board 15:00: EUR 35.4/order vs leaders 44.9; the gap is the fee): deep openings + cheap pairs; and one more opening step at 12 h everywhere.
 PRESETS["k-safe-f2pm"] = PRESETS["k-safe-f2"] + ["bundle_mult=0.72"]
 PRESETS["k-safe-f6"] = KSAFE_BASE + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92),(12,0,0.95))"]
@@ -159,3 +178,6 @@ PRESETS["k-safe-b3"] = PRESETS["k-safe"] + ["bundle3=true", "bundle3_mult=0.75"]
 # PAIRS_MISSED.md: 66% of missed pairs = the partner was already booked (lone cars book in minutes); est. km50 + 120-min hold +472-583/wk.
 PRESETS["k-safe-kmh"] = PRESETS["k-safe"] + ["bundle_km=50", "hold_minutes=120", "hold_lead=360"]
 PRESETS["k-safe-lskd"] = PRESETS["k-safe"] + ["long_split=(360,180)", "bundle_keep_drop=true"]  # both pair fixes
+# k-safe-dc + re-drivers' long_split: a pair with >= 6 h of driving still unbooked 3 h after posting goes out as singles
+# (long pairs carry 4.4 of 20.5 warned singles a week; k-safe-ls vs k-safe: +540/+220, worst 0.960/0.948 vs 0.942).
+PRESETS["k-safe-dcls"] = PRESETS["k-safe-dc"] + ["long_split=(360,180)"]
