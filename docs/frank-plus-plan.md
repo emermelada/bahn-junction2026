@@ -31,10 +31,24 @@ Small but safe: it removes bulk-yard bursts, which made our own bot miss the gat
 - Dealers are concentrated: the top dealer sends 30% of requests, the top ten 78%. Trust (+1% per on-time order, up to 25%) is worth most there.
 - `docs/log/` holds every experiment of ours, including the 25 that did not help (lane table at weight 1, week level, trust investment, direct offers, event detectors, explicit windows, ...).
 
+## Why k18 turns orders away (rc10, 12 weeks, from `log.txt`)
+
+| Per week | Requests |
+|---|---|
+| quoted or declined | 1,033 |
+| declined | 310 |
+| - no option with positive EV at any price (`noev`) | 225 |
+| - every option under the on-time bar (`skip`) | 76 |
+| - both | 10 |
+
+The cost model is not biased: on 3,920 single-car gigs, booked fee / modelled cost has median 0.98 (p10 0.93, p25 0.95, p75 1.21, p90 1.81; the tail is escalations). So the 225 `noev` requests a week are lanes where one car alone costs too much for the price the competitor allows.
+
+**Design idea: chain-aware quoting.** Your measurements: a two-car gig costs about 0.85x the typical fees, a single 1.14x; 71% of won cars could ride in chains in hindsight, k18 chains about 41 a week. Today the quote prices every car as a single. If, at quote time, the request's pickup lies near the delivery of a car we hold (won, unbooked or held for pairing) and the timing fits (the same test as the chain planner), price it with the chain cost. That should turn part of the 225 `noev` requests into profitable wins, and every such win is a ready-made chain partner, so the planner forms more chains instead of fewer.
+
 ## Plan (in order)
 
 1. Add `max_per_batch=6` to the k18 preset after the last 3 rc10 seeds confirm it.
-2. Diagnose the volume gap before tuning: on k18 runs, count declined requests by reason (on-time bar, load price, EV under the floor) and the margin of the orders the top teams take that we refuse.
+2. Chain-aware quoting (above): price a request at chain cost when it fits a car we hold; measure orders a week, chains a week, mean and min on-time on rc10 against k18.
 3. Escalation cost: your own log shows 66 escalated singles costing €2.5k a week above typical. Measure which of them were predictable at quote time (slack, town supply, hour) and price or decline those.
 4. The thinnest week (rc10-02, 90.1%): find what went late there before loosening anything.
 5. Make the emulator survive `Unreachable` so the live rehearsal runs to the end.
