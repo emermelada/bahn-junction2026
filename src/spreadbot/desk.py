@@ -746,6 +746,8 @@ class Desk:
         day = pl.day_of.get(oid, self.now // DAY)
         chain = [(o, l) for o, l in pl.chain_for(oid) if o in self.orders and self.orders[o].order["status"] != "cancelled"
                  and (o, l) not in self.leg_gig and not self._pending(o, l) and l in self.undelivered(o)]
+        if why.startswith("unbundle") or ob.order["id"] in self.bundle_last and self.bundle_last[oid] - self.now < cfg.unbundle_minutes:
+            chain = []  # a chain that was split (timeout, drop, alarm) is not posted again as the same chain
         # a3's finding: at volume the late cars are the ones no driver booked before the warning. A risky car goes out
         # earlier and opens at the hot fee.
         if cfg.bundle and legs == [0] and len(ob.order["legs"]) == 1 and self.simple(ob) and why in ("won", "tick") and self.try_bundle(ob):

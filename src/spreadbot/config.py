@@ -63,7 +63,7 @@ class Config:
     v2_barrier_cents: int = 30000      # gate barrier per late car at the target (Halal: EUR 300 x min(2, used)^4)
     v2_barrier_target: float = 0.94    # used = projected late share / (1 - this); the barrier is 16x at twice the target
     v2_war_chain: bool = True          # on a price-war day a car that shares a driver with a planned one is priced at bundle_mult of its cost
-    v2_hot_p: float = 0.12             # Risk.p_late at or above this: post v2_hot_early hours earlier and open at fee_open_hot (unwarned cars are ~2% late, warned 66-77%)
+    v2_hot_p: float = 0.25             # Risk.p_late at or above this: post v2_hot_early hours earlier and open at fee_open_hot (0.12 made 205 of 529 posts hot on dev-07: fees 1.17x typical)
     v2_hot_early: float = 2.0          # hours before hold_hour for a risky car
     v2_fee_per_min: float = 39.0       # stub clearing fee prior: cents per driving minute after the fixed part (reveals: typical fee 7,392 c per leg of 152 min)
     v2_fee_fixed: float = 1500.0       # stub clearing fee: cents per car
