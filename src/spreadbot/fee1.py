@@ -150,7 +150,9 @@ class Fee1:
         price = ob.order.get("priceCents") or 2 * base
         r_fee, r_late = cfg.fee1_rescue
         v_res = r_fee * base + r_late * cfg.late_cost_frac * price
-        grid = [m for m in cfg.fee1_grid if not (desert and m < cfg.fee1_desert_floor)] or [cfg.fee1_desert_floor]
+        drive = sum(d.geo.drive(ob.order["legs"][l]["pickup"]["placeId"], ob.order["legs"][l]["delivery"]["placeId"]) for l in legs)
+        floor = max(cfg.fee1_desert_floor if desert else 0.0, cfg.fee1_long[1] if cfg.fee1_long and drive >= cfg.fee1_long[0] else 0.0)
+        grid = [m for m in cfg.fee1_grid if m >= floor] or [max(cfg.fee1_grid)]
         mu1 = self.mu(ob, legs, d.now) + self.delta
         # A car that sat unbooked at fee m0: its residual is above (ln m0 - mu0) / sigma, it books now only above that
         miss = self.prior_miss(oid, legs, d.now)
@@ -165,7 +167,8 @@ class Fee1:
             return max(0.0, Phi(z) - Phi(e_min)) / max(1e-9, tail)
 
         t1 = repick_at(d.now, cfg.fee1_repick) if cfg.fee1_repick else t_alarm
-        stage2 = cfg.fee1_repick and t_alarm - t1 >= cfg.fee1_min_minutes and self.posts(oid, legs) + 1 < cfg.fee1_max_posts
+        stage2 = (cfg.fee1_repick and t_alarm - t1 >= cfg.fee1_min_minutes + (cfg.fee1_last_call or 0)
+                  and self.posts(oid, legs) + 1 < cfg.fee1_max_posts)
         if not stage2:
             t1 = t_alarm
         w1 = self.window(day_minutes(d.now, t1))

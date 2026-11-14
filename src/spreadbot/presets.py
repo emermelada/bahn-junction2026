@@ -187,3 +187,6 @@ PRESETS["k-f1"] = PRESETS["k-safe-dcl"] + ["fee1=true"]
 # prices on the same cars (the load charge binds: quoting at a 5% lower cost was -396/wk at equal orders, m25-fma).
 PRESETS["kdcl-hold"] = PRESETS["k-safe-dcl"] + ["quote_cost_hold=1.05"]
 PRESETS["k-f1h"] = PRESETS["k-f1"] + ["quote_cost_hold=1.05"]
+# fee1 v5 on the stack: long cars (>= 4 h drive, long_warn's class) never under 1.0; a last-call new post 150 min before the alarm;
+# relative weight 0.05 (PROBE's causal forks, research/re/probe/relstat.py).
+PRESETS["k-f1h5"] = PRESETS["k-f1h"] + ["fee1_long=(240,1.0)", "fee1_last_call=150", "fee1_rel_share=0.05"]

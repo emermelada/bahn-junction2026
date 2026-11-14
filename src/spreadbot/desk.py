@@ -1751,19 +1751,29 @@ class Desk:
         cfg = self.cfg
         for gid in sorted(self.gigs):
             rec = self.gigs[gid]
-            if rec.status != "open" or not self.fee1_gig(rec) or self.now < repick_at(rec.posted_at, cfg.fee1_repick):
-                continue  # (a re-pick that would fall at night waits for the morning: nobody plans a trip then)
+            if rec.status != "open" or not self.fee1_gig(rec):
+                continue
             oid = rec.legs[0][0]
             ob = self.orders.get(oid)
-            legs = [l for _, l in rec.legs]
-            if not ob or ob.urgent or self.fee1.posts(oid, legs) >= cfg.fee1_max_posts:
+            if not ob or ob.urgent:
                 continue
+            legs = [l for _, l in rec.legs]
             q = ob.order["legs"][legs[-1]]["delivery"]["placeId"]
             alarm = max(cfg.alarm_minutes, cfg.desert_alarm) if (cfg.desert_n and self.desert(q)) else cfg.alarm_minutes
-            if self.last_pickup(ob, legs) - alarm - self.now < cfg.fee1_min_minutes:
-                continue  # too close to the alarm for another choice: it rides to the alarm's steep fees
+            left = self.last_pickup(ob, legs) - alarm - self.now  # minutes to our alarm
+            posts = self.fee1.posts(oid, legs)
+            # Last call: a car still unbooked fee1_last_call min before the alarm gets one more new post at a safe fee (the ladder's
+            # raise 8 h before the last pickup, as a post that notifies drivers): without it a miss rode to the alarm (f1v4: cars booked
+            # on their only post were late 1.4% vs 0.6%).
+            last_call = (cfg.fee1_last_call and cfg.fee1_min_minutes <= left <= cfg.fee1_last_call
+                         and self.now - rec.posted_at >= 60 and posts <= cfg.fee1_max_posts)
+            if not last_call:
+                if self.now < repick_at(rec.posted_at, cfg.fee1_repick) or posts >= cfg.fee1_max_posts:
+                    continue  # (a re-pick that would fall at night waits for the morning: nobody plans a trip then)
+                if left < cfg.fee1_min_minutes + (cfg.fee1_last_call or 0):
+                    continue  # too close to the alarm for another choice: the last call (or the alarm) takes it
             self.fee1.close(rec, False, self.now)
-            self.say("FEE1_REPICK", f"{gid} {oid} sat {self.now - rec.posted_at} min at {rec.schedule[0]['feeCents']}")
+            self.say("FEE1_REPICK", f"{gid} {oid} sat {self.now - rec.posted_at} min at {rec.schedule[0]['feeCents']}{' last-call' if last_call else ''}")
             self.withdraw(gid)
 
     def offer_home(self) -> None:
