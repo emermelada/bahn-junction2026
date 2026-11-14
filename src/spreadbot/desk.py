@@ -158,6 +158,7 @@ class Desk:
         self.won_log: list[int] = []  # minutes of our wins (scarcity)
         self.admitted: set[str] = set()  # requests quoted by safe_admit
         self.admits: dict[int, int] = defaultdict(int)  # day of quote -> safe_admit quotes (rebuilt by the replay of price requests)
+        self._vol_off = False  # vol_guard tripped: no extra volume for the rest of the week
 
     # ------------------------------------------------------------------ helpers
     def say(self, code: str, detail: str = "") -> None:
@@ -720,7 +721,8 @@ class Desk:
         cars / won cars >= warned_share. Sticky: once scarce, scarce for the week."""
         cfg = self.cfg
         hi = min(t, cfg.scarcity_until) // 60
-        h = max(self.scarce_hour + 1, -(-cfg.scarcity_from // 60))
+        start = min(cfg.scarcity_from, cfg.scarcity_z[6]) if len(cfg.scarcity_z) > 6 else cfg.scarcity_from
+        h = max(self.scarce_hour + 1, -(-start // 60))
         while h <= hi and not self.scarce:
             self.scarce_hour = h
             H = h * 60
@@ -730,7 +732,18 @@ class Desk:
             fee = sum(fees) / len(fees) if len(fees) >= cfg.scarcity_min_n else 0.0
             share = warned / won if won >= cfg.scarcity_min_n else 0.0
             f_lim, w_lim = cfg.scarcity
-            if fee >= f_lim or share >= w_lim:
+            if cfg.scarcity_z:
+                # Standardized sum of both Tuesday signals against normal weeks (PROBE's 228 labelled weeks: z >= 2.5 flags 35% of
+                # bad weeks at 4% false alarms; fee AND warned at best 28% / 4%, fee OR warned 37% / 11%; research/re/fleet/scar_rules.out).
+                mf, sf, mw, sw, thr = cfg.scarcity_z[:5]
+                if H < cfg.scarcity_from:
+                    # Early tier (scarcity_z[5] from minute scarcity_z[6]): only an extreme week flips before Tuesday midnight. nf-04's z was
+                    # 8.4 at Tue 12:00 and 16.6 at Tue 18:00; no normal tuning week passed 5.6 by Tue 18:00 (research/re/fleet/zcurve.py).
+                    thr = cfg.scarcity_z[5]
+                hit = fee > 0 and won >= cfg.scarcity_min_n and (fee - mf) / sf + (share - mw) / sw >= thr
+            else:
+                hit = fee >= f_lim or share >= w_lim
+            if hit:
                 self.scarce = True
                 self.say("SCARCE", f"at {H}: fee/typ={fee:.3f} (n={len(fees)}, >= {f_lim}) warned/won={warned}/{won}={share:.3f} (>= {w_lim})"
                          f": no safe_admit, long >= {cfg.scarcity_long} declined, risk x{cfg.scarcity_risk}, set {dict(cfg.scarce_set)}")
@@ -819,14 +832,32 @@ class Desk:
             self._brake_at = self.now
         return self._brake_x
 
+    def volume_ok(self) -> bool:
+        """vol_guard (min orders, warned share, fee/typical): the week is not spiralling. Once 'warned share' of our orders had a
+        deadline warning, or our last 60 bookings paid 'fee/typical' on average, extra volume stops for the rest of the week (sticky).
+        nf-04-type weeks (warned 21%, fee 1.30x) tipped under 0.90 with every volume arm; normal weeks stay <= 5.7% / 1.06x by Thursday."""
+        g = self.cfg.vol_guard
+        if not g:
+            return True
+        if self._vol_off:
+            return False
+        n_min, w_max, f_max = g
+        if self.won_count >= n_min:
+            xs = self.book_ratios[-60:]
+            if len(self.warned) / max(1, self.won_count) >= w_max or (len(xs) >= 30 and sum(xs) / len(xs) >= f_max):
+                self._vol_off = True
+                self.say("VOL_OFF", f"warned {len(self.warned)}/{self.won_count}, fee/typ {sum(xs) / max(1, len(xs)):.2f}: no extra volume this week")
+                return False
+        return True
+
     def due_load(self, day: int) -> float:
         """Our orders due on this day (won, not cancelled), over the number of drivers in the world."""
         n = self.due_count.get(day, 0)
-        if self.cfg.load_bundle_w < 1.0:
+        if self.cfg.load_bundle_w < 1.0 and self.volume_ok():
             chained = 0
             for rec in self.gigs.values():
                 oids = {o for o, _ in rec.legs}
-                if len(oids) > 1 and rec.status in ("open", "booked", "working"):
+                if len(oids) > 1 and rec.status in (("booked", "working") if self.cfg.load_bundle_booked else ("open", "booked", "working")):
                     for o in oids:
                         ob = self.orders.get(o)
                         if ob and min(self.deadline(ob.order, l) for l in range(len(ob.order["legs"]))) // DAY == day:
@@ -1198,7 +1229,20 @@ class Desk:
             rel = max(rel, 6 * DAY + self.cfg.hold_hour * 60)  # due on the last Monday: book it on Sunday for Monday
         if self.cfg.hold_min_left and self.last_pickup(ob, list(range(len(o["legs"])))) - rel < self.cfg.hold_min_left:
             return None  # too little time between the release and the last pickup: drivers need the evening and morning to book it
-        return rel if rel > self.now else None
+        if rel > self.now:
+            return rel
+        if self.cfg.batch_hours:
+            # Batch dispatch: a car the evening release would post at once waits for the next batch, so it is paired against the whole
+            # pool (held cars + our open singles) instead of booking alone in minutes (PAIRS_MISSED: 66% of missed pairs = partner
+            # already booked; 180-266 cars/wk are posted at the win). Only while batch_min_left remains after the batch.
+            last = self.last_pickup(ob, list(range(len(o["legs"]))))
+            day = self.now // DAY
+            for d in (day, day + 1):
+                for h in sorted(self.cfg.batch_hours):
+                    t = d * DAY + h * 60
+                    if t > self.now + 5:
+                        return t if last - t >= self.cfg.batch_min_left else None
+        return None
 
     def release_held(self) -> None:
         """Posts the cars whose release has come: pairs first (a max greedy matching), then singles."""
@@ -1562,7 +1606,17 @@ class Desk:
             return
         if self.fee1_gig(rec):
             self.fee1.close(rec, False, self.now)
-        sched = steep(self.now, base, self.cfg, floor=cur, plan=self.steep_plan_now(ob))
+        plan = self.steep_plan_now(ob)
+        if self.cfg.rescue_cap and len({o for o, _ in legs}) == 1:
+            # Governor-capped rescue (Franco's idea B): with the week comfortably on time, a car whose margin would be small at
+            # rescue fees gets a capped plan, not the steep climb (rescued singles paid 1.39x and were still 55% late, ~19/wk).
+            proj_min, margin_max, cap_plan = self.cfg.rescue_cap[:3]
+            ref = self.cfg.rescue_cap[3] if len(self.cfg.rescue_cap) > 3 else plan[-1]  # the fee the margin is judged at
+            price = ob.order.get("priceCents") or 0
+            if self.gov.projection() >= proj_min and price - ref * base < margin_max:
+                plan = tuple(max(m, cur / max(1.0, base)) for m in cap_plan)
+                self.say("RESCUE_CAP", f"{rec.id} {oid} {why} price={price} base={int(base)} plan={plan}")
+        sched = steep(self.now, base, self.cfg, floor=cur, plan=plan)
         rec.schedule = sched
         rec.escalated = True
         self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": sched})
@@ -1926,13 +1980,21 @@ class Desk:
             if not last_call:
                 # v5_repost: one re-pick at a flat fee, then the car keeps it to the last call (no second model re-pick)
                 max_posts = min(cfg.fee1_max_posts, 2) if cfg.v5_repost and not getattr(self, "scarce", False) else cfg.fee1_max_posts
-                if self.now < repick_at(rec.posted_at, cfg.fee1_repick) or posts >= max_posts:
+                if self.now < repick_at(rec.posted_at, cfg.fee1_repick) or (posts >= max_posts and not cfg.fee1_after_ladder):
                     continue  # (a re-pick that would fall at night waits for the morning: nobody plans a trip then)
-                if left < cfg.fee1_min_minutes + (cfg.fee1_last_call or 0):
+                if left < cfg.fee1_min_minutes + (cfg.fee1_last_call or 0) and not cfg.fee1_after_ladder:
                     continue  # too close to the alarm for another choice: the last call (or the alarm) takes it
             if not last_call and cfg.v5_pair2 and not getattr(self, "scarce", False) and self.v5_pair2(rec):
                 continue  # paired with another sitting single of ours: one driver, two cars, at the pair's fee
             self.fee1.close(rec, False, self.now)
+            if cfg.fee1_after_ladder and not last_call:
+                # The miss rejoins the old ladder in place (fee_open now, then the fee_rel steps): ARCHIVE's split of k-f1h5f, a re-posted
+                # car cost EUR 3.6-6.0 more than under the ladder (-103..-220/wk) while fee1's first picks gained +540/wk every week.
+                cur = current_fee(rec.schedule, self.now)
+                rec.schedule = self.ladder_from_now(ob, legs, cur)
+                self.outbox.append({"type": "reprice", "gigId": gid, "schedule": rec.schedule})
+                self.say("FEE1_LADDER", f"{gid} {oid} sat {self.now - rec.posted_at} min at {cur} -> {rec.schedule[0]['feeCents']}..{rec.schedule[-1]['feeCents']}")
+                continue
             self.say("FEE1_REPICK", f"{gid} {oid} sat {self.now - rec.posted_at} min at {rec.schedule[0]['feeCents']}{' last-call' if last_call else ''}")
             self.withdraw(gid)
 
@@ -1968,6 +2030,22 @@ class Desk:
             self.withdraw(r.id)
         self.post_bundle(first, second, last, why="pair2")
         return True
+    def ladder_from_now(self, ob: OrderBook, legs: list[int], cur: int) -> list[dict]:
+        """The relative ladder from now for a sitting gig: fee_open (never under its current fee), then the fee_rel steps before the
+        last pickup. Two or more steps, so the gig is no longer a fee1 gig."""
+        cfg, now = self.cfg, self.now
+        base = self.base_fee(ob, legs)
+        last = self.last_pickup(ob, legs)
+        prev = max(cur, int(round(base * cfg.fee_open)))
+        out = [{"at": now, "feeCents": prev}]
+        for hours_before, mult in cfg.fee_rel:
+            fee = max(prev, int(round(base * mult)))
+            out.append({"at": max(now + cfg.fee_hold, last - int(hours_before * HOUR)), "feeCents": fee})
+            prev = fee
+        out = dedupe(sorted(out, key=lambda x: (x["at"], x["feeCents"])))
+        if len(out) < 2:  # keep it out of fee1's hands: one more step at the steep plan's first rung before the alarm
+            out.append({"at": max(now + cfg.fee_hold, last - cfg.alarm_minutes), "feeCents": max(prev + 1, int(round(base * cfg.steep_plan[0])))})
+        return dedupe(out)
 
     def offer_home(self) -> None:
         """Direct offers to drivers who live near a gig's delivery but too far from its pickup to be notified: the trip home

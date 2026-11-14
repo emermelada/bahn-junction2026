@@ -137,6 +137,8 @@ class Config:
     fee_plan: tuple = ((0.0, 0.95), (0.15, 1.15), (0.4, 1.45), (0.7, 1.85))  # (share of slack, fee over typical fee)
     steep_plan: tuple = (1.7, 2.0, 2.3, 2.6)  # after a deadline warning: generous, a late car costs more
     steep_step: int = 30
+    rescue_cap: tuple = ()             # (min projection, max margin cents at the plan's top fee, capped plan): a single whose margin at rescue fees
+                                       # would be under this, in a week projected comfortably on time, gets the capped plan instead (() = off)
     gov_steep: bool = True             # choose the escalation by the projected on-time share
     gov_relaxed: float = 0.95          # above this projection, a car is not worth saving at any price
     steep_relaxed: tuple = (1.4, 1.6, 1.8)  # v1aa: p10 margin 6,773 vs 5,594, same mean
@@ -207,6 +209,8 @@ class Config:
     bundle_soon_mult: float = 1.0      # fee of such a chain over the two typical fees: still under two single gigs (~1.18x)
     bundle_soon_slack: int = 180       # such a chain needs this long before its last start, and splits this long before it
     load_bundle_w: float = 1.0         # a car in one of our live chains counts this much in the day's load (one driver moves two)
+    load_bundle_booked: bool = False   # load_bundle_w only for pairs a driver holds: an open pair may still split into two lone cars
+    vol_guard: tuple = ()              # (min orders, warned share, fee/typical of the last 60 bookings): extra volume (load_bundle_w) stops for the week once either is reached (() = off)
     bundle_rel: tuple = ()             # ((hours before the chain's last start, fee as a share of the two typical fees), ...); () = fee_rel on the bundle fee
     hold_minutes: int = 0              # hold a won car up to this long, unposted, to find a chain partner (0 = post at once)
     hold_lead: int = 12 * 60           # post a held car at the latest this long before its pickup window opens
@@ -218,6 +222,8 @@ class Config:
                                        # next-day cars with last pickup 12-14 h held to 16:00 are 25% late vs 11% posted at once (176 c3 weeks)
     hold_all: bool = False             # hold every car (default: only cars that could be paired, see simple())
     hold_open: bool = True             # at a release, also pair with our open unbooked single gigs
+    batch_hours: tuple = ()            # batch dispatch: hours of the day at which cars the evening release would post at once are released together (() = off)
+    batch_min_left: int = 12 * 60      # only while this long remains to the last pickup after the batch (Halal: holding to 07:00 of the last day 11.1% late)
     hold_price: bool = False           # quote a car that pairs with a held car (same pickup day, near) at the bundle cost
     bundle_keep: float = 0.0          # a dropped bundle with this many hours to spare stays a bundle, raised to this x its base (0 = split)
     hold_km: float = 0.0               # air km from A's delivery to B's pickup for a release pair (0 = bundle_km)
@@ -248,6 +254,10 @@ class Config:
     fee1_desert_floor: float = 1.05    # desert deliveries (desert_n) never below this (the tail guard of d-feerd)
     fee1_long: tuple = ()              # (drive min, floor): long cars never below this fee. k-f1h WAR: cheaper long gigs got warned, long_warn
                                        # then declined long cars 38-40x/wk vs 27 (the highest-margin cars, EUR 63-77 each; -8.7 won/wk) (() = off)
+    fee1_only: tuple = ()              # (min hours to the last pickup, min drivers <= 30 road min from the delivery): fee1 only for such cars (() = all)
+    fee1_window_fee: bool = False      # booking-time profile by fee (low fees book later: a 6 h miss is weak evidence; PROBE forks)
+    fee1_after_ladder: bool = False    # a fee1 gig unbooked at its re-pick time joins the old ladder in place instead of a new post
+    fee1_long_ladder: bool = False     # long cars (fee1_long[0]) are not fee1 cars at all: the opening + ladder as before
     fee1_last_call: int = 0            # minutes before our alarm: a fee1 car still unbooked gets one more new post at a safe fee (0 = off)
     fee1_harm: float = 1.0             # weight of the harm a fee above the going fee does to our other waiting gigs (0 = off; Halal: -EUR 2,967/wk without)
     fee1_rel_share: float = 0.15       # share of a fee's pull that comes from our own other gigs: PROBE measured ~0.1-0.3 (DRIVERS.md: +10% on our
@@ -257,6 +267,8 @@ class Config:
     # + ln(drive min) + posted Fri..Mon2 + private end + premium; sigma. PROBE's counterfactual forks (57 cars, 227 probes,
     # research/re/probe/out/clear_fit.json): median clearing fee ~0.98 (few drivers near the delivery, < 8 h) to 0.64 (many, > 40 h).
     fee1_clear: tuple = (0.1892, -0.0561, -0.0130, -0.1032, 0.0275, -0.0573, 0.0076, 0.0241, 0.2250)
+    fee1_sigma: float = 0.0            # override sigma (0 = fee1_clear's). f1h5: 0.80 picks booked 57% vs 74% predicted, 1.00 78% vs 84%: too
+                                       # steep; PROBE's population curve and Halal's flat fees imply 0.29-0.31
     fee1_delta: tuple = (0.10, 0.30, 1440)  # this week's offset of ln(clearing fee): prior sd, clamp, half-life of a post's weight (min)
                                        # (Halal learns its intercept: -EUR 505/wk without; drivers booking us: 48 Mon, 61-62 Tue-Thu, 38 Fri)
     fee1_obs_minutes: int = 240        # a first post unbooked for this many daytime minutes counts as "did not clear" for the offset
@@ -266,6 +278,7 @@ class Config:
     v5_repost: float = 0.0             # fee1's re-pick posts once at max(this, floors); no further model re-picks (last call and alarm unchanged; 0 = off)
     v5_pair2: bool = False             # at the re-pick, first try to pair the car with another open unbooked single of ours (pairs pay 0.84x)
     v5_short_open: float = 0.0         # ladder singles with < 8 h to the last pickup (fee1 cannot choose) open at this, not fee_open (0 = off)
+                                       # (a censored-exposure version, 85f9226, was -301 (se 152) on WAR vs this one: kept this)
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
     backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little
     backhaul_mult: float = 1.0         # offer fee over typical fee (never under the app fee unless backhaul_below)
@@ -285,6 +298,8 @@ class Config:
     scarcity: tuple = ()               # (fee_typ, warned_share): the week is scarce once, from Tue 24:00, the last 24 h's booked single-gig
                                        # fee/typical >= fee_typ or warned/won >= warned_share (probe/SCARCITY.md: Tue fee >= 1.08 flags 24% of bad
                                        # weeks at 3% false alarms; warned/won median 0.063 bad vs 0.031 normal); () = off
+    scarcity_z: tuple = ()             # (fee mean, fee sd, warned mean, warned sd, threshold) of normal Tuesdays: flip when the standardized sum of both
+                                       # >= threshold instead of the OR of scarcity's limits (() = OR). PROBE weeks: (1.002, 0.044, 0.037, 0.029, 2.5)
     scarcity_from: int = 2880          # first check at Tue 24:00: no Monday signal exists (SCARCITY.md, AUC 0.51-0.55)
     scarcity_until: int = 4320         # last hourly check before Thu 00:00: a later flip guards little (Friday has the Friday guard)
     scarcity_min_n: int = 20           # bookings and wins in the 24 h window needed for a ratio (a normal Tuesday has ~100 of each)

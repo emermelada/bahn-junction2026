@@ -137,6 +137,20 @@ class Fee1:
             return 0.7 * minutes / 60
         return 1.0 - 0.3 * math.exp(-(minutes - 60) / 240)
 
+    def window_m(self, minutes: float, m: float) -> float:
+        """window() by fee (fee1_window_fee): low fees book later. PROBE's flat-fee forks (probes.jsonl): within 1 h 0.67 of the
+        pre-warning bookings at 0.85, 0.81 at 1.05, 0.90 at 1.2; after 6 h still 18% at 0.85, 11% at 1.05, 6% at 1.2, 25-30% at
+        0.62-0.72 (new drivers each day, mostly next morning)."""
+        if minutes <= 0:
+            return 0.0
+        w60 = min(0.95, max(0.40, 0.81 + 0.6 * (m - 1.05)))
+        w360 = 1.0 - min(0.35, max(0.05, 0.11 + 0.35 * (1.05 - m)))
+        if minutes < 60:
+            return w60 * minutes / 60
+        if minutes <= 360:
+            return w60 + (w360 - w60) * math.log(minutes / 60) / math.log(6)
+        return 1.0 - (1.0 - w360) * math.exp(-(minutes - 360) / 1440)
+
     def plan(self, ob: "OrderBook", legs: list[int], last: int, base: float, desert: bool) -> Optional[tuple]:
         """(fee m, expected cost in cents, P1(m), the first window's end, V2(m), info), or None with too little time before the alarm."""
         d, cfg = self.desk, self.desk.cfg
@@ -145,11 +159,17 @@ class Fee1:
         if t_alarm - d.now < cfg.fee1_min_minutes:
             return None
         self.calibrate()
-        sig = cfg.fee1_clear[-1]
+        sig = (cfg.fee1_sigma or cfg.fee1_clear[-1])
         oid = ob.order["id"]
         price = ob.order.get("priceCents") or 2 * base
         r_fee, r_late = cfg.fee1_rescue
         v_res = r_fee * base + r_late * cfg.late_cost_frac * price
+        drive = sum(d.geo.drive(ob.order["legs"][l]["pickup"]["placeId"], ob.order["legs"][l]["delivery"]["placeId"]) for l in legs)
+        if cfg.fee1_long_ladder and cfg.fee1_long and drive >= cfg.fee1_long[0]:
+            return None  # long cars keep the ladder: long_warn was built on how they book under it (k-f1h5's bad weeks: +12..+83 long declines)
+        if cfg.fee1_only and ((last - d.now) / 60 < cfg.fee1_only[0]
+                              or d.home_near_delivery(ob.order["legs"][legs[-1]]["delivery"]["placeId"], 30) < cfg.fee1_only[1]):
+            return None  # narrow fee1: only cars with time and drivers near the delivery (where its cheap fees are); the rest keep the ladder
         floor = self.floor(ob, legs, desert)
         grid = [m for m in cfg.fee1_grid if m >= floor] or [max(cfg.fee1_grid)]
         mu1 = self.mu(ob, legs, d.now) + self.delta
@@ -174,8 +194,12 @@ class Fee1:
         A, going = self.harm(ob.order["legs"][legs[0]]["pickup"]["placeId"]) if cfg.fee1_harm else (0.0, 1.0)
         mu2 = self.mu(ob, legs, t1) + self.delta if stage2 else mu1
         w2 = self.window(day_minutes(t1, t_alarm)) if stage2 else 0.0
+        e1 = day_minutes(d.now, t1)
+        e2 = day_minutes(t1, t_alarm) if stage2 else 0
         best = None
         for m in grid:
+            if cfg.fee1_window_fee:
+                w1 = self.window_m(e1, m)
             pc = p_clear(m, mu1)
             p1 = pc * w1
             if stage2:
@@ -191,7 +215,7 @@ class Fee1:
                     miss_clear = 1 - Phi(lo)               # P(residual above m's | ...) * tail (unnormalised)
                     slow = pc * (1 - w1) * tail            # cleared at m but did not book inside the window (unnormalised)
                     tot = miss_clear + slow
-                    pb = ((max(0.0, Phi(z2) - Phi(lo)) + slow) / tot if tot > 1e-12 else 0.0) * w2
+                    pb = ((max(0.0, Phi(z2) - Phi(lo)) + slow) / tot if tot > 1e-12 else 0.0) * (self.window_m(e2, m2) if cfg.fee1_window_fee else w2)
                     v2 = min(v2, pb * m2 * base + (1 - pb) * v_res)
             else:
                 v2 = v_res
@@ -279,7 +303,7 @@ class Fee1:
             legs = [l for _, l in rec.legs]
             base = d.base_fee(ob, legs)
             m = current_fee(rec.schedule, d.now) / max(1.0, base)
-            sig = cfg.fee1_clear[-1]
+            sig = (cfg.fee1_sigma or cfg.fee1_clear[-1])
             z = (math.log(max(0.05, m)) - self.mu(ob, legs, rec.posted_at) - self.delta) / sig
             price = ob.order.get("priceCents") or 2 * base
             r_fee, r_late = cfg.fee1_rescue
@@ -307,7 +331,7 @@ class Fee1:
             return None
         legs = [l for _, l in rec.legs]
         m = rec.schedule[0]["feeCents"] / max(1.0, d.base_fee(ob, legs))
-        return (math.log(max(0.05, m)) - self.mu(ob, legs, rec.posted_at)) / d.cfg.fee1_clear[-1]
+        return (math.log(max(0.05, m)) - self.mu(ob, legs, rec.posted_at)) / (d.cfg.fee1_sigma or d.cfg.fee1_clear[-1])
 
     def close(self, rec: "GigRec", booked: bool, at: int) -> None:
         """A fee1 gig's flat exposure ended (booked, withdrawn for a re-pick, or escalated at the alarm). First posts are this
@@ -343,7 +367,7 @@ class Fee1:
         if d.now // 60 == self.d_at:
             return
         self.d_at = d.now // 60
-        sig = cfg.fee1_clear[-1]
+        sig = (cfg.fee1_sigma or cfg.fee1_clear[-1])
         W = cfg.fee1_obs_minutes
         prior_sd, lim, half = cfg.fee1_delta
         xs = []
