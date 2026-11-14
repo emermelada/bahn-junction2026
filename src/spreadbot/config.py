@@ -223,6 +223,8 @@ class Config:
     hold_km: float = 0.0               # air km from A's delivery to B's pickup for a release pair (0 = bundle_km)
     hold_weekend: bool = False         # a held car whose last pickup is on the last Monday is released Sunday at hold_hour (not before Friday):
                                        # bookings made 2+ days ahead are a third dropped and a fifth late (RESEARCH_2 round 2), Mon2 drivers are idle
+    cheap_week: tuple = ()              # (decide minute, mu max, min results, hub drivers <= 30 min, cost mult): in a week the competitor
+                                       # prices low at Monday noon, cars into driver-dense hubs are quoted at a lower cost (ARCHIVE c_hubtier)
     drop_calm_hours: float = 0.0       # a single dropped with more than this many hours to its last pickup is posted again at the opening
                                        # fee instead of escalated (k-safe, 35 weeks: 25 of 35 drops/wk had > 16 h left, rebooked at
                                        # 1.24-1.31x typical, 2-4% late); 0 = off

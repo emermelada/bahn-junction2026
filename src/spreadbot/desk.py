@@ -150,6 +150,7 @@ class Desk:
         self.gov_logged = -1
         self.warned: set[str] = set()  # orders that had a deadline warning
         self._strict_cfg: Optional[Config] = None
+        self._cheap_week = None  # cheap_week: decided at Monday noon, then fixed for the week
         self._fee1 = None  # Fee1 engine (fee1.py), built on first use when cfg.fee1
         self.scarce = False  # scarcity switch: this week drivers are scarce (FLEET's cheap openings read it too)
         self.scarce_hour = -1  # last hour boundary (minute // 60) the scarcity rule was checked at
@@ -549,6 +550,13 @@ class Desk:
             # fee1's savings stop the quote's fall below the hold, nothing more: never under the base's quote, and a week where
             # drivers cost more (scarcity, or Monday's prior) still raises it.
             cost = max(cost, r["referenceFeeCents"] * self.cost_mult())
+        hub_tag = ""
+        if cfg.cheap_week and self.cheap_week_on():
+            # A cheap-competitor week (Monday-noon level low): we lose volume, mostly on cars into driver-dense hubs, which are the
+            # cheapest to move (ARCHIVE c_hubtier.out: no-margin declines 19.1% vs 12.4% into hubs). Quote those at a lower cost.
+            if self.home_near_delivery(r["legs"][-1]["delivery"]["placeId"], 30) >= cfg.cheap_week[3]:
+                cost *= cfg.cheap_week[4]
+                hub_tag = " cw=hub"
         if cfg.hold_price and self.pairs_with_held(r):
             cost *= cfg.bundle_mult  # a held car for the same day starts or ends near this one: the evening release pairs them
         elif cfg.bundle_price and self.chainable(r):
@@ -672,7 +680,8 @@ class Desk:
         self.quote_meta[r["id"]] = meta
         head = f"bar={bar:.2f} bl={backlog} tg={t_gain/100:.0f} tf={tf:.2f} mu={self.market.mu_for(dealer, day, r["legs"][0]["pickup"]["placeId"]):.3f} cost={cost/100:.0f}"
         if cfg.late_barrier:
-            head += f" lb={barrier/100:.0f}"  # late_barrier: euros per expected late car right now
+            head += f" lb={barrier/100:.0f}"
+        head += hub_tag  # late_barrier: euros per expected late car right now
         if cfg.backlog_brake:
             head += f" bk={self._brake_u}/{brake:.2f}"  # backlog_brake: driverless cars due soon / charge in units
         if not prices:
@@ -1439,6 +1448,15 @@ class Desk:
             out.append({"at": now + int(span * frac), "feeCents": fee})
             prev = fee
         return dedupe(out)
+
+    def cheap_week_on(self) -> bool:
+        """Decided once, at the first quote from cheap_week[0] (Monday 12:00): the learned competitor level is low, after enough
+        results. Sticky for the week; a replay after a restart decides the same at the same quote."""
+        cw = self.cfg.cheap_week
+        if self._cheap_week is None and self.now >= cw[0]:
+            self._cheap_week = bool(self.market.n_obs >= cw[2] and self.market.mu <= cw[1])
+            self.say("CHEAP_WEEK", f"{self._cheap_week} mu={self.market.mu:.3f} n={self.market.n_obs}")
+        return bool(self._cheap_week)
 
     def home_near_delivery(self, place: str, minutes: int = 30) -> int:
         """Drivers whose trip home from this delivery takes at most `minutes` of road (fixed per world: cached)."""

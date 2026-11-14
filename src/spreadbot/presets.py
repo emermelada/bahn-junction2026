@@ -261,3 +261,7 @@ PRESETS["v5L"] = PRESETS["k-f1h5fD"] + ["load_bundle_w=0.6", "load_free=0.12", "
 PRESETS["v5La"] = PRESETS["v5aV2"] + LB  # the first test (v5-run3 tag v5V2lb): with v5a's long cars down to 0.90
 PRESETS["v5L45"] = PRESETS["v5L"] + ["late_barrier=(0.945,300,4,20)"]  # looser target: keep more of V2's volume in normal weeks
 PRESETS["v5L14"] = PRESETS["v5L"] + ["load_free=0.14"]                   # bolder volume under the same barrier
+# v6 (claude/v6-cheapweek): v5La + Franco's P1 in the form ARCHIVE's numbers support: in a cheap week (Mon 12:00 mu <= 1.305 after
+# 25 results), cars into hubs (>= 69 drivers <= 30 min of the delivery = top tercile) quoted at 0.92 of the cost. No sparse surcharge.
+PRESETS["v6h"] = PRESETS["v5La"] + ["cheap_week=(720,1.305,25,69,0.92)"]
+PRESETS["v6h85"] = PRESETS["v5La"] + ["cheap_week=(720,1.305,25,69,0.85)"]
