@@ -57,3 +57,14 @@ y4 beats the base on all 12 seeds (+1,918/week, +20%); its worst week is 8,066 v
 
 Money line with stricter guards (all + hold 16): y5 guard 0.93: 11/12, mean 10,865. y6 guard 0.94: cut at 4 seeds by a memory reap, 4/4 ranked, 13,057 vs 14,198 for y4 on the same seeds. y7 guard 0.93 + load 0.06: 12/12, min on-time 0.919, mean 10,894.
 **Kill the money line**: every ranked variant is below y4 (late 2.0, load 0.07: 11,579, 12/12). Candidate for rc3: `hold=true hold_hour=16 late_cost_frac=2.0 load_free=0.07`, pending a fresh check on dev-19..30.
+
+## 5-week test, dev-31..35 (never used before), totals over the 5 weeks
+
+| Version | 5-week total | Mean/week | Ranked | Min on-time | Worst week |
+|---|---|---|---|---|---|
+| rc2 | 50,829 | 10,166 | 5/5 | 0.950 | 5,276 |
+| hold 16:00 | 59,926 | 11,985 | 5/5 | 0.942 | 3,329 |
+| **hold 16:00 + late 2.0 + load 0.07 (y4)** | **63,009** | **12,602** | **5/5** | 0.939 | **7,132** |
+| hold 16:00 + late 1.2 + load 0.06 (y3) | 62,185 | 12,437 | 5/5 | 0.947 | 5,340 |
+
+y4 +24% over rc2, and the only version that also lifts the bad week (dev-32: 7,132 vs 5,276). Candidate rc3 = y4.
