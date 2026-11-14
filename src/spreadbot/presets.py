@@ -73,3 +73,5 @@ PRESETS["k-load"] = PRESETS["c3g"] + ["load_free=0.12", "load_slope=2"]
 # Stacks: + re-drivers' opening-fee rule (d-fee), + re-market's last-Monday load room (m2mon2 at a gentler 0.15).
 PRESETS["k-s1"] = PRESETS["k-load"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))"]
 PRESETS["k-s2"] = PRESETS["k-s1"] + ["load_free_mon2=0.15"]
+# d-fee2's 0.85 where >= 80 drivers live near the delivery: 1 warned of ~60 such gigs; its 0.9 elsewhere drove dev-46 to 0.917.
+PRESETS["d-fee5"] = PRESETS["c3g"] + ["fee_open_rule=((24,80,0.85),(24,0,0.92),(12,80,0.95))"]
