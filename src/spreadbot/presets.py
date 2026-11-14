@@ -318,3 +318,6 @@ PRESETS["v5La-R1"] = PRESETS["v5La"] + R1
 PRESETS["v5La-R2"] = PRESETS["v5La"] + ["batch_hours=(7,12,16)", "bundle_km=40"]
 # (B) governor-capped rescue (Franco): projection >= 0.935 and margin at the steep plan's top under EUR 20 -> plan (1.15, 1.25).
 PRESETS["v5La-B"] = PRESETS["v5La"] + ["rescue_cap=(0.935,2000,(1.15,1.25))"]
+# B fired 23-85x/wk (margin judged at the plan's top 1.8x: nearly every car): SCAR -260, fresh-07 -50 orders. B2: judged at the
+# realised rescue fee 1.39x, only cars that lose money there, only when projected >= 0.945.
+PRESETS["v5La-B2"] = PRESETS["v5La"] + ["rescue_cap=(0.945,0,(1.15,1.25),1.39)"]

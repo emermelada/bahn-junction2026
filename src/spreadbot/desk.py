@@ -1598,9 +1598,10 @@ class Desk:
         if self.cfg.rescue_cap and len({o for o, _ in legs}) == 1:
             # Governor-capped rescue (Franco's idea B): with the week comfortably on time, a car whose margin would be small at
             # rescue fees gets a capped plan, not the steep climb (rescued singles paid 1.39x and were still 55% late, ~19/wk).
-            proj_min, margin_max, cap_plan = self.cfg.rescue_cap
+            proj_min, margin_max, cap_plan = self.cfg.rescue_cap[:3]
+            ref = self.cfg.rescue_cap[3] if len(self.cfg.rescue_cap) > 3 else plan[-1]  # the fee the margin is judged at
             price = ob.order.get("priceCents") or 0
-            if self.gov.projection() >= proj_min and price - plan[-1] * base < margin_max:
+            if self.gov.projection() >= proj_min and price - ref * base < margin_max:
                 plan = tuple(max(m, cur / max(1.0, base)) for m in cap_plan)
                 self.say("RESCUE_CAP", f"{rec.id} {oid} {why} price={price} base={int(base)} plan={plan}")
         sched = steep(self.now, base, self.cfg, floor=cur, plan=plan)
