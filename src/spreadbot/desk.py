@@ -1030,6 +1030,8 @@ class Desk:
         if car["electric"] and car["chargePercent"] is not None and car["chargePercent"] < 30 and \
                 self.geo.km(L["pickup"]["placeId"], L["delivery"]["placeId"]) > self.cfg.charge_km:
             pick["withCharging"] = True
+        if self.cfg.stop_windows and len(o["legs"]) == 1 and not self.is_late(ob, [leg]):
+            to = min(to, self.last_pickup(ob, [leg]))  # a pickup after this cannot be on time: let no driver plan it
         if (frm > pw["from"] or to < pw["to"]) and frm < to and to > self.now:
             pick["window"] = {"from": frm, "to": to}
         dw = L["delivery"]["window"]
@@ -1041,6 +1043,8 @@ class Desk:
             iv = open_intervals(real, dw["from"], dto)
             if iv:
                 dto = iv[-1][1]
+        if self.cfg.stop_windows and not self.is_late(ob, [leg]) and dto - self.cfg.stop_margin > max(self.now, dw["from"]) + 60:
+            dto -= self.cfg.stop_margin  # drivers plan to arrive inside the window: keep an hour in hand
         dele: dict = {"orderId": o["id"], "leg": leg, "kind": "delivery"}
         if dto < dw["to"] and dto > max(self.now, dw["from"]):
             dele["window"] = {"from": dw["from"], "to": dto}
@@ -1083,6 +1087,8 @@ class Desk:
             # Steps anchored to lastPickupAt: hold the opening fee while there is time, raise as the pickup nears.
             # The opening fee always shows for at least fee_hold minutes: most views come in the first minutes.
             opening = cfg.fee_open_hot if ob.p_exp >= cfg.hot_p else cfg.fee_open
+            if cfg.fee_open_dense and self.ontime.supply(ob.order["legs"][legs[0]]["pickup"]["placeId"], 30.0) >= cfg.dense_n:
+                opening = cfg.fee_open_dense  # many drivers live near the pickup: it books in minutes at less
             out, prev = [{"at": now, "feeCents": int(round(base * opening))}], int(round(base * opening))
             for hours_before, mult in cfg.fee_rel:
                 at = max(now + cfg.fee_hold, last - int(hours_before * HOUR))

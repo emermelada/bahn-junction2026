@@ -76,7 +76,7 @@ def main() -> int:
                 if not os.path.exists(snap):
                     shutil.copytree("src", snap, ignore=shutil.ignore_patterns("__pycache__"))
                 env = dict(os.environ, PYTHONPATH=snap, PYTHONIOENCODING="utf-8")
-                cmd = [sys.executable, "-m", "spreadbot.run", "practice", "--level", "8", "--seed", s, "--tag", tag, "--quiet"]
+                cmd = [sys.executable, "-m", "spreadbot.run", "practice", "--level", "8", "--seed", s, "--tag", tag, "--quiet", "--reveal"]
                 if preset:
                     cmd += ["--preset", preset]
                 for kv in sets:
