@@ -100,6 +100,7 @@ class Desk:
         self.offered: set[tuple[str, str]] = set()  # (gig, driver)
         self.gig_viewers: dict[str, list[str]] = {}  # gig -> drivers who viewed it, in order
         self.bundle_last: dict[str, int] = {}  # order -> last minute to start its bundle
+        self.held: dict[str, int] = {}  # order -> release minute (evening release)
         self.morning_drops: dict[int, int] = defaultdict(int)
         self.due_count: dict[int, int] = defaultdict(int)
         self.batch_won: dict[str, int] = defaultdict(int)
@@ -184,6 +185,12 @@ class Desk:
         self.orders[o["id"]] = ob
         self.won_count += 1
         self.observe_outcome(o["id"], e["at"], True)
+        if self.cfg.hold:
+            rel = self.release_at(ob)
+            if rel is not None:
+                self.held[o["id"]] = rel
+                self.say("HOLD", f"{o['id']} until {rel}")
+                return
         self.dispatch_order(o["id"], "won")
 
     def on_order_lost(self, e: dict) -> None:
@@ -284,6 +291,16 @@ class Desk:
             return
         rec.status, rec.driver = "open", None
         self.say("REOPEN", f"{gid} {why}")
+        if self.cfg.bundle_keep and len({o for o, _ in rec.legs}) > 1:
+            # A dropped pair notifies again in the app. With time to spare, keep the pair (one driver, two cars)
+            # and raise it a little, instead of two singles at once; the unbundle timer still splits it later.
+            last = min(self.bundle_last.get(o, 0) for o, _ in rec.legs)
+            if last - self.now > self.cfg.unbundle_minutes + 2 * HOUR:
+                fee = max(current_fee(rec.schedule, self.now), int(round(self.gig_base(rec) * self.cfg.bundle_keep)))
+                rec.schedule = dedupe([{"at": self.now, "feeCents": fee}] + [x for x in rec.schedule if x["at"] > self.now and x["feeCents"] > fee])
+                self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": rec.schedule})
+                self.say("KEEP_BUNDLE", f"{gid} fee={fee}")
+                return
         # The gig is in the app again with its old schedule: make sure it can still find a driver.
         self.escalate_gig(rec, why)
 
@@ -418,7 +435,9 @@ class Desk:
         cal = self.gov.calibration() if cfg.calibrate else 1.0
         drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
         cost = r["referenceFeeCents"] * (self.drive_cost_mult(drive) if cfg.drive_cost else self.cost_mult())
-        if cfg.bundle_price and self.chainable(r):
+        if cfg.hold_price and self.pairs_with_held(r):
+            cost *= cfg.bundle_mult  # a held car for the same day starts or ends near this one: the evening release pairs them
+        elif cfg.bundle_price and self.chainable(r):
             cost *= cfg.bundle_mult  # one of our open gigs ends where this car starts (or the reverse): a driver can take both
         backlog = self.backlog(r["legs"][0]["pickup"]["placeId"])
         t_gain, t_loss = self.trust_value(dealer)
@@ -584,6 +603,10 @@ class Desk:
         ob = self.orders.get(oid)
         if not ob:
             return
+        if oid in self.held:
+            if self.held[oid] > self.now:
+                return
+            del self.held[oid]
         legs = [l for l in self.undelivered(oid) if (oid, l) not in self.leg_gig and not self._pending(oid, l)]
         if not legs:
             return
@@ -613,6 +636,27 @@ class Desk:
                 continue
             O = ob.order["legs"][0]
             if ob.order["deadline"] // DAY != r["options"][0]["deadline"] // DAY:
+                continue
+            if self.geo.air(O["delivery"]["placeId"], p) <= km or self.geo.air(d, O["pickup"]["placeId"]) <= km:
+                return True
+        return False
+
+    def pairs_with_held(self, r: dict) -> bool:
+        """A one-car dealer-to-dealer request whose pickup day has a held car that ends near its pickup or starts
+        near its delivery (rough check at quote time; the release runs the full check)."""
+        if len(r["legs"]) != 1 or not self.held:
+            return False
+        L = r["legs"][0]
+        if L["pickup"]["privateAddress"] or L["delivery"]["privateAddress"]:
+            return False
+        p, d, day = L["pickup"]["placeId"], L["delivery"]["placeId"], L["pickup"]["window"]["from"] // DAY
+        km = self.cfg.hold_km or self.cfg.bundle_km
+        for oid in sorted(self.held):
+            ob = self.orders.get(oid)
+            if not ob or len(ob.order["legs"]) != 1:
+                continue
+            O = ob.order["legs"][0]
+            if O["pickup"]["window"]["from"] // DAY != day:
                 continue
             if self.geo.air(O["delivery"]["placeId"], p) <= km or self.geo.air(d, O["pickup"]["placeId"]) <= km:
                 return True
@@ -672,6 +716,75 @@ class Desk:
             return False
         last, first, second, rec = best
         self.withdraw(rec.id)
+        self.post_bundle(first, second, last)
+        return True
+
+    # ------------------------------------------------------------------ evening release
+    def release_at(self, ob: OrderBook) -> Optional[int]:
+        """When to post a car picked up on a later day: hold_hour on the day before its first pickup day.
+        Drivers book most gigs the day before (most know only their next day), and cars held together can be
+        paired: one driver, two cars, no ticket home in between. None: post now."""
+        o = ob.order
+        if not (self.cfg.hold_all or self.simple(ob)):
+            return None
+        frm = max(max(self.leg_note(o["id"], l).ready_at or 0, L["pickup"]["window"]["from"]) for l, L in enumerate(o["legs"]))
+        rel = (frm // DAY - 1) * DAY + self.cfg.hold_hour * 60
+        return rel if rel > self.now else None
+
+    def release_held(self) -> None:
+        """Posts the cars whose release has come: pairs first (a max greedy matching), then singles."""
+        due = sorted(oid for oid, t in self.held.items() if t <= self.now)
+        if not due:
+            return
+        for oid in due:
+            del self.held[oid]
+        cfg = self.cfg
+        def free(o: str) -> bool:  # no live or pending gig (after a restart, a held car may already be posted)
+            return o in self.orders and self.orders[o].order["status"] != "cancelled" and                 not any((o, l) in self.leg_gig or self._pending(o, l) for l in range(len(self.orders[o].order["legs"])))
+        A = [self.orders[o] for o in due if free(o)]
+        later = [self.orders[o] for o in sorted(self.held) if free(o)]  # still held: cars for the same day
+        open_recs = {}
+        if cfg.hold_open:
+            for rec in self.gigs.values():
+                if rec.status == "open" and not rec.escalated and len(rec.legs) == 1:
+                    ob = self.orders.get(rec.legs[0][0])
+                    if ob and self.simple(ob):
+                        open_recs[ob.order["id"]] = rec
+        cands = A + later + [self.orders[o] for o in sorted(open_recs)]
+        km = cfg.bundle_km
+        if cfg.hold_km:
+            self.cfg = cfg.with_(bundle_km=cfg.hold_km)
+        edges = []
+        try:
+            for a in A:
+                if not self.simple(a):
+                    continue
+                for b in cands:
+                    if b is a or not self.simple(b):
+                        continue
+                    for first, second in ((a, b), (b, a)):
+                        last = self.chain(first, second)
+                        if last is not None:
+                            L1, L2 = first.order["legs"][0], second.order["legs"][0]
+                            tr = self.geo.drive(L1["delivery"]["placeId"], L2["pickup"]["placeId"])
+                            edges.append((tr, -last, first.order["id"], second.order["id"], last))
+        finally:
+            self.cfg = cfg
+        used: set = set()
+        for tr, _, f, s, last in sorted(edges):
+            if f in used or s in used:
+                continue
+            used.update((f, s))
+            for x in (f, s):
+                self.held.pop(x, None)
+                if x in open_recs:
+                    self.withdraw(open_recs[x].id)
+            self.post_bundle(self.orders[f], self.orders[s], last, why="release")
+        for a in A:
+            if a.order["id"] not in used:
+                self.dispatch_order(a.order["id"], "release")
+
+    def post_bundle(self, first: OrderBook, second: OrderBook, last: int, why: str = "bundle") -> None:
         stops = self.stops_for(first, 0) + self.stops_for(second, 0)
         audience = {"experienced": any(x.order["legs"][0]["car"]["premium"] for x in (first, second)), "manualLicence": False}
         base = (self.base_fee(first, [0]) + self.base_fee(second, [0])) * self.cfg.bundle_mult
@@ -687,8 +800,10 @@ class Desk:
         self.pending_posts.append((action, "bundle"))
         self.bundle_last[first.order["id"]] = last
         self.bundle_last[second.order["id"]] = last
-        self.say("BUNDLE", first.order["id"] + "+" + second.order["id"] + f" last={last} fee0={sched[0]['feeCents']}")
-        return True
+        for x in (first, second):
+            if x.first_post_at is None:
+                x.first_post_at = self.now
+        self.say("BUNDLE", first.order["id"] + "+" + second.order["id"] + f" {why} last={last} fee0={sched[0]['feeCents']}")
 
     def unbundle(self, rec: GigRec, why: str) -> None:
         self.say("UNBUNDLE", f"{rec.id} {why}")
@@ -994,6 +1109,8 @@ class Desk:
             if self.now - t0 > 60:
                 self.fast_book.append((t0, False))
                 del self.first_posts[gid]
+        if self.held:
+            self.release_held()  # before the loop below, which would post released cars one by one
         for oid in list(self.orders):
             ob = self.orders[oid]
             if ob.order["status"] == "cancelled":

@@ -103,6 +103,14 @@ class Config:
     bundle_window: int = 120           # pair with gigs posted at most this many minutes ago
     bundle_mult: float = 0.8           # one driver, no trip home in between: the pair costs less than two gigs
     unbundle_minutes: int = 5 * 60     # unbooked this close to its last start: post the cars alone
+    # --- evening release: hold cars picked up on a later day, release them together and pair them first
+    hold: bool = False                 # singles post at once; with hold, a car for a later day waits for its release
+    hold_hour: int = 18                # release at this hour of the day before the pickup day
+    hold_all: bool = False             # hold every car (default: only cars that could be paired, see simple())
+    hold_open: bool = True             # at a release, also pair with our open unbooked single gigs
+    hold_price: bool = False           # quote a car that pairs with a held car (same pickup day, near) at the bundle cost
+    bundle_keep: float = 0.0          # a dropped bundle with this many hours to spare stays a bundle, raised to this x its base (0 = split)
+    hold_km: float = 0.0               # air km from A's delivery to B's pickup for a release pair (0 = bundle_km)
     # --- experiments (research runs only)
     experiment_quote: bool = False
     exp_quote_lo: float = 1.0
