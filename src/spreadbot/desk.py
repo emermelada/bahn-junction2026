@@ -631,6 +631,22 @@ class Desk:
         k = self.cfg.cost_prior_n
         return base * (paid + k) / (pred + k)
 
+    def move_cost(self, r: dict, opt: dict) -> float:
+        """Expected driver fee in cents for a request's option: typical fee x this week's fee level, scaled by the opening
+        fee_open_rule would give it (cheap where drivers live near the delivery and the pickup is far off). For the quote."""
+        drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
+        cost = r["referenceFeeCents"] * (self.drive_cost_mult(drive) if self.cfg.drive_cost else self.cost_mult())
+        if self.cfg.fee_open_rule and len(r["legs"]) == 1:
+            L = r["legs"][0]
+            last = min(opt["deadline"], L["pickup"]["window"]["to"] + drive) - drive
+            left = (last - self.now) / HOUR
+            nd = self.home_near_delivery(L["delivery"]["placeId"])
+            for hours, n, mult in self.cfg.fee_open_rule:
+                if left >= hours and nd >= n:
+                    cost *= mult / self.cfg.fee_open
+                    break
+        return cost
+
     def cost_mult(self) -> float:
         """Expected fee over typical fee: the prior, moved by what our own bookings paid this week."""
         prior, n = self.cfg.cost_prior, self.cfg.cost_prior_n
