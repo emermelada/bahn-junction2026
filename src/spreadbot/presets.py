@@ -182,3 +182,6 @@ PRESETS["k-safe-kmh"] = PRESETS["k-safe"] + ["bundle_km=50", "hold_minutes=120",
 PRESETS["k-safe-dcls"] = PRESETS["k-safe-dc"] + ["long_split=(360,180)"]
 # re-market: the quote charges private-address cars the fee drivers ask for them (1.19x / 1.145x vs 1.11x typical).
 PRESETS["m19class"] = PRESETS["k-safe-dc"] + ["class_cost=(1.072,1.032)"]
+# re-market: pair-aware quoting at the expected cost of a car that may pair (not the pair fee), on k-safe-dc.
+PRESETS["m20pq92"] = PRESETS["k-safe-dc"] + ["hold_price=true", "bundle_price=true", "pairq_mult=0.92"]
+PRESETS["m20pq96"] = PRESETS["k-safe-dc"] + ["hold_price=true", "bundle_price=true", "pairq_mult=0.96"]

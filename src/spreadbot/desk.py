@@ -507,10 +507,14 @@ class Desk:
                 cost *= cfg.class_cost[0]
             elif Ln["delivery"]["privateAddress"]:
                 cost *= cfg.class_cost[1]
+        pq = ""
+        pmult = cfg.pairq_mult or cfg.bundle_mult  # pairq_mult: the expected cost of a car that MAY pair (only ~a third do), not the pair's fee
         if cfg.hold_price and self.pairs_with_held(r):
-            cost *= cfg.bundle_mult  # a held car for the same day starts or ends near this one: the evening release pairs them
+            cost *= pmult  # a held car for the same day starts or ends near this one: the evening release pairs them
+            pq = " pq=held"
         elif cfg.bundle_price and self.chainable(r):
-            cost *= cfg.bundle_mult  # one of our open gigs ends where this car starts (or the reverse): a driver can take both
+            cost *= pmult  # one of our open gigs ends where this car starts (or the reverse): a driver can take both
+            pq = " pq=chain"
         backlog = self.backlog(r["legs"][0]["pickup"]["placeId"])
         t_gain, t_loss = self.trust_value(dealer)
         congestion = cfg.cong_frac * r["referenceFeeCents"] * max(0, backlog - cfg.cong_free)
@@ -608,7 +612,8 @@ class Desk:
                 prices["same_day"] = max(s, int(round(n / cfg.steer)))
             info.append(f"steer {s}/{n}->{prices['same_day']}/{prices['next_day']}")
         self.quote_meta[r["id"]] = meta
-        head = f"bar={bar:.2f} bl={backlog} tg={t_gain/100:.0f} tf={tf:.2f} mu={self.market.mu_for(dealer, day, r["legs"][0]["pickup"]["placeId"]):.3f} cost={cost/100:.0f}"
+        head = pq.strip() + " " if pq else ""
+        head += f"bar={bar:.2f} bl={backlog} tg={t_gain/100:.0f} tf={tf:.2f} mu={self.market.mu_for(dealer, day, r["legs"][0]["pickup"]["placeId"]):.3f} cost={cost/100:.0f}"
         if not prices:
             return decline_prices(r), f"DECLINE {head} {' '.join(info)}"
         return prices, f"{head} {' '.join(info)}"
