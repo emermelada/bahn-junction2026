@@ -34,7 +34,7 @@ BATCH = 50  # actions per call, the API's maximum
 spread.stream.QUIET_LIMIT = 30
 # Test finals 14:00 and 20:00 Helsinki: no new practice world from 40 min before to 50 min after (rate limits drop
 # to 20/s for everyone). Laptop clock (local time) = Helsinki - 1 h. Harness only, never inside decisions.
-BLACKOUT = [(12 * 60 + 20, 13 * 60 + 50), (18 * 60 + 20, 19 * 60 + 50)]
+BLACKOUT = [(12 * 60 + 20, 14 * 60 + 50), (18 * 60 + 20, 19 * 60 + 50)]
 
 
 def wait_blackout() -> None:
