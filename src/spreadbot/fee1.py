@@ -102,8 +102,8 @@ class Fee1:
         h = -math.log(max(1e-9, 1.0 - min(p, 1 - 1e-9)))
         return 1.0 - math.exp(-self.k * h)
 
-    def choose(self, ob: "OrderBook", legs: list[int], last: int, base: float, desert: bool) -> Optional[tuple[float, str]]:
-        """(fee multiplier, reason) for a new post, or None: too little time for a choice (the ladder and alarm take it)."""
+    def plan(self, ob: "OrderBook", legs: list[int], last: int, base: float, desert: bool) -> Optional[tuple]:
+        """(fee m, expected cost in cents, P1(m), first window T1, V_next, features), or None with too little time before the alarm."""
         d, cfg = self.desk, self.desk.cfg
         alarm = max(cfg.alarm_minutes, cfg.desert_alarm) if desert else cfg.alarm_minutes
         T = (last - alarm) - d.now
@@ -120,16 +120,40 @@ class Fee1:
         if N and T > N + cfg.fee1_min_minutes and self.picks.get(ob.order["id"], 0) + 1 < cfg.fee1_max_posts:
             x2 = self.features(ob, legs, last, d.now + N)
             x2["n_open"], x2["n_open_near"], x2["_med"] = x["n_open"], x["n_open_near"], x["_med"]
-            v_next = min(self.p_book(x2, m, T - N) * m * base + (1 - self.p_book(x2, m, T - N)) * v_res for m in grid)
-            T1 = N
+            costs = []
+            for m in grid:
+                p2 = self.p_book(x2, m, T - N)
+                costs.append(p2 * m * base + (1 - p2) * v_res)
+            v_next, T1 = min(costs), N
         best = None
         for m in grid:
             p1 = self.p_book(x, m, T1)
             e = p1 * m * base + (1 - p1) * v_next
-            if best is None or e < best[0] - 1e-9:
-                best = (e, m, p1)
-        e, m, p1 = best
-        return m, f"m={m:.2f} p1={p1:.2f} T1={T1} E={e / max(1.0, base):.3f} Vn={v_next / max(1.0, base):.3f} k={self.k:.2f} nd30={x['nd30']} med={x['_med']:.2f}"
+            if best is None or e < best[1] - 1e-9:
+                best = (m, e, p1)
+        return best + (T1, v_next, x)
+
+    def choose(self, ob: "OrderBook", legs: list[int], last: int, base: float, desert: bool) -> Optional[tuple[float, str]]:
+        """(fee multiplier, reason) for a new post, or None: too little time for a choice (the ladder and alarm take it)."""
+        pl = self.plan(ob, legs, last, base, desert)
+        if pl is None:
+            return None
+        m, e, p1, T1, v_next, x = pl
+        b = max(1.0, base)
+        return m, f"m={m:.2f} p1={p1:.2f} T1={T1} E={e / b:.3f} Vn={v_next / b:.3f} k={self.k:.2f} nd30={x['nd30']} med={x['_med']:.2f}"
+
+    def quote_cost(self, r: dict, opt: dict) -> Optional[tuple[float, float]]:
+        """For the quote (MARKET): (fee m, expected fee + rescue cost in cents) of moving this request's car alone if we win this
+        option and post it now. Single-leg requests only (None otherwise or with too little time)."""
+        from .desk import OrderBook
+        d = self.desk
+        if len(r["legs"]) != 1:
+            return None
+        last = d.est_last_pickup(r, opt["deadline"])
+        order = {"id": r["id"], "legs": r["legs"], "lastPickupAt": last, "priceCents": opt["listPriceCents"]}
+        q = r["legs"][0]["delivery"]["placeId"]
+        pl = self.plan(OrderBook(order, d.now), [0], last, float(r["referenceFeeCents"]), bool(d.cfg.desert_n and d.desert(q)))
+        return None if pl is None else (pl[0], pl[1])
 
     # ------------------------------------------------------------------ this week's calibration
     def exposure_h(self, rec: "GigRec", until: int) -> float:
