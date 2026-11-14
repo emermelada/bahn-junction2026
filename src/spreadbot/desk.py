@@ -525,6 +525,10 @@ class Desk:
             else:
                 info.append(f"menu:ev={ev/100:.0f} " + ",".join(f"{k}={v/next(o['listPriceCents'] for o in r['options'] if o['kind'] == k):.2f}" for k, v in prices.items()))
             meta = {k: v for k, v in meta.items() if k in prices}
+        if cfg.s_cap_cents and "same_day" in prices and "next_day" in prices and prices["same_day"] > prices["next_day"] + cfg.s_cap_cents - 100:
+            # Past the dealer's euros for speed it takes next_day for less: sell same_day just inside that gap instead.
+            info.append(f"scap {prices['same_day']}->{prices['next_day'] + cfg.s_cap_cents - 100}")
+            prices["same_day"] = prices["next_day"] + cfg.s_cap_cents - 100
         if cfg.steer and "same_day" in prices and "next_day" in prices:
             # Steer dealers to next_day: it pays more per car, can wait for the evening release and pair, and a
             # pickup the day before the deadline costs less than one on the deadline day.

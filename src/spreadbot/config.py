@@ -29,6 +29,10 @@ class Config:
     menu: bool = False                 # one price in fastest-option euros, slower options cheaper by the dealer's speed value, every option
                                        # at the same margin (dealer buys max(threshold - price); Halal: next = same - €14.5, 3 days = next - €6.1)
     speed_cents: tuple = (1450, 610)   # the dealer's euros for same->next day and next->within 3 days (Halal's medians)
+    s_cap_cents: int = 0               # with same_day and next_day quoted, same_day at most next_day + this - €1: a dealer pays ~€9-15 more for
+                                       # speed, so past that gap it takes next_day for less (our weeks: gap €15-20 -> takes same_day 38%) (0 = off)
+    mu_w: tuple = ()                   # (day, dealer, lane) weights of mu's parts when pricing (learning unchanged): fitted on 34 c3g weeks,
+                                       # 0.65/0.4/0.6, the full parts over-react (research/re/market/PRICING.md) (() = 1/1/1)
     shadow_cents: int = 0              # opportunity cost of one car of driver capacity
     min_ev_cents: int = 200            # expected margin below this is not worth a driver
     pl_cal: tuple = ()                 # ((drive minutes under, factor), ...): scale the quoted P(late) in the risk price by drive time.

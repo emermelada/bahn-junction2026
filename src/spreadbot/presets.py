@@ -54,3 +54,6 @@ PRESETS["c3g"] = PRESETS["c3"] + ["ontime_model=gbm"]
 PRESETS["m1menu"] = PRESETS["c3g"] + ["menu=true"]
 # re-market: no load charge on cars due the last Monday (Friday noev is the load charge; Mon2 cars are our safest).
 PRESETS["m2mon2"] = PRESETS["c3g"] + ["load_free_mon2=0.2"]
+# re-market: same_day capped at next_day + €9 (the dealer's speed value), and pricing with damped mu parts.
+PRESETS["m3scap"] = PRESETS["c3g"] + ["s_cap_cents=900"]
+PRESETS["m4muw"] = PRESETS["c3g"] + ["mu_w=(0.65,0.4,0.6)"]
