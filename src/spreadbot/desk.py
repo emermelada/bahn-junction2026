@@ -15,6 +15,7 @@ from .config import Config
 from .geo import DAY, HOUR, Geo, open_intervals
 from .notes_safe import LegNote, read_note_safe
 from .planner import FeesStub, Planner, SupplyStub
+from .risk import Risk
 from .policy import Governor, Market, OnTime
 
 OPTION_ORDER = ("same_day", "next_day", "within_3_days")
@@ -145,6 +146,7 @@ class Desk:
             except ImportError:
                 _Fees = FeesStub
             self.supply, self.fees = _Supply(self), _Fees(self)
+            self.risk = Risk(self)
             self.planner = Planner(self, self.supply, self.fees)
         self.gov_logged = -1
         self.warned: set[str] = set()  # orders that had a deadline warning
@@ -492,6 +494,12 @@ class Desk:
                 continue
             p_ok, slack = self.ontime.p_ok(r, opt["deadline"], kind)
             p_ok = min(0.99, p_ok * cal)
+            pday, region = 0, ""
+            if self.planner is not None:
+                # V2: P(late) from a3's Risk (dispatch state + day load, AUC 0.81 vs 0.73), on the planner's pickup day.
+                pday = self.planner.planned_day(r, min(opt["deadline"], self.deadline_day(r, opt) * DAY + DAY - 1))
+                region = self.supply.region(r["legs"][0]["pickup"]["placeId"])
+                p_ok = min(0.99, (1.0 - self.risk.p_late(r, kind, pday, 1)) * cal)
             if p_ok < bar or slack < cfg.min_slack_h:
                 info.append(f"{kind}:skip(p={p_ok:.2f},s={slack:.1f})")
                 continue
@@ -500,14 +508,13 @@ class Desk:
             load = self.due_load(self.deadline_day(r, opt))
             per_car = cfg.load_flat_cents if cfg.load_flat_cents else r["referenceFeeCents"]
             load_cost = cfg.load_slope * per_car * max(0.0, load - cfg.load_free * self.capacity_factor()) / 0.05
-            dday = self.deadline_day(r, opt)
             v2_cost = cost
             if self.planner is not None:
                 # V2: the car costs its predicted clearing fee plus the shadow price of its driver-hours on the day the
                 # planner would move it (free while that day has idle hours). No load charge: lam is the load.
-                pday = self.planner.planned_day(r, min(opt["deadline"], dday * DAY + DAY - 1))
-                region = self.supply.region(r["legs"][0]["pickup"]["placeId"])
                 v2_cost = self.fees.clearing(region, pday, 8, drive, 1)
+                if cfg.v2_war_chain and self.market.day_shift[day] < -cfg.war_shift and self.planner.has_partner(r, pday):
+                    v2_cost *= cfg.bundle_mult  # price war: only a car that shares a driver with a planned one still pays
                 load_cost = self.planner.lam(region, pday) * 100.0 * self.planner.hours_of(r)
                 load = pday
             risk_frac = (1 - p_ok) * cfg.late_cost_frac * self.pl_factor(drive)
@@ -714,19 +721,25 @@ class Desk:
         if oid not in pl.day_of:
             pl.replan(self.now)
         day = pl.day_of.get(oid, self.now // DAY)
-        release = (day - 1) * DAY + cfg.hold_hour * 60
+        chain = [(o, l) for o, l in pl.chain_for(oid) if o in self.orders and self.orders[o].order["status"] != "cancelled"
+                 and (o, l) not in self.leg_gig and not self._pending(o, l) and l in self.undelivered(o)]
+        # a3's finding: at volume the late cars are the ones no driver booked before the warning. A risky car goes out
+        # earlier and opens at the hot fee.
+        p_late = self.risk.p_late(ob.order, None, day, max(1, len({o for o, _ in chain})))
+        hot = p_late >= cfg.v2_hot_p
+        release = (day - 1) * DAY + cfg.hold_hour * 60 - (cfg.v2_hot_early * HOUR if hot else 0)
         last = self.last_pickup(ob, legs)
         if self.now < release and last - self.now > cfg.alarm_minutes + 2 * HOUR and not ob.urgent:
             return
-        chain = [(o, l) for o, l in pl.chain_for(oid) if o in self.orders and self.orders[o].order["status"] != "cancelled"
-                 and (o, l) not in self.leg_gig and not self._pending(o, l) and l in self.undelivered(o)]
+        if hot:
+            ob.p_exp = 1.0  # schedule() opens at fee_open_hot
         if ob.urgent or last - self.now < 2 * HOUR or len({o for o, _ in chain}) < 2 or not all(self.simple(self.orders[o]) for o, _ in chain):
             groups = [legs]
             if len(legs) == 2 and self.trade_minutes(ob.order) > 12 * HOUR - 10:
                 groups = [[l] for l in legs]  # a trade-in too long for one driver's day: two gigs
             for g in groups:
                 self.post(ob, g, why)
-            self.say("V2POST", f"{oid} day={day} alone {why}")
+            self.say("V2POST", f"{oid} day={day} alone p_late={p_late:.2f}{' hot' if hot else ''} {why}")
             return
         # the chain's last start: every car still on time when the driver takes them in order
         lastc, at, prev = 10 ** 9, 0, None
@@ -742,7 +755,7 @@ class Desk:
             stops += self.stops_for(self.orders[o], l)
         audience = {"experienced": any(self.orders[o].order["legs"][l]["car"]["premium"] for o, l in chain), "manualLicence": False}
         base = sum(self.base_fee(self.orders[o], [l]) for o, l in chain) * cfg.bundle_mult
-        out = [{"at": self.now, "feeCents": int(round(base * cfg.fee_open))}]
+        out = [{"at": self.now, "feeCents": int(round(base * (cfg.fee_open_hot if hot else cfg.fee_open)))}]
         prev_fee = out[0]["feeCents"]
         for hours_before, mult in cfg.fee_rel:
             fee = max(prev_fee, int(round(base * mult)))
@@ -756,7 +769,7 @@ class Desk:
             self.bundle_last[o] = lastc
             if self.orders[o].first_post_at is None:
                 self.orders[o].first_post_at = self.now
-        self.say("V2POST", "+".join(f"{o}/{l}" for o, l in chain) + f" day={day} last={lastc} fee0={sched[0]['feeCents']} {why}")
+        self.say("V2POST", "+".join(f"{o}/{l}" for o, l in chain) + f" day={day} last={lastc} fee0={sched[0]['feeCents']} p_late={p_late:.2f}{' hot' if hot else ''} {why}")
 
     # ------------------------------------------------------------------ bundles
     def chainable(self, r: dict) -> bool:

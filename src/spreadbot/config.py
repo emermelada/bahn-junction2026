@@ -59,6 +59,9 @@ class Config:
     v2_req_per_hour: float = 21.0      # requests per request hour in a level 8 week (1,040 a week over 50 hours)
     v2_hours_per_car: float = 3.5      # average driver-hours of a won car (drive + handling), from the reveals
     v2_supply_scale: float = 1.0       # scale on the stub supply (until supply.py lands)
+    v2_war_chain: bool = True          # on a price-war day a car that shares a driver with a planned one is priced at bundle_mult of its cost
+    v2_hot_p: float = 0.12             # Risk.p_late at or above this: post v2_hot_early hours earlier and open at fee_open_hot (unwarned cars are ~2% late, warned 66-77%)
+    v2_hot_early: float = 2.0          # hours before hold_hour for a risky car
     v2_fee_per_min: float = 39.0       # stub clearing fee prior: cents per driving minute after the fixed part (reveals: typical fee 7,392 c per leg of 152 min)
     v2_fee_fixed: float = 1500.0       # stub clearing fee: cents per car
     v2_fee_mult: float = 1.05          # stub: the expected fee over that base (c3 opens at 1.05 and books 79% there)

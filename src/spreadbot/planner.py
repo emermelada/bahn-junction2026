@@ -132,6 +132,24 @@ class Planner:
             days = days[:-1]
         return min(days, key=lambda d: (round(self.lam(region, d), 0), d))
 
+    def has_partner(self, r: dict, day: int) -> bool:
+        """A planned simple car on that day whose delivery is near this request's pickup, or the reverse: one driver could
+        take both (the price-war rule: such a car is priced at bundle_mult of its cost)."""
+        geo, desk, km = self.desk.geo, self.desk, self.cfg.bundle_km
+        L = r["legs"][0]
+        if len(r["legs"]) != 1 or L["pickup"]["privateAddress"] or L["delivery"]["privateAddress"]:
+            return False
+        for oid in sorted(self.day_of):
+            if self.day_of[oid] != day:
+                continue
+            ob = desk.orders.get(oid)
+            if not ob or len(ob.order["legs"]) != 1 or not desk.simple(ob):
+                continue
+            M = ob.order["legs"][0]
+            if geo.air(M["delivery"]["placeId"], L["pickup"]["placeId"]) <= km or geo.air(L["delivery"]["placeId"], M["pickup"]["placeId"]) <= km:
+                return True
+        return False
+
     def chain_for(self, oid: str) -> list[tuple[str, int]]:
         cid = self.chain_of.get(oid)
         return list(self.chains.get(cid, [])) if cid else []
