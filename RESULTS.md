@@ -63,3 +63,16 @@ The bulk order (33–38 cars from one yard) and other 10–25-car batches appear
 Adopted for the final: about −€100 to −€500/week for a 5-point higher floor on the one metric that zeroes the score.
 
 More rejected arms: price floor 1.65 (v2-g1 €1.9k with 41 wins), floor 1.45, steeper ladder (mean €5,732), higher price prior (€6,077), admit tier C via governor (v2-g1 92.3%, FAIL), higher fee bands (€5,317), stronger evening step, bundles (16/week, mean €6,425, 2/5), flat batch cap 6 / plan-day cliff (−€500–1,000).
+
+## Notes reader adopted: m19 = m18 + notes (Sat ~06:00)
+
+`src/notes.ts` (fi/sv/en, typo-tolerant, corrections and denials) scores 0 false positives / 0 misses on all 2,297 revealed notes with truth (`node src/tools/notes-validate.ts --all`). Used for the pickup's earliest minute, the note's delivery deadline, plates and the manual-licence audience.
+
+| 15 seeds (5 gate + 10 held-out) | m18 | m19 |
+|---|---|---|
+| Mean margin/week | €5,838 | €5,850 (better on 7/15) |
+| Failed-visit cost/week | €258 | **€59** |
+| Mean on time | 97.44% | **97.86%** (better on 10/15) |
+| Worst on time | 95.43% | 95.48% |
+
+This fails the strict margin rule (n−1 seeds better). Adopted anyway, because on time is the binding risk in the final and the failed-visit saving is mechanical, not noise.

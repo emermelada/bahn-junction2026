@@ -1,5 +1,5 @@
 {
- "name": "gated-m18",
+ "name": "gated-m19",
  "flags": {
   "gate": true,
   "capacity": true,
@@ -8,7 +8,8 @@
   "fees": true,
   "triage": true,
   "pricing": true,
-  "trust": true
+  "trust": true,
+  "notes": true
  },
  "pricing": {
   "clamp": {
