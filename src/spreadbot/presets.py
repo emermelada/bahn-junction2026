@@ -50,20 +50,16 @@ PRESETS["c3rl"] = PRESETS["c3"] + ["relook_minutes=360"]
 PRESETS["c3bprl"] = PRESETS["c3bp"] + ["relook_minutes=360"]
 # The lateness model from all our weeks (late_gbm.py, AUC 0.897 vs 0.737) in place of the logistic: the main line since Sat 14 Nov.
 PRESETS["c3g"] = PRESETS["c3"] + ["ontime_model=gbm"]
-# Candidates (claude/re-drivers): post next-day cars with an early last pickup at once; opening fee by slack and drivers near the delivery.
-PRESETS["c3gh"] = PRESETS["c3g"] + ["hold_min_left=1440"]
-PRESETS["c3gf"] = PRESETS["c3g"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))"]
-PRESETS["c3gf2"] = PRESETS["c3g"] + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92))"]  # deeper: drivers near the delivery skip the dear trip home
-PRESETS["c3ge"] = PRESETS["c3g"] + ["bundle_empty_end=(240,11)"]  # no long pairs ending where nobody lives
-PRESETS["c3go"] = PRESETS["c3g"] + ["offer_home_n=3"]  # offers to drivers who live near the delivery
-# re-drivers names (the short ones above are removed once their running tests end): d- prefix avoids clashes with re-market.
-PRESETS["d-fee"] = PRESETS["c3gf"]
-PRESETS["d-fee2"] = PRESETS["c3gf2"]
-PRESETS["d-pair"] = PRESETS["c3ge"]
-PRESETS["d-offer"] = PRESETS["c3go"]
+# Candidates (claude/re-drivers), research/re/drivers/NOTES.md. d-fee: PASSES dev-07..18 +369, dev-43..54 +429, WAR +708 vs c3g.
+PRESETS["d-fee"] = PRESETS["c3g"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))"]  # opening fee by slack and drivers near the delivery
+PRESETS["d-fee2"] = PRESETS["c3g"] + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92))"]  # deeper: drivers near the delivery skip the dear trip home
 PRESETS["d-feer"] = PRESETS["d-fee"] + ["relook_minutes=90", "relook_mult=1.05"]  # a low opening unbooked after 90 min goes back to 1.05 now
 # d-fee's low openings where < 40 drivers live near the delivery doubled the warned share (3.2% -> 6.7%) for 7% less fee; >= 40: flat, -11%.
 PRESETS["d-fee3"] = PRESETS["c3g"] + ["fee_open_rule=((24,40,0.92),(12,80,0.95))"]
+PRESETS["d-pair"] = PRESETS["c3g"] + ["bundle_empty_end=(240,11)"]  # no long pairs ending where nobody lives
+# killed: hold_min_left=1440 (-434), offer_home_n=3 (-220, 1.5% of offers accepted)
+PRESETS["d-pfee"] = PRESETS["c3g"] + ["bundle_open_dense=(12,80,0.76)"]  # cheaper pairs that end where many drivers live
+PRESETS["d-fee4"] = PRESETS["c3g"] + ["fee_open_rule=((24,0,0.92),(12,0,0.95))"]  # d-fee3 (cut only near drivers) gave +65: cut wider instead
 # re-market: menu pricing (one effective price, slower options cheaper by the dealer's speed value, every option at one margin).
 PRESETS["m1menu"] = PRESETS["c3g"] + ["menu=true"]
 # re-market: no load charge on cars due the last Monday (Friday noev is the load charge; Mon2 cars are our safest).
@@ -101,3 +97,18 @@ PRESETS["k-s3xdl"] = PRESETS["k-s3x"] + GATE + ["gate_load_max=0.12"]
 # k-s3dl with a hard cap on any deadline day's load: the stacks push days to 0.20-0.23 where piles go late.
 PRESETS["k-s3c15"] = PRESETS["k-s3dl"] + ["load_cap=0.15"]
 PRESETS["k-s3c17"] = PRESETS["k-s3dl"] + ["load_cap=0.17"]
+# d-fee2's 0.85 where >= 80 drivers live near the delivery: 1 warned of ~60 such gigs; its 0.9 elsewhere drove dev-46 to 0.917.
+PRESETS["d-fee5"] = PRESETS["c3g"] + ["fee_open_rule=((24,80,0.85),(24,0,0.92),(12,80,0.95))"]
+PRESETS["d-fee2r"] = PRESETS["d-fee2"] + ["relook_minutes=90", "relook_mult=1.05"]  # deeper openings with d-feer's guard
+# Desert delivery towns (DEV46.md): no fee cut and an alarm 12 h before the last pickup for cars to towns with <= 10 drivers within 60 min.
+PRESETS["d-feerd"] = PRESETS["d-feer"] + ["desert_n=11", "desert_alarm=720"]
+PRESETS["d-fee2d"] = PRESETS["d-fee2"] + ["desert_n=11", "desert_alarm=720"]
+# Safe low openings (SAFE_OPEN.md): cut only where warned and waited-to-1.25 stayed at c3g; 1.05 where <= 40 drivers live near the delivery.
+PRESETS["d-safe"] = PRESETS["c3g"] + ["fee_open_day=((0,3,81,24,0.85),(0,6,41,24,0.92),(0,1,81,12,0.95))",
+                                      "relook_minutes=90", "relook_mult=1.05"]
+# Stack + re-drivers' desert rule (no fee cut, alarm 12 h before the last pickup, for cars to towns with <= 10 drivers within 60 min)
+# + my load_desert_n (full load charge there): both from DEV46.md.
+DESERT = ["desert_n=11", "desert_alarm=720", "load_desert_n=10"]
+PRESETS["k-s3dlx"] = PRESETS["k-s3dl"] + DESERT
+PRESETS["k-s3c15x"] = PRESETS["k-s3c15"] + DESERT
+PRESETS["k-s3c17x"] = PRESETS["k-s3c17"] + DESERT

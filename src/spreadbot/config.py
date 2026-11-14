@@ -109,8 +109,13 @@ class Config:
     fee_open_rule: tuple = ()          # ((min hours to last pickup, min drivers living <= 30 road min from the delivery, opening), ...),
                                        # first match wins, else fee_open. 1.05 openings book in a median 1-5 min and are 63% of c3g's fees;
                                        # 0.95 openings pay 0.96-0.98 vs 1.05-1.06 with slack > 24 h (988k gigs, research/re/drivers/gigs.py)
+    fee_open_day: tuple = ()           # ((first day 0=Mon, last day, min drivers <= 30 road min from delivery, min hours to last pickup, opening), ...) first match, before fee_open_rule
+                                       # nd30 > 40 + 90-min relook kept warned 2.0/2.7% vs c3g 1.6/2.4%, waits to 1.25 0.7/1.2% vs 1.0/0.5%; nd30 <= 40 warned 3.0 -> 4.3% (SAFE_OPEN.md)
     stop_windows: bool = False         # pickup window ends at the car's last pickup, delivery window at deadline - stop_margin
     stop_margin: int = 60              # (Halal / jaffa: failed visits 10.6 -> 0, deliveries >24 h late fixed)
+    desert_n: int = 0                  # a delivery town with fewer drivers living <= 60 road min is a desert: no fee_open_rule cut and the own
+                                       # alarm at desert_alarm (0 = off). dev-46: 21% of won cars, ~2x late in every policy (DEV46.md)
+    desert_alarm: int = 720            # minutes before the last pickup: escalate a desert car this early (others: alarm_minutes)
     fee_hold: int = 45                 # minutes the opening fee shows before any raise
     fee_rel: tuple = ((8, 1.25), (5, 1.6))   # (hours before lastPickupAt, fee over typical fee)
     fee_plan: tuple = ((0.0, 0.95), (0.15, 1.15), (0.4, 1.45), (0.7, 1.85))  # (share of slack, fee over typical fee)
@@ -154,6 +159,8 @@ class Config:
     bundle_min_lead: int = 0           # minutes from now to the chain's start; k5: 46% booked under 2 h, 70% at 18-30 h
     bundle_empty_end: tuple = ()       # (drive min, drivers): no chain over this drive whose end has fewer drivers living <= 30 road min (() = off);
                                        # pairs > 4 h ending at nd30 <= 10: 45% booked in 60 min, 18.5% warned vs singles 60% / 3.7% (research/re/drivers/PAIRS.md)
+    bundle_open_dense: tuple = ()      # (min hours to the chain's last start, min drivers living <= 30 road min from its end, opening share of
+                                       # the two typical fees); () = off. Pairs ending at nd30 >= 150 book 91% in 60 min at 0.84 vs 67% at <= 10 (PAIRS.md)
     bundle_short: bool = False         # pick the partner that makes the shortest chain (short chains book more often), not the one with most slack
     bundle_keep_drop: bool = False     # a dropped bundle with time to spare stays in the app as a bundle (split later if still unbooked)
     bundle3: bool = False              # a held or new car may join an open two-car chain as its first or third car

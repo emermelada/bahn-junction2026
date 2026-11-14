@@ -671,11 +671,14 @@ class Desk:
         fee_open_rule would give it (cheap where drivers live near the delivery and the pickup is far off). For the quote."""
         drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
         cost = r["referenceFeeCents"] * (self.drive_cost_mult(drive) if self.cfg.drive_cost else self.cost_mult())
-        if self.cfg.fee_open_rule and len(r["legs"]) == 1:
+        if (self.cfg.fee_open_rule or self.cfg.fee_open_day) and len(r["legs"]) == 1:
             L = r["legs"][0]
             last = min(opt["deadline"], L["pickup"]["window"]["to"] + drive) - drive
             left = (last - self.now) / HOUR
             nd = self.home_near_delivery(L["delivery"]["placeId"])
+            day_mult = self.day_open(left, nd)
+            if day_mult:
+                return cost * day_mult / self.cfg.fee_open
             for hours, n, mult in self.cfg.fee_open_rule:
                 if left >= hours and nd >= n:
                     cost *= mult / self.cfg.fee_open
@@ -1025,7 +1028,10 @@ class Desk:
         if cfg.bundle_soon_lead and max(self.now + cfg.bundle_lead, first.order["legs"][0]["pickup"]["window"]["from"]) - self.now < cfg.bundle_soon_lead:
             mult = cfg.bundle_soon_mult  # starts soon: drivers' days are mostly planned, pay nearly two gigs' worth
             self.bundle_soon.update((first.order["id"], second.order["id"]))
-        out = [{"at": self.now, "feeCents": int(round(typical * mult * cfg.fee_open))}]
+        opening = mult * cfg.fee_open
+        if cfg.bundle_open_dense and last - self.now >= cfg.bundle_open_dense[0] * HOUR and                 self.home_near_delivery(second.order["legs"][0]["delivery"]["placeId"]) >= cfg.bundle_open_dense[1]:
+            opening = min(opening, cfg.bundle_open_dense[2])  # the chain ends where many drivers live: their ride home is free
+        out = [{"at": self.now, "feeCents": int(round(typical * opening))}]
         prev = out[0]["feeCents"]
         # Raises: fee_rel scaled by the bundle discount, or bundle_rel as shares of the two typical fees.
         steps = list(cfg.bundle_rel) if cfg.bundle_rel else [(h, m * mult) for h, m in cfg.fee_rel]
@@ -1154,7 +1160,7 @@ class Desk:
             opening = cfg.fee_open_hot if ob.p_exp >= cfg.hot_p else cfg.fee_open
             if cfg.fee_open_dense and self.ontime.supply(ob.order["legs"][legs[0]]["pickup"]["placeId"], 30.0) >= cfg.dense_n:
                 opening = cfg.fee_open_dense  # many drivers live near the pickup: it books in minutes at less
-            if cfg.fee_open_rule and not ob.p_exp >= cfg.hot_p:
+            if (cfg.fee_open_rule or cfg.fee_open_day) and not ob.p_exp >= cfg.hot_p:
                 opening = self.open_rule(ob, legs, last, opening)
             out, prev = [{"at": now, "feeCents": int(round(base * opening))}], int(round(base * opening))
             for hours_before, mult in cfg.fee_rel:
@@ -1179,14 +1185,33 @@ class Desk:
             self._near_q[key] = sum(c for h, c in sorted(self.home_count.items()) if self.geo.drive(place, h) <= minutes)
         return self._near_q[key]
 
+    def desert(self, place: str) -> bool:
+        """A delivery town the shortage emptied: fewer than desert_n drivers live within 60 road minutes (dev-46: 21% of won cars,
+        twice as late in every policy; research/re/drivers/DEV46.md)."""
+        return bool(place) and self.home_near_delivery(place, 60) < self.cfg.desert_n
+
     def open_rule(self, ob: OrderBook, legs: list[int], last: int, default: float) -> float:
         """Opening fee by time to the last pickup and drivers living near the delivery (cheap to move: they need no trip home)."""
         left = (last - self.now) / HOUR
-        nd = self.home_near_delivery(ob.order["legs"][legs[-1]]["delivery"]["placeId"])
+        q = ob.order["legs"][legs[-1]]["delivery"]["placeId"]
+        if self.cfg.desert_n and self.desert(q):
+            return default  # no cut where nobody lives near the delivery
+        nd = self.home_near_delivery(q)
+        day_mult = self.day_open(left, nd)
+        if day_mult:
+            return day_mult
         for hours, n, mult in self.cfg.fee_open_rule:
             if left >= hours and nd >= n:
                 return mult
         return default
+
+    def day_open(self, left: float, nd: int) -> float:
+        """fee_open_day: the opening for today's posting day, drivers near the delivery and hours to the last pickup; 0 = none."""
+        day = self.now // DAY
+        for d0, d1, n, hours, mult in self.cfg.fee_open_day:
+            if d0 <= day <= d1 and nd >= n and left >= hours:
+                return mult
+        return 0.0
 
     def last_pickup(self, ob: OrderBook, legs: list[int]) -> int:
         """The world's lastPickupAt, made earlier by a note's tighter deadline (the world's does not count it)."""
@@ -1516,7 +1541,10 @@ class Desk:
                 ob = self.orders.get(rec.legs[0][0])
                 if len({o for o, _ in rec.legs}) > 1 and all(o in self.bundle_soon for o, _ in rec.legs):
                     continue  # a short-notice chain splits by its own clock (tick above)
-                if ob and self.last_pickup(ob, [l for _, l in rec.legs]) - self.now < self.cfg.alarm_minutes:
+                alarm = self.cfg.alarm_minutes
+                if self.cfg.desert_n and ob and len({o for o, _ in rec.legs}) == 1 and self.desert(self.stop_place(rec.stops[-1]) or ""):
+                    alarm = max(alarm, self.cfg.desert_alarm)  # few drivers live near this delivery: escalate while there is time
+                if ob and self.last_pickup(ob, [l for _, l in rec.legs]) - self.now < alarm:
                     ob.urgent = True
                     self.escalate_gig(rec, "alarm")
         if self.cfg.viewer_offers:
