@@ -37,6 +37,11 @@ while (now < endsAt) {
   const by = Math.floor(debt)
   if (by < 1) continue
   debt -= by
-  now = (await world.advance({ by: Math.min(by, endsAt - now) })).now
+  try {
+    now = (await world.advance({ by: Math.min(by, endsAt - now) })).now
+  } catch (error) {
+    console.error(`ticker: ${(error as Error).message}; retrying`)
+    await new Promise((done) => setTimeout(done, 1000))
+  }
 }
 console.log(`ticker: world ${world.id} ended`)
