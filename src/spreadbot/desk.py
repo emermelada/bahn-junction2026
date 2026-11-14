@@ -120,6 +120,7 @@ class Desk:
         self.viewers: dict[str, int] = {}  # driver -> last minute seen in the app
         self.roster = {d["id"]: d for d in roster}
         self.home_count: dict[str, int] = defaultdict(int)
+        self._near_q: dict[tuple[str, int], int] = {}
         for d in roster:
             self.home_count[d["homePlaceId"]] += 1
         self.won_count = 0
@@ -1100,6 +1101,8 @@ class Desk:
             opening = cfg.fee_open_hot if ob.p_exp >= cfg.hot_p else cfg.fee_open
             if cfg.fee_open_dense and self.ontime.supply(ob.order["legs"][legs[0]]["pickup"]["placeId"], 30.0) >= cfg.dense_n:
                 opening = cfg.fee_open_dense  # many drivers live near the pickup: it books in minutes at less
+            if cfg.fee_open_rule and not ob.p_exp >= cfg.hot_p:
+                opening = self.open_rule(ob, legs, last, opening)
             out, prev = [{"at": now, "feeCents": int(round(base * opening))}], int(round(base * opening))
             for hours_before, mult in cfg.fee_rel:
                 at = max(now + cfg.fee_hold, last - int(hours_before * HOUR))
@@ -1115,6 +1118,22 @@ class Desk:
             out.append({"at": now + int(span * frac), "feeCents": fee})
             prev = fee
         return dedupe(out)
+
+    def home_near_delivery(self, place: str, minutes: int = 30) -> int:
+        """Drivers whose trip home from this delivery takes at most `minutes` of road (fixed per world: cached)."""
+        key = (place, minutes)
+        if key not in self._near_q:
+            self._near_q[key] = sum(c for h, c in sorted(self.home_count.items()) if self.geo.drive(place, h) <= minutes)
+        return self._near_q[key]
+
+    def open_rule(self, ob: OrderBook, legs: list[int], last: int, default: float) -> float:
+        """Opening fee by time to the last pickup and drivers living near the delivery (cheap to move: they need no trip home)."""
+        left = (last - self.now) / HOUR
+        nd = self.home_near_delivery(ob.order["legs"][legs[-1]]["delivery"]["placeId"])
+        for hours, n, mult in self.cfg.fee_open_rule:
+            if left >= hours and nd >= n:
+                return mult
+        return default
 
     def last_pickup(self, ob: OrderBook, legs: list[int]) -> int:
         """The world's lastPickupAt, made earlier by a note's tighter deadline (the world's does not count it)."""

@@ -50,3 +50,6 @@ PRESETS["c3rl"] = PRESETS["c3"] + ["relook_minutes=360"]
 PRESETS["c3bprl"] = PRESETS["c3bp"] + ["relook_minutes=360"]
 # The lateness model from all our weeks (late_gbm.py, AUC 0.897 vs 0.737) in place of the logistic: the main line since Sat 14 Nov.
 PRESETS["c3g"] = PRESETS["c3"] + ["ontime_model=gbm"]
+# Candidates (claude/re-drivers): post next-day cars with an early last pickup at once; opening fee by slack and drivers near the delivery.
+PRESETS["c3gh"] = PRESETS["c3g"] + ["hold_min_left=1440"]
+PRESETS["c3gf"] = PRESETS["c3g"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))"]

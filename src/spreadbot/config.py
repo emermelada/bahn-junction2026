@@ -90,6 +90,9 @@ class Config:
     fee_open_hot: float = 1.3
     fee_open_dense: float = 0.0        # opening fee for a single whose pickup has >= dense_n drivers within 30 km (0 = fee_open):
     dense_n: int = 150                 # dense towns book in a median 2 min at 1.05 (13,297 singles of the c1/c3/c4/y4 runs)
+    fee_open_rule: tuple = ()          # ((min hours to last pickup, min drivers living <= 30 road min from the delivery, opening), ...),
+                                       # first match wins, else fee_open. 1.05 openings book in a median 1-5 min and are 63% of c3g's fees;
+                                       # 0.95 openings pay 0.96-0.98 vs 1.05-1.06 with slack > 24 h (988k gigs, research/re/drivers/gigs.py)
     stop_windows: bool = False         # pickup window ends at the car's last pickup, delivery window at deadline - stop_margin
     stop_margin: int = 60              # (Halal / jaffa: failed visits 10.6 -> 0, deliveries >24 h late fixed)
     fee_hold: int = 45                 # minutes the opening fee shows before any raise
