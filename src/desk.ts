@@ -11,6 +11,8 @@ import { Governor } from "./governor.ts"
 import { Quoter } from "./quote.ts"
 import { Fees } from "./fees.ts"
 import { Pricing } from "./pricing.ts"
+import { Offers } from "./offers.ts"
+import type { OfferNeed } from "./offers.ts"
 
 /** How to post a leg again after a failed visit. */
 export type Retry = { pickupFrom: number; manualLicence: boolean; plates: boolean }
@@ -44,6 +46,8 @@ export class V2Desk implements Desk {
   readonly v2Quote: boolean
   readonly fees: Fees
   readonly pricing: Pricing
+  readonly offers: Offers
+  readonly offerQueue = new Map<string, string>() // gigId -> reason, fired at the next tick
   readonly dropRaised = new Set<string>() // orders whose gig got the one +15% after a drop
   readonly doomedGigs = new Set<string>() // gigs repriced to the doomed schedule
   readonly cliffSeen = new Set<string>() // gigs counted as reaching the cliff (fee learner)
@@ -62,6 +66,7 @@ export class V2Desk implements Desk {
     this.v2Quote = f.gate || f.capacity || f.governor || f.ladder || f.pricing
     this.fees = new Fees(cfg, this.geo, ctx.log)
     this.pricing = new Pricing(cfg, this.geo, this.books)
+    this.offers = new Offers(cfg, this.geo, this.books)
     if (f.pricing) this.quoter.ratio = (request, option) => this.pricing.quoteRatio(request, option, this.now, f.capacity ? this.capacity.dealerPenalty(request.dealerId, this.now) : 0)
   }
 
@@ -106,6 +111,11 @@ export class V2Desk implements Desk {
     else if (event.kind === "order_lost") (this.quoter.onLost(event.requestId), this.pricing.outcome(event.requestId, false, event.at))
     else if (event.kind === "order_cancelled") this.quoter.onCancelled(event.orderId)
     if (this.cfg.flags.fees) this.feeEvent(event)
+    if (event.kind === "offer_answered") {
+      this.offers.answered(event.gigId, event.driverId, event.answer)
+      if (event.answer === "accepted") this.booked.add(event.gigId)
+      this.ctx.log?.({ at: event.at, kind: "offer_answer", gig: event.gigId, driver: event.driverId, answer: event.answer })
+    }
     if (event.kind === "price_request") this.quote(event.request)
     else if (event.kind === "order_won") await this.win(event.order)
     else if (event.kind === "order_changed") await this.change(event.order)
@@ -129,6 +139,41 @@ export class V2Desk implements Desk {
       this.nextSweep = this.now - (this.now % this.cfg.triage.sweepEveryMin) + this.cfg.triage.sweepEveryMin
       await this.sweep()
     }
+    if (this.cfg.flags.offers) this.fireOffers()
+  }
+
+  /** One offer round for each queued gig that is still open. */
+  fireOffers(): void {
+    for (const [gigId, reason] of this.offerQueue) {
+      this.offerQueue.delete(gigId)
+      if (this.booked.has(gigId)) continue
+      const need = this.offerNeed(gigId, reason)
+      if (need) this.outbox.push(...this.offers.round(need, this.now, this.ctx.log))
+    }
+  }
+
+  offerNeed(gigId: string, reason: string): OfferNeed | null {
+    const action = this.posts.get(gigId)
+    const orderId = action?.stops[0]?.orderId
+    const order = orderId ? this.orders.get(orderId) : undefined
+    if (!action || !order || !action.stops.some(({ orderId, leg }) => this.legGigs.get(orderId)?.get(leg) === gigId)) return null
+    const first = action.stops.find((s) => s.kind === "pickup")!
+    const last = action.stops.at(-1)!
+    const steps = action.schedule.filter((st) => st.at <= this.now)
+    const fee = (steps.at(-1) ?? action.schedule[0]!).feeCents * (reason === "thin" || reason === "stale" ? this.cfg.offers.feeMult : 1)
+    return {
+      gigId, reason, fee, lastPickup: order.lastPickupAt,
+      pickup: this.books.placeOf(first.orderId, first.leg, "pickup"),
+      delivery: this.books.placeOf(last.orderId, last.leg, "delivery"),
+      premium: !!action.audience.experienced, manual: !!action.audience.manualLicence,
+    }
+  }
+
+  /** A reprice that also updates the remembered schedule (offers read the current fee from it). */
+  pushReprice(gigId: string, schedule: FeeStep[]): void {
+    const post = this.posts.get(gigId)
+    if (post) this.posts.set(gigId, { ...post, schedule })
+    this.outbox.push({ type: "reprice", gigId, schedule })
   }
 
   /** Fee learner inputs and the one raise after a drop. */
@@ -145,7 +190,7 @@ export class V2Desk implements Desk {
       this.fees.dropped(order.legs[0]!.pickup.placeId)
       if (this.dropRaised.has(order.id) || this.urgent.has(order.id)) return
       this.dropRaised.add(order.id)
-      this.outbox.push({ type: "reprice", gigId: event.gigId, schedule: this.feesFor(order, pickups(action)) })
+      this.pushReprice(event.gigId, this.feesFor(order, pickups(action)))
     }
   }
 
@@ -170,7 +215,14 @@ export class V2Desk implements Desk {
         if (this.now > order.lastPickupAt && !this.doomedGigs.has(gigId) && this.posts.has(gigId)) {
           this.doomedGigs.add(gigId)
           this.ctx.log?.({ at: this.now, kind: "doomed", order: order.id, gig: gigId })
-          this.outbox.push({ type: "reprice", gigId, schedule: this.feesFor(order, pickups(this.posts.get(gigId)!)) })
+          this.pushReprice(gigId, this.feesFor(order, pickups(this.posts.get(gigId)!)))
+        }
+        if (this.cfg.flags.offers && !this.offers.quiet(this.now)) {
+          const last = this.offers.lastRound.get(gigId) ?? -1e9
+          const toGo = order.lastPickupAt - this.now
+          const posted = this.books.gigs.get(gigId)?.postedAt ?? this.now
+          if (toGo > 0 && toGo < this.cfg.offers.warnMinBefore && this.now - last >= 30) this.offerQueue.set(gigId, "risk")
+          else if (toGo > 0 && toGo < 12 * 60 && this.now - posted >= this.cfg.offers.openMinTrigger && this.now - last >= 60) this.offerQueue.set(gigId, "stale")
         }
       }
     }
@@ -272,7 +324,10 @@ export class V2Desk implements Desk {
     this.urgent.add(orderId)
     await this.sendPostOf(orderId)
     for (const gigId of this.gigsOf(orderId)) {
-      if (!this.booked.has(gigId)) this.outbox.push({ type: "reprice", gigId, schedule: this.feesFor(order, pickups(this.posts.get(gigId)!)) })
+      if (!this.booked.has(gigId)) {
+        this.pushReprice(gigId, this.feesFor(order, pickups(this.posts.get(gigId)!)))
+        if (this.cfg.flags.offers) this.offerQueue.set(gigId, "rescue")
+      }
     }
   }
 
@@ -353,6 +408,8 @@ export class V2Desk implements Desk {
         this.carry(action, id)
         const last = action.stops.at(-1)!
         this.books.posted(id, [...new Set(action.stops.map((s) => s.orderId))], pickups(action), this.now, action.schedule[0]?.feeCents ?? 0, this.books.placeOf(last.orderId, last.leg, last.kind), "")
+        const pickup = this.books.placeOf(action.stops[0]!.orderId, action.stops[0]!.leg, "pickup")
+        if (this.cfg.flags.offers && pickup && this.geo.reach30(pickup).all < this.cfg.offers.reach30Trigger) this.offerQueue.set(id, "thin")
       }
     })
   }
