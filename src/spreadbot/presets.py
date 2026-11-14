@@ -73,6 +73,30 @@ PRESETS["k-load"] = PRESETS["c3g"] + ["load_free=0.12", "load_slope=2"]
 # Stacks: + re-drivers' opening-fee rule (d-fee), + re-market's last-Monday load room (m2mon2 at a gentler 0.15).
 PRESETS["k-s1"] = PRESETS["k-load"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))"]
 PRESETS["k-s2"] = PRESETS["k-s1"] + ["load_free_mon2=0.15"]
+# k-s1 with the governor tightened by its measured error: projection at the last win is up to +0.021 above the final share
+# (research/re/projerr.py, 69 high-volume weeks), so the bar tightens under 0.945 to keep the worst week >= 0.93.
+PRESETS["k-s1g"] = PRESETS["k-s1"] + ["gov_tight=0.945", "gov_rescue=0.93", "gov_relaxed=0.95"]
+# k-s3: the safer stack. load_slope 0.5 (34/34 ranked, worst 0.929) + re-drivers' d-feer (opening rule + 90-min look back to 1.05,
+# worst 0.936-0.947) + re-market's last-Monday room at 0.15 (Mon2 late 1-3% up to load 0.12, 5-6% at 0.14-0.16; dev-43..50 +1,271, 8/8).
+PRESETS["k-s3"] = PRESETS["c3g"] + ["load_slope=0.5", "fee_open_rule=((24,0,0.92),(12,80,0.95))", "relook_minutes=90", "relook_mult=1.05",
+                                    "load_free_mon2=0.15"]
+# Tail-risk guard: under 0.94 projected on time, a car with P(on time) >= 0.95 is worth up to EUR 40 more (full at 0.92): it dilutes
+# the late ones. c3g is unranked on 2/20 fresh weeks; the governor's late tightening (k-s1g) cannot undo cars already won.
+GATE = ["gate_bonus_cents=4000", "gate_target=0.94", "gate_span=0.02", "gate_safe_p=0.95"]
+PRESETS["k-s1d"] = PRESETS["k-s1"] + GATE
+PRESETS["k-s3d"] = PRESETS["k-s3"] + GATE
+PRESETS["c3gd"] = PRESETS["c3g"] + GATE
+# Stronger guard: the projection is up to +0.02..0.03 optimistic (projerr.py), so start diluting under 0.955, full bonus at 0.925.
+PRESETS["k-s3e"] = PRESETS["k-s3"] + ["gate_bonus_cents=4000", "gate_target=0.955", "gate_span=0.03", "gate_safe_p=0.95"]
+# k-s3 + full load charge for cars delivering where <= 10 drivers live within 60 road min (re-drivers' DEV46.md: the stacks starve
+# the cars c3g also won by adding long drives into such towns).
+PRESETS["k-s3x"] = PRESETS["k-s3"] + ["load_desert_n=10"]
+# k-s3d with the bonus only on deadline days under load 0.12 (the knee), so dilution does not overload a day.
+PRESETS["k-s3dl"] = PRESETS["k-s3d"] + ["gate_load_max=0.12"]
+PRESETS["k-s3xdl"] = PRESETS["k-s3x"] + GATE + ["gate_load_max=0.12"]
+# k-s3dl with a hard cap on any deadline day's load: the stacks push days to 0.20-0.23 where piles go late.
+PRESETS["k-s3c15"] = PRESETS["k-s3dl"] + ["load_cap=0.15"]
+PRESETS["k-s3c17"] = PRESETS["k-s3dl"] + ["load_cap=0.17"]
 # d-fee2's 0.85 where >= 80 drivers live near the delivery: 1 warned of ~60 such gigs; its 0.9 elsewhere drove dev-46 to 0.917.
 PRESETS["d-fee5"] = PRESETS["c3g"] + ["fee_open_rule=((24,80,0.85),(24,0,0.92),(12,80,0.95))"]
 PRESETS["d-fee2r"] = PRESETS["d-fee2"] + ["relook_minutes=90", "relook_mult=1.05"]  # deeper openings with d-feer's guard
@@ -88,3 +112,28 @@ PRESETS["d-feer4"] = PRESETS["c3g"] + ["fee_open_rule=((24,0,0.92),(12,0,0.95))"
 PRESETS["d-low"] = PRESETS["c3g"] + ["fee_open_rule=((24,80,0.80),(12,0,0.88))", "desert_n=11", "desert_alarm=720"]
 # ... and with no scheduled raises (drivers wait for raises they have seen; Halal: one flat fee per gig): only the own alarm escalates.
 PRESETS["d-flat"] = PRESETS["d-low"] + ["fee_rel=()"]
+# Stack + re-drivers' desert rule (no fee cut, alarm 12 h before the last pickup, for cars to towns with <= 10 drivers within 60 min)
+# + my load_desert_n (full load charge there): both from DEV46.md.
+DESERT = ["desert_n=11", "desert_alarm=720", "load_desert_n=10"]
+PRESETS["k-s3dlx"] = PRESETS["k-s3dl"] + DESERT
+PRESETS["k-s3c15x"] = PRESETS["k-s3c15"] + DESERT
+PRESETS["k-s3c17x"] = PRESETS["k-s3c17"] + DESERT
+# re-market: Mon2 cars free of the load charge only when the drive is under 4 h (long Mon2 gigs wait for Monday and go late).
+PRESETS["m8mon2s"] = PRESETS["c3g"] + ["load_free_mon2=0.2", "mon2_max_drive=240"]
+# re-market: a car won < 6 h before its last pickup with >= 4 h of driving paid 1.26x the fee the quote assumed (1.00-1.10 for every
+# other lead x drive); quote its fee x1.25. 34 c3g weeks replayed: -1.9 orders, -0.32 late, -0.8 warned, +10 EUR/week (SHORT_NOTICE.md).
+PRESETS["m7short"] = PRESETS["c3g"] + ["short_fee=(6,240,1.25)"]
+# re-market: the lateness trees fed the site-hours last pickup they were trained on.
+PRESETS["m9lead"] = PRESETS["c3g"] + ["gbm_site_lead=true"]
+# Stack with re-market's narrower last-Monday room: 0.2 only for drives under 4 h (long Mon2 gigs wait ~77 h, 29-44% late; MON2_LATE.md).
+MON2S = ["load_free_mon2=0.2", "mon2_max_drive=240"]
+PRESETS["k-s5"] = PRESETS["k-s3dlx"] + MON2S
+PRESETS["k-s5c17"] = PRESETS["k-s5"] + ["load_cap=0.17"]
+PRESETS["k-s5c15"] = PRESETS["k-s5"] + ["load_cap=0.15"]
+# The conservative stack: only changes whose worst week stayed near c3g's on all three tuning sets.
+# re-market m8mon2s (Mon2 room for drives < 4 h: +594/+834/+519, 34/34, worst 0.944-0.948) + re-drivers d-feerd (worst 0.938-0.941).
+PRESETS["k-safe"] = PRESETS["c3g"] + MON2S + ["fee_open_rule=((24,0,0.92),(12,80,0.95))", "relook_minutes=90", "relook_mult=1.05",
+                                              "desert_n=11", "desert_alarm=720"]
+# re-drivers arms on the new bar k-safe: its fee part swapped for d-fee2d's deeper openings (d-fee2d vs c3g +732/+710).
+KSAFE_BASE = PRESETS["c3g"] + MON2S + ["desert_n=11", "desert_alarm=720"]
+PRESETS["k-safe-f2"] = KSAFE_BASE + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92))"]

@@ -66,6 +66,8 @@ class LateModel:
         deadline = opt["deadline"] if not n.deadline else min(opt["deadline"], n.deadline)
         end = L0["delivery"]["window"]["to"] if L0["delivery"]["privateAddress"] else deadline
         lastp = min(end, deadline) - drive
+        if d.cfg.gbm_site_lead:
+            lastp = d.est_last_pickup(r, opt["deadline"])  # the world's lastPickupAt, which the trees were fitted on (site hours included)
         dday = deadline // DAY
         roster = max(1, len(d.roster))
         near_open = 0

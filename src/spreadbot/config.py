@@ -33,6 +33,7 @@ class Config:
                                        # speed, so past that gap it takes next_day for less (our weeks: gap €15-20 -> takes same_day 38%) (0 = off)
     mu_w: tuple = ()                   # (day, dealer, lane) weights of mu's parts when pricing (learning unchanged): fitted on 34 c3g weeks,
                                        # 0.65/0.4/0.6, the full parts over-react (research/re/market/PRICING.md) (() = 1/1/1)
+    short_fee: tuple = ()              # (hours, drive min, mult): an option whose estimated last pickup is < hours after respondBy and drive >= min quotes the fee x mult; such cars paid 1.26x the assumed fee vs 1.00-1.10 elsewhere (research/re/market/SHORT_NOTICE.md) (() = off)
     shadow_cents: int = 0              # opportunity cost of one car of driver capacity
     min_ev_cents: int = 200            # expected margin below this is not worth a driver
     pl_cal: tuple = ()                 # ((drive minutes under, factor), ...): scale the quoted P(late) in the risk price by drive time.
@@ -54,12 +55,17 @@ class Config:
     gate_target: float = 0.935
     gate_span: float = 0.02            # full bonus this far under target
     gate_safe_p: float = 0.95
+    load_cap: float = 0.0              # no quote for an option whose deadline day already holds this share of the roster (0 = off):
+                                       # late 4-6% under day load 0.12, 8% at 0.12-0.14, 12-13% above (research/re/lateload.py, tuning runs)
+    gate_load_max: float = 0.0         # no gate bonus for a car whose deadline day is already this loaded (0 = off): late share climbs
+                                       # from 0.046 at day load 0.08-0.10 to 0.084 at 0.12-0.14 and 0.122 above (research/re/lateload.py)
     steer: float = 0.0                 # with both quoted: same_day at least next_day / steer (dealers take next_day under ~0.85x)
     steer_down: bool = False           # instead lower next_day to steer x same_day
     # --- on-time selection
     ontime_fee_assumed: float = 1.6    # the fee the on-time model assumes (fee_plan reaches about this)
     ontime_shift: float = 0.0
     ontime_model: str = "policy"       # "policy": fit on weeks of this dispatch policy; "research": the first fit; "gbm": late_gbm.py trees
+    gbm_site_lead: bool = False        # gbm lead_h from the site-hours last pickup (as trained), not deadline - drive: 4-5 h band P(late) 0.036 -> 0.079 vs 0.087 seen (research/re/market/SHORT_NOTICE.md)
     dilute: bool = True               # in rescue, the bar is the projection (+ margin), not a fixed 0.92
     dilute_margin: float = 0.01
     calibrate: bool = False            # scale P(on time) by this world's observed/predicted on-time ratio
@@ -85,11 +91,16 @@ class Config:
     # --- load: our cars due per day over the world's drivers
     load_free: float = 0.07            # rc3: with late 2.0 the long and thin-town cars get dear, so the safe ones can take more load (y4)
     load_free_mon2: float = 0.0        # load_free for cars due on the last Monday (0 = load_free): Friday noev is 80-94% the load charge, Mon2 cars 2.4-3.2% late (research/re/market/WAR_FRIDAY.md)
+    mon2_max_drive: int = 0            # load_free_mon2 only for drives under this (min): long Mon2 gigs wait ~77 h, 29-44% late (research/re/market/MON2_LATE.md) (0 = all)
     adaptive_load: bool = False        # scale load_free by how easily our first posts book this week
     cap_min: float = 0.7
     cap_max: float = 1.4
     load_flat_cents: int = 0           # load cost per car in cents (every car counts the same for the gate); 0 = one typical fee
     load_slope: float = 1.0            # extra cost, in typical fees, per 0.05 of load above load_free
+    load_desert_n: int = 0             # cars delivering where <= this many drivers live within 60 road min keep the full load charge
+                                       # (0 = off): the stacks' extra late cars on dev-46 are cars c3g also won, starved by extra long
+                                       # drives into such towns (21% of won cars that week vs ~35 cars in a median week; drivers/DEV46.md)
+    load_desert_slope: float = 1.0     # their load_slope (c3g's)
     # --- fees
     fee_mode: str = "relative"         # "span": fee_plan over the slack; "relative": fee_rel anchored to lastPickupAt
     fee_open: float = 1.05              # 12/12 ranked, min on-time 0.919 vs 11/12, 0.896 at 0.95 (v1v vs v1p, 12 seeds)
