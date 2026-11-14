@@ -1772,13 +1772,38 @@ class Desk:
             last_call = (cfg.fee1_last_call and cfg.fee1_min_minutes <= left <= cfg.fee1_last_call
                          and self.now - rec.posted_at >= 60 and posts <= cfg.fee1_max_posts)
             if not last_call:
-                if self.now < repick_at(rec.posted_at, cfg.fee1_repick) or posts >= cfg.fee1_max_posts:
+                if self.now < repick_at(rec.posted_at, cfg.fee1_repick) or (posts >= cfg.fee1_max_posts and not cfg.fee1_after_ladder):
                     continue  # (a re-pick that would fall at night waits for the morning: nobody plans a trip then)
-                if left < cfg.fee1_min_minutes + (cfg.fee1_last_call or 0):
+                if left < cfg.fee1_min_minutes + (cfg.fee1_last_call or 0) and not cfg.fee1_after_ladder:
                     continue  # too close to the alarm for another choice: the last call (or the alarm) takes it
             self.fee1.close(rec, False, self.now)
+            if cfg.fee1_after_ladder and not last_call:
+                # The miss rejoins the old ladder in place (fee_open now, then the fee_rel steps): ARCHIVE's split of k-f1h5f, a re-posted
+                # car cost EUR 3.6-6.0 more than under the ladder (-103..-220/wk) while fee1's first picks gained +540/wk every week.
+                cur = current_fee(rec.schedule, self.now)
+                rec.schedule = self.ladder_from_now(ob, legs, cur)
+                self.outbox.append({"type": "reprice", "gigId": gid, "schedule": rec.schedule})
+                self.say("FEE1_LADDER", f"{gid} {oid} sat {self.now - rec.posted_at} min at {cur} -> {rec.schedule[0]['feeCents']}..{rec.schedule[-1]['feeCents']}")
+                continue
             self.say("FEE1_REPICK", f"{gid} {oid} sat {self.now - rec.posted_at} min at {rec.schedule[0]['feeCents']}{' last-call' if last_call else ''}")
             self.withdraw(gid)
+
+    def ladder_from_now(self, ob: OrderBook, legs: list[int], cur: int) -> list[dict]:
+        """The relative ladder from now for a sitting gig: fee_open (never under its current fee), then the fee_rel steps before the
+        last pickup. Two or more steps, so the gig is no longer a fee1 gig."""
+        cfg, now = self.cfg, self.now
+        base = self.base_fee(ob, legs)
+        last = self.last_pickup(ob, legs)
+        prev = max(cur, int(round(base * cfg.fee_open)))
+        out = [{"at": now, "feeCents": prev}]
+        for hours_before, mult in cfg.fee_rel:
+            fee = max(prev, int(round(base * mult)))
+            out.append({"at": max(now + cfg.fee_hold, last - int(hours_before * HOUR)), "feeCents": fee})
+            prev = fee
+        out = dedupe(sorted(out, key=lambda x: (x["at"], x["feeCents"])))
+        if len(out) < 2:  # keep it out of fee1's hands: one more step at the steep plan's first rung before the alarm
+            out.append({"at": max(now + cfg.fee_hold, last - cfg.alarm_minutes), "feeCents": max(prev + 1, int(round(base * cfg.steep_plan[0])))})
+        return dedupe(out)
 
     def offer_home(self) -> None:
         """Direct offers to drivers who live near a gig's delivery but too far from its pickup to be notified: the trip home
