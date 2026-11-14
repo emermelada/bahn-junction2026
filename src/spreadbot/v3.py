@@ -13,7 +13,7 @@
 """
 from __future__ import annotations
 
-from .desk import Desk, OrderBook, decline_prices, lane_of
+from .desk import Desk, OrderBook, decline_prices, dedupe, lane_of
 from .geo import DAY, HOUR
 
 # Halal, randomised flat fees on 8 weeks: share of cars booked before the deadline warning at a flat fee (x typical).
@@ -31,10 +31,10 @@ def booked_share(m: float) -> float:
     return pts[-1][1]
 
 
-def late_ratio(m: float) -> float:
-    """Late share at flat fee m over the late share at 1.15x (where c3's on-time model was fitted)."""
+def late_ratio(m: float, anchor: float = 1.05) -> float:
+    """Late share at flat fee m over the late share at the anchor fee (c3's opening fee, where its on-time model was fitted)."""
     late = lambda x: 1 - (0.25 + 0.71 * booked_share(x))  # noqa: E731
-    return late(m) / late(1.15)
+    return late(m) / late(anchor)
 
 
 class V3Desk(Desk):
@@ -46,11 +46,18 @@ class V3Desk(Desk):
         """Price of one more expected late car: ~0 while the projected on-time share is far above the target,
         v3_barrier at the target, 16x that at twice the allowed late share (Halal's barrier, alignas' sla_pressure)."""
         c = self.cfg
-        used = (1 - self.gov.projection()) / max(1e-6, 1 - c.v3_target)
+        used = (1 - self.v3_projection()) / max(1e-6, 1 - c.v3_target)
         return c.v3_barrier_cents * min(2.0, max(0.0, used)) ** 4
 
+    def v3_projection(self) -> float:
+        """The governor's projection with a prior of v3_prior_n orders on time at the target: four early wins at
+        0.85 must not read as an 85% week and shut the desk for a day (smoke dev-07: Monday 241 of 252 declined)."""
+        d, c = self, self.cfg
+        n = len(d.ontime_orders) + len(d.late_orders) + sum(1 for o in d.orders if o not in d.ontime_orders and o not in d.late_orders)
+        return (d.gov.projection() * n + c.v3_target * c.v3_prior_n) / (n + c.v3_prior_n)
+
     def p_late(self, p_ok: float, m: float) -> float:
-        return min(0.95, (1 - p_ok) * late_ratio(m))
+        return min(0.95, (1 - p_ok) * late_ratio(m, self.cfg.v3_anchor))
 
     def best_fee(self, p_ok: float, typical: float, price: float, lam: float) -> tuple[float, float]:
         """(fee multiple, P(late)) minimising fee + P(late) x (refund + goodwill + barrier)."""
@@ -75,7 +82,7 @@ class V3Desk(Desk):
             return decline_prices(r), f"DECLINE batch {r['batchId']} full"
         place, lane = r["legs"][0]["pickup"]["placeId"], lane_of(r)
         lam = self.barrier_cents()
-        proj = self.gov.projection()
+        proj = self.v3_projection()
         typical = float(r["referenceFeeCents"])
         cand = {}  # kind -> (price, cost at that price, ev, p_ok, m)
         info = []
@@ -133,7 +140,13 @@ class V3Desk(Desk):
                 p_ok = self.ontime.p_ok(r, opt["deadline"], o["option"])[0]
         m, pl = self.best_fee(p_ok, base, float(o.get("priceCents", 0) or 0), self.barrier_cents())
         self.say("V3FEE", f"{o['id']} legs={legs} m={m:.2f} pl={pl:.2f}")
-        return [{"at": self.now, "feeCents": max(1, int(round(base * m)))}]
+        out, prev = [{"at": self.now, "feeCents": max(1, int(round(base * m)))}], int(round(base * m))
+        for hours_before, mult in self.cfg.fee_rel:
+            # Late raises anchored to the last pickup (c3's): drivers wait only near the pickup, and they book the hard cars.
+            fee = max(prev, int(round(base * mult)))
+            out.append({"at": max(self.now + self.cfg.fee_hold, last - int(hours_before * HOUR)), "feeCents": fee})
+            prev = fee
+        return dedupe(sorted(out, key=lambda x: (x["at"], x["feeCents"])))
 
     def on_order_won(self, e: dict) -> None:
         super().on_order_won(e)

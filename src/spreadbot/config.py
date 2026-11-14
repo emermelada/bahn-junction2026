@@ -170,6 +170,8 @@ class Config:
     v3_fee_grid: tuple = (0.85, 1.0, 1.15, 1.3, 1.5)  # flat fees tried per gig (Halal's grid; 0.70 books 39%, too few)
     v3_floor: float = 0.925            # always ranked first: with the projection under this, only cars with P(late) <= v3_floor_pl
     v3_floor_pl: float = 0.05
+    v3_prior_n: int = 40               # the projection starts as 40 orders on time at the target (smoke dev-07 without it: EUR 3.5k, 103 orders)
+    v3_anchor: float = 1.05            # fee where the on-time model holds: c3's opening fee (its raises and rescue were in the fitted outcomes)
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
     backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little
     backhaul_mult: float = 1.0         # offer fee over typical fee (never under the app fee unless backhaul_below)
