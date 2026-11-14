@@ -242,3 +242,7 @@ BRAKE = ["backlog_brake=(0.03,10,16,24,0.24,0.10,0.86)"]
 PRESETS["v5aV2b"] = PRESETS["v5aV2"] + BRAKE
 PRESETS["k-f1h5f-bk"] = PRESETS["k-f1h5f"] + BRAKE
 PRESETS["v5aV2b0"] = PRESETS["v5aV2"] + ["backlog_brake=(0.03,10,16,24,0.0,0.0,1.0)"]  # dry: logs BRAKE U only, no effect
+# Offline calibration (research/re/archive/c_brake_cal.csv): hours with U > 0.03 x roster Mon-Thu: bad weeks fresh-10/20/15, dev-48 19-27,
+# good weeks 0-9; U peaks Wed-Thu (fresh-20 max 49-52 vs good <= 31). RoutePulse's charge is small (<= ~EUR 34/car); the strong arm
+# reacts twice as fast (scale 8) and cuts free load up to 30%.
+PRESETS["v5aV2bs"] = PRESETS["v5aV2"] + ["backlog_brake=(0.03,10,8,24,0.5,0.2,0.7)"]

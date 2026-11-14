@@ -18,6 +18,7 @@ class TestBrake(unittest.TestCase):
         self.assertEqual(c.backlog_brake, (0.03, 10, 16, 24, 0.24, 0.10, 0.86))
         self.assertEqual(c.load_free, 0.12)
         self.assertEqual(Config.parse(PRESETS["v5aV2b0"]).backlog_brake[4:], (0.0, 0.0, 1.0))
+        self.assertEqual(Config.parse(PRESETS["v5aV2bs"]).backlog_brake[2], 8)
 
 
 if __name__ == "__main__":
