@@ -56,7 +56,7 @@ class Config:
     cong_radius: float = 80.0          # km: drivers come from about this far for a typical gig
     cong_horizon: int = 18 * 60        # only gigs whose last pickup is within this many minutes
     # --- load: our cars due per day over the world's drivers
-    load_free: float = 0.07            # load under which a car costs nothing extra (1.0 = off)
+    load_free: float = 0.05            # v1am: mean 9,661 vs 9,000 at 0.07, min on-time 0.938 (12 seeds)
     adaptive_load: bool = False        # scale load_free by how easily our first posts book this week
     cap_min: float = 0.7
     cap_max: float = 1.4
