@@ -72,7 +72,7 @@ export class Quoter {
         let why = ""
         const cViaGovernor = flags.gate && tier === "C" && flags.governor && this.cfg.governor.admitC && f.slackHours >= this.cfg.governor.cMinSlack
         if (flags.gate && tier === "C" && !cViaGovernor) why = "tier C"
-        if (!why && this.cfg.capacity.batchMax > 0 && request.batchId && (this.batchAdmitted.get(request.batchId) ?? 0) >= this.cfg.capacity.batchMax) (tier = "C"), (why = "batch cap")
+        if (!why && this.cfg.capacity.batchMax > 0 && request.batchId && (this.batchAdmitted.get(request.batchId) ?? 0) >= Math.max(this.cfg.capacity.batchMax, Math.round(this.cfg.capacity.batchPerReach * this.geo.reach30(pickup).all))) (tier = "C"), (why = "batch cap")
         if (!why && flags.gate && option.kind === "next_day" && f.drive > this.cfg.gate.nextDay.maxDriveMin) (tier = "C"), (why = "long next_day")
         if (!why && flags.gate && tier !== "A" && this.braked(pickup, now)) (tier = "C"), (why = "pool brake")
         if (!why && flags.governor && maxTier === "A" && tier === "B") (tier = "C"), (why = "calendar")
