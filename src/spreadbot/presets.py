@@ -149,3 +149,7 @@ PRESETS["k-safe-f6"] = KSAFE_BASE + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12
 PRESETS["k-safe-f7"] = KSAFE_BASE + ["fee_open_rule=((24,80,0.85),(12,0,0.9),(6,80,0.95))"]
 # Deep openings with a safety net: cut only for cars with P(on time) >= 0.97, while the projection is >= 0.955 and the week's booked/first fee <= 1.12.
 PRESETS["k-safe-f2g"] = PRESETS["k-safe-f2"] + ["fee_cut_guard=(0.97,0.955,1.12)"]
+# Pair share (k-safe 31% of cars paired at 0.85x vs leaders 49-58% at ~0.76x; ~EUR 23 saved per car moved; GITHUB_LEADS.md 6-8):
+PRESETS["k-safe-bp"] = PRESETS["k-safe"] + ["repair_pairs=true", "repair_lead=180", "repair_mult=0.85", "repair_split=60"]  # board pairs (Halal +1.9k)
+PRESETS["k-safe-hold"] = PRESETS["k-safe"] + ["hold_minutes=60"]  # a new car waits up to 60 min for a partner (Halal +829/wk at 60 min)
+PRESETS["k-safe-km50"] = PRESETS["k-safe"] + ["bundle_km=50"]  # pair links up to 50 km (bahn67 +2.4% on one set)
