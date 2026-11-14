@@ -198,3 +198,6 @@ PRESETS["k-safe-dclD"] = PRESETS["k-safe-dcl"] + ["long_warn_distinct=true"]
 # V5a: long cars (>= 4 h drive) may go down to 0.90 under fee1 (they paid 1.00-1.05x at 24 h+ leads: EUR ~900/wk above 0.90x,
 # research/re/v5/lead_open_f1h5f.out); the guard counts warned cars, not warning events (ARCHIVE D_LONGWARN.md).
 PRESETS["v5a"] = PRESETS["k-f1h5f"] + ["long_warn_distinct=true", "fee1_long=(240,0.9)"]
+# V5r: the rescue fee capped near Halal's (urgent <= 1.6x, measured: 2x rescue bought +0.1 pt for -EUR 740). Every collapse week is a
+# governor spiral at steep_rescue 2.0-4.0x (escalation EUR 5.9-12k vs ~750 normal; research/re/archive/R1_BADWEEKS.md point 1).
+PRESETS["v5r"] = PRESETS["k-f1h5fD"] + ["steep_plan=(1.5,1.7,1.9)", "steep_rescue=(1.6,1.8,2.0)"]
