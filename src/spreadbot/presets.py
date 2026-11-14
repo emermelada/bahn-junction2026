@@ -190,3 +190,4 @@ PRESETS["k-f1h"] = PRESETS["k-f1"] + ["quote_cost_hold=1.05"]
 # fee1 v5 on the stack: long cars (>= 4 h drive, long_warn's class) never under 1.0; a last-call new post 150 min before the alarm;
 # relative weight 0.05 (PROBE's causal forks, research/re/probe/relstat.py).
 PRESETS["k-f1h5"] = PRESETS["k-f1h"] + ["fee1_long=(240,1.0)", "fee1_last_call=150", "fee1_rel_share=0.05"]
+PRESETS["k-f1h5f"] = PRESETS["k-f1h5"] + ["quote_cost_floor=true"]  # MARKET: quote cost = max(1.05, cost_mult): fee1 savings only stop the fall below 1.05

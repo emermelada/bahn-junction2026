@@ -27,6 +27,7 @@ class Config:
     outage_min: int = 4                # results in the region before it can be flagged
     quote_cost_hold: float = 0.0       # quote cost = typical x this constant instead of cost_mult (our running booking ratio): fee savings stay margin
                                        # instead of passing to dealers while the load charge binds (m25: -396 at equal orders); 1.05 = k-safe-dcl's mean (0 = off)
+    quote_cost_floor: bool = False     # with quote_cost_hold: the hold is a floor, cost = max(hold, cost_mult): never below the base's quote, and a dearer week still raises it
     quote_move_cost: bool = False      # quote each option at move_cost (the fee rule's opening: 0.92-0.95x where drivers live near the delivery), not the flat cost
     dist_lr: float = 0.0               # the competitor's price list changes shape once a week (HANDBOOK): learn a slope of its level on ln(km),
                                        # c3g residuals show a lasting step of ~0.14 ratio per ln km on one Tue-Thu morning (PRICE_EVENTS.md) (0 = off)
