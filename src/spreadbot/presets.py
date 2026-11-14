@@ -307,3 +307,9 @@ PRESETS["k-f1h5fV1g"] = PRESETS["k-f1h5fV1"] + ["vol_guard=(60,0.06,1.10)"]
 # V1g fired too early (5/11 WAR weeks on Mon/Tue at 6% of 60 orders = 4 cars; +38 vs V1 +154). Thresholds from ARCHIVE's Tuesday
 # signals (c_spiral_sig.csv): harsh weeks warn 0.092-0.099, fee60 1.17-1.20; normal warn 0.02-0.06, fee60 0.88-0.99.
 PRESETS["k-f1h5fV1g2"] = PRESETS["k-f1h5fV1"] + ["vol_guard=(100,0.09,1.15)"]
+# --- FLEET radical arms on v5La (Franco 22:30: radical exploration on tuning, ship only if every harsh week ranks)
+# R1, very low openings: fee1's grid down to 0.62 on PROBE's final clearing-fee fit (156 cars incl. 0.62-0.80 probes, calibrated
+# 0.72-1.2; premium +0.32, private +0.11), booking time by fee (low fees book later; a 6 h miss is weak evidence).
+R1 = ["fee1_grid=(0.62,0.68,0.75,0.82,0.90,1.00,1.15,1.30)", "fee1_window_fee=true",
+      "fee1_clear=(0.2771,-0.0694,0.0153,-0.1463,-0.0037,0.0635,0.1097,0.3214,0.2609)"]
+PRESETS["v5La-R1"] = PRESETS["v5La"] + R1
