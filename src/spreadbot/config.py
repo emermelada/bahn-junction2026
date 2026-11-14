@@ -10,6 +10,7 @@ class Config:
     quote_options: tuple = ("same_day", "next_day", "within_3_days")
     mu_prior: float = 1.28             # competitor over list: 3 research weeks, P(win)=0.5 near 1.28 (lab/frank/curves.py)
     win_slope: float = 6.7             # same fit: win 0.87 at 1.0, 0.19 at 1.5
+    win_cap: float = 1.0               # dealer win rate ceiling in the win model (1 = none); data: ~0.68
     mu_lr: float = 0.004               # world level: slow, ~100 quotes to move a lot
     day_lr: float = 0.012              # today's shift: fast, the day factor and the price war are per day
     war_guard: bool = False            # freeze world and dealer learning on a day whose shift is below -war_shift

@@ -107,7 +107,9 @@ class Market:
                 + self.cfg.lane_w * lane_shift(lane))
 
     def p_win(self, ratio_eff: float, dealer: str, day: int, place: str = "", lane: str = "") -> float:
-        return sigmoid(self.cfg.win_slope * (self.mu_for(dealer, day, place, lane) - ratio_eff))
+        # win_cap: about a third of requests are lost at any price (36 k18 weeks: 0.68 at the lowest ratios). Without the
+        # cap, those losses pull the learned competitor level down and we quote too low (research/RESEARCH_2.md L1).
+        return self.cfg.win_cap * sigmoid(self.cfg.win_slope * (self.mu_for(dealer, day, place, lane) - ratio_eff))
 
     def observe(self, at: int, dealer: str, ratio_eff: float, won: bool, place: str = "", lane: str = "") -> None:
         day = at // DAY
