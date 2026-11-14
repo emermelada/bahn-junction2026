@@ -514,7 +514,13 @@ class Desk:
                 # Our long cars are going unbooked this week: a new long car would wait for drivers who are not there.
                 return decline_prices(r), f"DECLINE long {drive} min: {recent} long cars warned in {cfg.long_warn[2]} min"
         cost = r["referenceFeeCents"] * (cfg.quote_cost_hold or (self.drive_cost_mult(drive) if cfg.drive_cost else self.cost_mult()))
-        if cfg.quote_cost_hold and cfg.quote_cost_floor:
+        if cfg.quote_cost_equiv:
+            # What the quote would be under the old fleet: the same prior, then its bookings' mean ratio. A cheaper fleet keeps its
+            # saving as margin; a dearer week (scarcity) still raises the quote through the real cost_mult.
+            n, k = cfg.cost_prior_n, min(150, len(self.book_ratios))
+            equiv = (cfg.cost_prior * n + cfg.quote_cost_equiv * k) / (n + k)
+            cost = r["referenceFeeCents"] * max(equiv, self.cost_mult())
+        elif cfg.quote_cost_hold and cfg.quote_cost_floor:
             # fee1's savings stop the quote's fall below the hold, nothing more: never under the base's quote, and a week where
             # drivers cost more (scarcity, or Monday's prior) still raises it.
             cost = max(cost, r["referenceFeeCents"] * self.cost_mult())
