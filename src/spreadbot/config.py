@@ -252,7 +252,8 @@ class Config:
                                        # steep; PROBE's population curve and Halal's flat fees imply 0.29-0.31
     fee1_delta: tuple = (0.10, 0.30, 1440)  # this week's offset of ln(clearing fee): prior sd, clamp, half-life of a post's weight (min)
                                        # (Halal learns its intercept: -EUR 505/wk without; drivers booking us: 48 Mon, 61-62 Tue-Thu, 38 Fri)
-    fee1_obs_minutes: int = 30         # a first post unbooked after this many daytime minutes on show counts (by its exposure) for the offset
+    fee1_obs_minutes: int = 240        # a first post unbooked for this many daytime minutes counts as "did not clear" for the offset
+                                       # (a censored-exposure version, 85f9226, was -301 (se 152) on WAR vs this one: kept this)
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
     backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little
     backhaul_mult: float = 1.0         # offer fee over typical fee (never under the app fee unless backhaul_below)
