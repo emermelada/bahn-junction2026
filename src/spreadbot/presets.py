@@ -279,3 +279,7 @@ PRESETS["v5La-pc1b"] = PRESETS["v5La"] + ["bundle_climb=((0,0.68),(25,0.76))"]
 # V5 stack (V5, 23:05): the shipped v5La + end-at-hub pairs (v5h2: +134 se 167 vs v5La, worst 0.926, dev-05 no collapse) + ARCHIVE's climbing
 # pair fee (pc1: +379 se 132 vs v5La, MARKET's arm). Both touch pairs (which partner / at what fee): tested together before holdouts.
 PRESETS["v5S"] = PRESETS["v5h2"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0.80))"]
+# MARKET IDEA 1 (Franco, post-01:00): intraday competitor rebound. Cheap week = learned world level <= 1.305 at Mon 12:00 after >= 25
+# results; then while we win > 55% of the last 20 quoted results (normal ~0.55 overall, 0.38-0.43 in cheap weeks), quotes + 3% of list.
+PRESETS["v5S-rb3"] = PRESETS["v5S"] + ["rebound=(20,0.55,0.03,1.305,720,25)"]
+PRESETS["v5S-rb25"] = PRESETS["v5S"] + ["rebound=(15,0.55,0.025,1.305,720,25)"]

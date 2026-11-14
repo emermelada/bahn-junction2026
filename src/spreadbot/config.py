@@ -33,6 +33,9 @@ class Config:
                                        # c3g residuals show a lasting step of ~0.14 ratio per ln km on one Tue-Thu morning (PRICE_EVENTS.md) (0 = off)
     learn_fastest: bool = False        # learn the competitor only from requests where we quoted the fastest option: with only a slower
                                        # option quoted the dealer often wants speed (win 0.31 vs 0.52 at the same ratio, 16,818 quotes), which drags mu down
+    rebound: tuple = ()                # (window, win rate, markup, mu cut, minute, min results): in a cheap week (learned world level <= cut at
+                                       # that minute, after min results), while our win rate over the last `window` quoted results is above
+                                       # `win rate`, every quote gets + markup x list (the competitor has come back up today) (() = off)
     dealer_lr: float = 0.006           # per dealer: the competitor cuts where we win most
     min_ratio: float = 1.00            # never quote under list
     max_ratio: float = 1.80

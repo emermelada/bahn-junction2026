@@ -152,6 +152,8 @@ class Desk:
         self.gov_logged = -1
         self.warned: set[str] = set()  # orders that had a deadline warning
         self._strict_cfg: Optional[Config] = None
+        self.rb_results: list[bool] = []  # rebound: won / lost of each quoted result, in order (rebuilt by the event replay)
+        self._rb_cheap: Optional[bool] = None  # rebound: this week's competitor is cheap (decided once at rebound's minute)
         self._fee1 = None  # Fee1 engine (fee1.py), built on first use when cfg.fee1
         self.scarce = False  # scarcity switch: this week drivers are scarce (FLEET's cheap openings read it too)
         self.scarce_hour = -1  # last hour boundary (minute // 60) the scarcity rule was checked at
@@ -262,6 +264,8 @@ class Desk:
         if ratios:
             self.market.observe(at, r["dealerId"], min(ratios) / self.trust_factor(r["dealerId"]), won, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             self.n_quoted_outcomes += 1
+            if self.cfg.rebound:
+                self.rb_results.append(won)
             if won:
                 self.n_won_quoted += 1
                 o = self.orders.get(rid)
@@ -671,6 +675,12 @@ class Desk:
             else:
                 prices["same_day"] = max(s, int(round(n / cfg.steer)))
             info.append(f"steer {s}/{n}->{prices['same_day']}/{prices['next_day']}")
+        if cfg.rebound and prices and self.rebound_on():
+            # A cheap week's competitor came back up today: we win more than usual at our quotes, so ask a little more.
+            for o in r["options"]:
+                if o["kind"] in prices:
+                    prices[o["kind"]] += int(round(o["listPriceCents"] * cfg.rebound[2]))
+            info.append(f"rebound+{cfg.rebound[2]:.3f}")
         self.quote_meta[r["id"]] = meta
         head = f"bar={bar:.2f} bl={backlog} tg={t_gain/100:.0f} tf={tf:.2f} mu={self.market.mu_for(dealer, day, r["legs"][0]["pickup"]["placeId"]):.3f} cost={cost/100:.0f}"
         if cfg.late_barrier:
@@ -680,6 +690,18 @@ class Desk:
         if not prices:
             return decline_prices(r), f"DECLINE {head} {' '.join(info)}"
         return prices, f"{head} {' '.join(info)}"
+
+    def rebound_on(self) -> bool:
+        """rebound: the week is cheap (decided once at the rule's minute from the learned world level, sticky) and our win rate over
+        the last `window` quoted results is above the rule's rate. Pure function of state the event replay rebuilds."""
+        window, rate, _, cut, at, n = self.cfg.rebound
+        if self._rb_cheap is None and self.now >= at:
+            self._rb_cheap = self.market.n_obs >= n and self.market.mu <= cut
+            self.say("REBOUND_WEEK", f"{self._rb_cheap} mu={self.market.mu:.3f} n={self.market.n_obs} at {self.now}")
+        if not self._rb_cheap:
+            return False
+        xs = self.rb_results[-window:]
+        return len(xs) >= window and sum(xs) > rate * len(xs)
 
     def safe_admit(self, r: dict, opt: dict, p_ok: float, drive: int, dday: int, load: float, dealer: str, day: int, tf: float,
                    risk_frac: float, extra: float) -> Optional[tuple[float, float, float]]:
