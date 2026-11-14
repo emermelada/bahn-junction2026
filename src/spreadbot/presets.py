@@ -55,3 +55,6 @@ PRESETS["c3swpc"] = PRESETS["c3"] + ["stop_windows=true", "pick_cap=true"]
 # The lateness model from all our weeks (late_gbm.py, AUC 0.897 vs 0.737) in place of the logistic, with and without the pickup windows.
 PRESETS["c3g"] = PRESETS["c3"] + ["ontime_model=gbm"]
 PRESETS["c3gw"] = PRESETS["c3swpc"] + ["ontime_model=gbm"]
+# Reposting instead of raising (drivers are notified of new posts, not of raises).
+PRESETS["c3r"] = PRESETS["c3"] + ["repost=true"]
+PRESETS["c3gr"] = PRESETS["c3g"] + ["repost=true"]

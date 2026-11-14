@@ -78,6 +78,7 @@ class OrderBook:
     plates: set = field(default_factory=set)
     p_ok: float = 0.85
     p_exp: float = 0.0
+    repost_mult: float = 0.0  # repost: the fee step this car was last posted at (0 = the opening fee)
 
 
 class Desk:
@@ -1098,6 +1099,9 @@ class Desk:
             # Steps anchored to lastPickupAt: hold the opening fee while there is time, raise as the pickup nears.
             # The opening fee always shows for at least fee_hold minutes: most views come in the first minutes.
             opening = cfg.fee_open_hot if ob.p_exp >= cfg.hot_p else cfg.fee_open
+            if cfg.repost:
+                # One fee per post: a raise reaches ~1 view in 30 min, a new post ~10 (c3 views); the step comes as a repost in tick.
+                return [{"at": now, "feeCents": int(round(base * max(opening, ob.repost_mult)))}]
             if cfg.fee_open_dense and self.ontime.supply(ob.order["legs"][legs[0]]["pickup"]["placeId"], 30.0) >= cfg.dense_n:
                 opening = cfg.fee_open_dense  # many drivers live near the pickup: it books in minutes at less
             out, prev = [{"at": now, "feeCents": int(round(base * opening))}], int(round(base * opening))
@@ -1435,6 +1439,8 @@ class Desk:
                         self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": rec.schedule})
                         self.say("VIEWRAISE", f"{rec.id} views={len(self.gig_viewers[rec.id])} {cur}->{fee}")
                     rec.view_raised = True
+        if self.cfg.repost:
+            self.repost_due()
         if self.cfg.own_alarm:
             for rec in list(self.gigs.values()):
                 if rec.status != "open" or rec.escalated:
@@ -1477,6 +1483,31 @@ class Desk:
             rec.schedule = dedupe([{"at": self.now, "feeCents": fee}] + later)
             self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": rec.schedule})
             self.say("RELOOK", f"{rec.id} {ob.order['id']} sat {self.now - rec.posted_at} min {cur}->{fee}")
+
+    def repost_due(self) -> None:
+        """At each fee_rel step, an unbooked single is withdrawn and posted again at the step's fee: drivers near the pickup
+        get a new notification (views in the 30 min after a post: 10.3; after a raise of a sitting gig: 0.9)."""
+        cfg = self.cfg
+        for gid in sorted(self.gigs):
+            rec = self.gigs[gid]
+            if rec.status != "open" or rec.escalated or len({o for o, _ in rec.legs}) != 1:
+                continue
+            oid = rec.legs[0][0]
+            ob = self.orders.get(oid)
+            if not ob or ob.urgent:
+                continue
+            last = self.last_pickup(ob, [l for _, l in rec.legs])
+            if last - self.now < 2 * HOUR:
+                continue  # the rescue path (alarm, warning) takes over
+            step = 0.0
+            for hours_before, mult in cfg.fee_rel:
+                if self.now >= last - int(hours_before * HOUR) and mult > max(cfg.fee_open, ob.repost_mult):
+                    step = max(step, mult)
+            if step:
+                ob.repost_mult = step
+                self.withdraw(gid)
+                self.dispatch_order(oid, "repost")
+                self.say("REPOST", f"{gid} {oid} x{step:.2f} last-now={(last - self.now) // 60}h")
 
     def offer_viewers(self) -> None:
         """A driver who viewed our gig and did not book is active today and close by; in the app they may be

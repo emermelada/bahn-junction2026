@@ -97,6 +97,8 @@ class Config:
                                        # one picked up in time 1.8% / 0.7%; 2.5 trade-ins a week were booked in time with a pickup planned too late
     fee_hold: int = 45                 # minutes the opening fee shows before any raise
     fee_rel: tuple = ((8, 1.25), (5, 1.6))   # (hours before lastPickupAt, fee over typical fee)
+    repost: bool = False               # fee_rel steps of single gigs as withdraw + new post at the step's fee: a new post notifies drivers
+                                       # near the pickup (10.3 views in its first 30 min), a raise of a sitting gig reaches 0.9 (60 c3 weeks)
     fee_plan: tuple = ((0.0, 0.95), (0.15, 1.15), (0.4, 1.45), (0.7, 1.85))  # (share of slack, fee over typical fee)
     steep_plan: tuple = (1.7, 2.0, 2.3, 2.6)  # after a deadline warning: generous, a late car costs more
     steep_step: int = 30
