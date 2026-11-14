@@ -143,6 +143,15 @@ class Market:
             return sum(w * sigmoid(k * (b + d - ratio_eff) / math.sqrt(1 + math.pi * k * k * v / 8)) for w, d, v in self.kal_day(day))
         return sigmoid(k * (self.mu_for(dealer, day, place, lane) - ratio_eff))
 
+    def p_price(self, ratio_eff: float, dealer: str, day: int, place: str = "", lane: str = "") -> float:
+        """P(win) for pricing: with mu_w, today's, the dealer's and the lane's parts count only partly (they over-react)."""
+        if not self.cfg.mu_w or self.cfg.day_kalman:
+            return self.p_win(ratio_eff, dealer, day, place, lane)
+        wd, wl, wn = self.cfg.mu_w
+        mu = (self.mu + wd * self.day_shift[day] + wl * self.dealer_shift[dealer] + self.place_shift.get((place, day), 0.0)
+              + wn * self.cfg.lane_w * lane_shift(lane))
+        return sigmoid(self.cfg.win_slope * (mu - ratio_eff))
+
     def kal_observe(self, day: int, b: float, ratio_eff: float, won: bool) -> float:
         """One result: weigh each hypothesis by how well it predicted it, then one EKF step on each. Returns P(war)."""
         k, y = self.cfg.win_slope, 1.0 if won else 0.0
@@ -197,11 +206,41 @@ class Market:
         r = cfg.min_ratio
         while r <= cfg.max_ratio + 1e-9:
             price = list_cents * r * tf
-            ev = self.p_win(r, dealer, day, place, lane) * (price * (1 - risk_frac) - cost - shadow)
+            ev = self.p_price(r, dealer, day, place, lane) * (price * (1 - risk_frac) - cost - shadow)
             if ev > best_ev:
                 best, best_ev = r, ev
             r += 0.01
         return best, best_ev
+
+    def speed_offset(self, kind: str) -> int:
+        """The dealer's euros for speed below same_day: what a slower option's threshold lacks."""
+        a, b = self.cfg.speed_cents
+        return {"same_day": 0, "next_day": a}.get(kind, a + b)
+
+    def best_menu(self, dealer: str, day: int, list_fast: int, tf: float, cost: float, cands: list, place: str = "", lane: str = "") -> tuple[dict, float]:
+        """Menu pricing: the dealer compares options by price + speed offset, so P(win) follows the lowest such price.
+        Search that effective price; at each, the option with the best margin sets it; the others get the same margin."""
+        cfg = self.cfg
+        s0 = min(c[2] for c in cands)
+        best, best_ev, best_m = None, 0.0, 0.0
+        r = cfg.min_ratio
+        while r <= cfg.max_ratio + 1e-9:
+            eff = list_fast * r * tf
+            m = max(((eff - (s - s0) * tf) * (1 - risk) - cost - extra for _, lst, s, risk, extra in cands if eff - (s - s0) * tf >= lst * cfg.min_ratio * tf), default=None)
+            if m is not None:
+                ev = self.p_win(r, dealer, day, place, lane) * m
+                if ev > best_ev:
+                    best, best_ev, best_m = r, ev, m
+            r += 0.01
+        if best is None:
+            return {}, 0.0
+        prices = {}
+        for kind, lst, s, risk, extra in cands:
+            p = (best_m + cost + extra) / (1 - risk)
+            p = max(p, list_fast * best * tf - (s - s0) * tf, lst * cfg.min_ratio * tf)
+            if p <= lst * cfg.max_ratio * tf:
+                prices[kind] = int(round(p))
+        return prices, best_ev
 
 
 class Governor:

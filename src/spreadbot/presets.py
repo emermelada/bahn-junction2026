@@ -64,3 +64,10 @@ PRESETS["d-offer"] = PRESETS["c3go"]
 PRESETS["d-feer"] = PRESETS["d-fee"] + ["relook_minutes=90", "relook_mult=1.05"]  # a low opening unbooked after 90 min goes back to 1.05 now
 # d-fee's low openings where < 40 drivers live near the delivery doubled the warned share (3.2% -> 6.7%) for 7% less fee; >= 40: flat, -11%.
 PRESETS["d-fee3"] = PRESETS["c3g"] + ["fee_open_rule=((24,40,0.92),(12,80,0.95))"]
+# re-market: menu pricing (one effective price, slower options cheaper by the dealer's speed value, every option at one margin).
+PRESETS["m1menu"] = PRESETS["c3g"] + ["menu=true"]
+# re-market: no load charge on cars due the last Monday (Friday noev is the load charge; Mon2 cars are our safest).
+PRESETS["m2mon2"] = PRESETS["c3g"] + ["load_free_mon2=0.2"]
+# re-market: same_day capped at next_day + €9 (the dealer's speed value), and pricing with damped mu parts.
+PRESETS["m3scap"] = PRESETS["c3g"] + ["s_cap_cents=900"]
+PRESETS["m4muw"] = PRESETS["c3g"] + ["mu_w=(0.65,0.4,0.6)"]
