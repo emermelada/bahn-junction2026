@@ -261,3 +261,7 @@ PRESETS["v5L"] = PRESETS["k-f1h5fD"] + ["load_bundle_w=0.6", "load_free=0.12", "
 PRESETS["v5La"] = PRESETS["v5aV2"] + LB  # the first test (v5-run3 tag v5V2lb): with v5a's long cars down to 0.90
 PRESETS["v5L45"] = PRESETS["v5L"] + ["late_barrier=(0.945,300,4,20)"]  # looser target: keep more of V2's volume in normal weeks
 PRESETS["v5L14"] = PRESETS["v5L"] + ["load_free=0.14"]                   # bolder volume under the same barrier
+# v5Lf: v5La with the late barrier charging only lateness above the free share (dev-05: Monday cars 10/105 late -> proj 0.90 -> barrier
+# EUR 2-3.9k per late car on every car -> 0 orders Tue-Fri, EUR 1,449 @0.907 vs the release 273 orders @0.956, EUR 3,435).
+PRESETS["v5Lf45"] = PRESETS["v5La"] + ["late_barrier_free=0.045"]  # = 1 - target: cars at least as safe as the target pay nothing
+PRESETS["v5Lf02"] = PRESETS["v5La"] + ["late_barrier_free=0.02"]   # only the safest cars (p_ok >= 0.98) pay nothing
