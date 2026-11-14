@@ -123,6 +123,10 @@ class Market:
         self.out_acc: dict[tuple[int, str], list[float]] = {}  # (day, region centre) -> [sum(won - p), sum p(1-p), n], 08-18
         self.beta = 0.0                                         # dist_lr: competitor level per ln(km) around the median lane (e^4.97 = 144 km)
         self.outage: dict[int, str] = {}                        # day -> centre of the flagged outage region
+        # tier_lr (P3): the competitor's level per option tier, zero-mean around mu (PRICING.md: the pooled curve is 5.5 pts low
+        # on same_day-only requests and 5 pts high on next+3-day menus), learned slowly from each result's cheapest quoted option.
+        self.tier: dict[str, float] = {"same_day": 0.0, "next_day": 0.0, "within_3_days": 0.0}
+        self.tier_n: dict[str, int] = {"same_day": 0, "next_day": 0, "within_3_days": 0}
 
     def kal_day(self, day: int) -> list[list[float]]:
         """Today's two hypotheses, made at the first quote or result of the day. The war comes once a week on a
@@ -144,10 +148,11 @@ class Market:
         c = self.outage.get(day)
         return bool(c and place) and 8 * HOUR <= t % DAY < 18 * HOUR and self.desk.geo.air(c, place) <= 80.0
 
-    def mu_for(self, dealer: str, day: int, place: str = "", lane: str = "") -> float:
+    def mu_for(self, dealer: str, day: int, place: str = "", lane: str = "", kind: str = "") -> float:
+        t = self.tier.get(kind, 0.0) if self.cfg.tier_lr and kind else 0.0
         if self.cfg.outage_z and self.in_outage(day, place, self.desk.now):
-            return self.mu_base(dealer, day, place, lane) * (1 + self.cfg.outage_up)
-        return self.mu_base(dealer, day, place, lane)
+            return self.mu_base(dealer, day, place, lane) * (1 + self.cfg.outage_up) + t
+        return self.mu_base(dealer, day, place, lane) + t
 
     def dist_x(self, lane: str) -> float:
         if not lane:
@@ -166,21 +171,21 @@ class Market:
         return (self.mu + self.day_shift[day] + self.dealer_shift[dealer] + self.place_shift.get((place, day), 0.0)
                 + self.cfg.lane_w * lane_shift(lane))
 
-    def p_win(self, ratio_eff: float, dealer: str, day: int, place: str = "", lane: str = "") -> float:
+    def p_win(self, ratio_eff: float, dealer: str, day: int, place: str = "", lane: str = "", kind: str = "") -> float:
         k = self.cfg.win_slope
         if self.cfg.day_kalman:
             # The mixture of both hypotheses, each widened by its own uncertainty (probit approximation).
             b = self.base_for(dealer, day, place, lane)
             return sum(w * sigmoid(k * (b + d - ratio_eff) / math.sqrt(1 + math.pi * k * k * v / 8)) for w, d, v in self.kal_day(day))
-        return sigmoid(k * (self.mu_for(dealer, day, place, lane) - ratio_eff))
+        return sigmoid(k * (self.mu_for(dealer, day, place, lane, kind) - ratio_eff))
 
-    def p_price(self, ratio_eff: float, dealer: str, day: int, place: str = "", lane: str = "") -> float:
+    def p_price(self, ratio_eff: float, dealer: str, day: int, place: str = "", lane: str = "", kind: str = "") -> float:
         """P(win) for pricing: with mu_w, today's, the dealer's and the lane's parts count only partly (they over-react)."""
         if not self.cfg.mu_w or self.cfg.day_kalman:
-            return self.p_win(ratio_eff, dealer, day, place, lane)
+            return self.p_win(ratio_eff, dealer, day, place, lane, kind)
         wd, wl, wn = self.cfg.mu_w
         mu = (self.mu + wd * self.day_shift[day] + wl * self.dealer_shift[dealer] + self.place_shift.get((place, day), 0.0)
-              + wn * self.cfg.lane_w * lane_shift(lane))
+              + wn * self.cfg.lane_w * lane_shift(lane)) + (self.tier.get(kind, 0.0) if self.cfg.tier_lr and kind else 0.0)
         return sigmoid(self.cfg.win_slope * (mu - ratio_eff))
 
     def kal_observe(self, day: int, b: float, ratio_eff: float, won: bool) -> float:
@@ -200,9 +205,9 @@ class Market:
             h[0] = max(1e-6, h[0] / tot)
         return hs[1][0]
 
-    def observe(self, at: int, dealer: str, ratio_eff: float, won: bool, place: str = "", lane: str = "") -> None:
+    def observe(self, at: int, dealer: str, ratio_eff: float, won: bool, place: str = "", lane: str = "", kind: str = "") -> None:
         day = at // DAY
-        g = (1.0 if won else 0.0) - self.p_win(ratio_eff, dealer, day, place, lane)
+        g = (1.0 if won else 0.0) - self.p_win(ratio_eff, dealer, day, place, lane, kind)
         k = self.cfg.win_slope
         if self.cfg.day_kalman:
             # The day level lives in the two hypotheses; the world and dealer levels learn less while a war is likely,
@@ -237,6 +242,16 @@ class Market:
             self.mu += self.cfg.mu_lr * k * g
             self.dealer_shift[dealer] += self.cfg.dealer_lr * k * g
         self.day_shift[day] += self.cfg.day_lr * k * g
+        if self.cfg.tier_lr and kind in self.tier:
+            # P3: this tier's offset learns slowly; then the offsets are re-centred on zero (weighted by results) and the mean
+            # moves to mu, so the pooled level keeps its meaning and the prediction for the average request does not jump.
+            self.tier[kind] = min(0.3, max(-0.3, self.tier[kind] + self.cfg.tier_lr * k * g))
+            self.tier_n[kind] += 1
+            tot = sum(self.tier_n.values())
+            m = sum(self.tier[t] * self.tier_n[t] for t in sorted(self.tier)) / tot
+            for t in sorted(self.tier):
+                self.tier[t] -= m
+            self.mu += m
         if self.cfg.place_lr and place:
             # The outage: one region's dealers pay ~30% more for a day. Each place nearby learns from this result.
             for other, w in self.desk.nearby(place):
@@ -248,14 +263,14 @@ class Market:
         self.n_obs += 1
         self.day_obs[day].append(won)
 
-    def best_ratio(self, dealer: str, day: int, list_cents: int, tf: float, cost: float, risk_frac: float, shadow: float, place: str = "", lane: str = "") -> tuple[float, float]:
+    def best_ratio(self, dealer: str, day: int, list_cents: int, tf: float, cost: float, risk_frac: float, shadow: float, place: str = "", lane: str = "", kind: str = "") -> tuple[float, float]:
         """The ratio over list (before trust) with the best expected margin, and that margin."""
         cfg = self.cfg
         best, best_ev = 0.0, 0.0
         r = cfg.min_ratio
         while r <= cfg.max_ratio + 1e-9:
             price = list_cents * r * tf
-            ev = self.p_price(r, dealer, day, place, lane) * (price * (1 - risk_frac) - cost - shadow)
+            ev = self.p_price(r, dealer, day, place, lane, kind) * (price * (1 - risk_frac) - cost - shadow)
             if ev > best_ev:
                 best, best_ev = r, ev
             r += 0.01

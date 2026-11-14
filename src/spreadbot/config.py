@@ -33,6 +33,9 @@ class Config:
                                        # c3g residuals show a lasting step of ~0.14 ratio per ln km on one Tue-Thu morning (PRICE_EVENTS.md) (0 = off)
     learn_fastest: bool = False        # learn the competitor only from requests where we quoted the fastest option: with only a slower
                                        # option quoted the dealer often wants speed (win 0.31 vs 0.52 at the same ratio, 16,818 quotes), which drags mu down
+    tier_lr: float = 0.0               # P3: learning rate of the competitor's zero-mean offset per option tier (same/next/3-day) on top of mu (0 = off)
+    cheap_hub: tuple = ()              # P1: (minute, mu cut, min results, drivers <= 30 min of the delivery, floor): in a week whose learned
+                                       # world level at that minute is <= cut, hub deliveries quote at max(floor, cost_mult) (ARCHIVE c_hubtier) (() = off)
     dealer_lr: float = 0.006           # per dealer: the competitor cuts where we win most
     min_ratio: float = 1.00            # never quote under list
     max_ratio: float = 1.80

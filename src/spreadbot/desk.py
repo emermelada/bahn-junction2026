@@ -152,6 +152,7 @@ class Desk:
         self.gov_logged = -1
         self.warned: set[str] = set()  # orders that had a deadline warning
         self._strict_cfg: Optional[Config] = None
+        self._cheap: Optional[bool] = None  # P1 cheap_hub: this week's competitor is cheap (decided once at Mon 12:00)
         self._fee1 = None  # Fee1 engine (fee1.py), built on first use when cfg.fee1
         self.scarce = False  # scarcity switch: this week drivers are scarce (FLEET's cheap openings read it too)
         self.scarce_hour = -1  # last hour boundary (minute // 60) the scarcity rule was checked at
@@ -255,13 +256,15 @@ class Desk:
         if self.cfg.learn_fastest and not (fastest["kind"] in q and q[fastest["kind"]] < 3 * fastest["listPriceCents"]):
             return  # a loss here says the dealer wanted speed, not that our price was high
         ratios = [q[o["kind"]] / o["listPriceCents"] for o in r["options"] if o["kind"] in q and q[o["kind"]] < 3 * o["listPriceCents"]]
+        kinds = [o["kind"] for o in r["options"] if o["kind"] in q and q[o["kind"]] < 3 * o["listPriceCents"]]
+        tier = kinds[ratios.index(min(ratios))] if ratios and self.cfg.tier_lr and not self.cfg.menu else ""  # P3: the cheapest option's tier
         if self.cfg.menu and ratios:
             # Menu pricing learns the lowest price + speed offset, in units of the fastest option's list.
             s0 = self.market.speed_offset(fastest["kind"])
             ratios = [min((q[o["kind"]] + (self.market.speed_offset(o["kind"]) - s0) * self.trust_factor(r["dealerId"])) / fastest["listPriceCents"]
                           for o in r["options"] if o["kind"] in q and q[o["kind"]] < 3 * o["listPriceCents"])]
         if ratios:
-            self.market.observe(at, r["dealerId"], min(ratios) / self.trust_factor(r["dealerId"]), won, r["legs"][0]["pickup"]["placeId"], lane_of(r))
+            self.market.observe(at, r["dealerId"], min(ratios) / self.trust_factor(r["dealerId"]), won, r["legs"][0]["pickup"]["placeId"], lane_of(r), tier)
             self.n_quoted_outcomes += 1
             if won:
                 self.n_won_quoted += 1
@@ -552,6 +555,10 @@ class Desk:
             # fee1's savings stop the quote's fall below the hold, nothing more: never under the base's quote, and a week where
             # drivers cost more (scarcity, or Monday's prior) still raises it.
             cost = max(cost, r["referenceFeeCents"] * self.cost_mult())
+        if cfg.cheap_hub and self.cheap_week() and self.home_near_delivery(r["legs"][-1]["delivery"]["placeId"], 30) >= cfg.cheap_hub[3]:
+            # P1: a cheap-competitor week loses volume into driver hubs (noev 19% vs 12%), the cheapest cars to serve (fee 0.93x,
+            # 3.3% late, ARCHIVE c_hubtier): their floor drops to cheap_hub's level; every other car keeps the floor above.
+            cost = r["referenceFeeCents"] * max(cfg.cheap_hub[4], self.cost_mult())
         if cfg.hold_price and self.pairs_with_held(r):
             cost *= cfg.bundle_mult  # a held car for the same day starts or ends near this one: the evening release pairs them
         elif cfg.bundle_price and self.chainable(r):
@@ -621,7 +628,7 @@ class Desk:
             if cfg.quote_move_cost:
                 # The fee rule opens cheap where drivers live near the delivery and the pickup is far off: quote that cost.
                 c_opt = cost * self.move_cost(r, opt) / max(1.0, r["referenceFeeCents"] * self.cost_mult())
-            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, c_opt, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
+            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, c_opt, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r), kind)
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 adm = self.safe_admit(r, opt, p_ok, drive, dday, load, dealer, day, tf, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost)
                 if adm is None:
@@ -636,7 +643,7 @@ class Desk:
                 # Build a big dealer's trust fast: win its safe cars with high probability while each still
                 # makes money; once the count is at 25, normal pricing (times 1.25) takes over by itself.
                 place = r["legs"][0]["pickup"]["placeId"]
-                r_inv = self.market.mu_for(dealer, day, place) - math.log(cfg.invest_pwin / (1 - cfg.invest_pwin)) / cfg.win_slope
+                r_inv = self.market.mu_for(dealer, day, place, "", kind) - math.log(cfg.invest_pwin / (1 - cfg.invest_pwin)) / cfg.win_slope
                 margin_inv = opt["listPriceCents"] * r_inv * tf * (1 - risk_frac) - cost - (cfg.shadow_cents + congestion + load_cost)
                 if cfg.min_ratio <= r_inv < ratio and margin_inv > cfg.invest_min_margin_cents:
                     ratio = r_inv
@@ -703,7 +710,7 @@ class Desk:
             fq = self.fee1.quote_cost(r, opt)
             if fq is not None:
                 c = min(c, fq[1])  # fee1's own expected fee + rescue cost of moving this car alone
-        ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, c, risk_frac, extra, r["legs"][0]["pickup"]["placeId"], lane_of(r))
+        ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, c, risk_frac, extra, r["legs"][0]["pickup"]["placeId"], lane_of(r), opt["kind"])
         if ratio <= 0 or ev < cfg.min_ev_cents:
             return None
         return ratio, ev, c
@@ -756,6 +763,15 @@ class Desk:
                     self.switch_cfg(dict(cfg.scarce_set))
             h += 1
         self.scarce_hour = max(self.scarce_hour, hi)
+
+    def cheap_week(self) -> bool:
+        """P1: decided once at cheap_hub's minute (Mon 12:00) from the learned world level, sticky for the week. A pure function
+        of the market's state at that minute, which the restart's event replay rebuilds."""
+        if self._cheap is None and self.now >= self.cfg.cheap_hub[0]:
+            at, cut, n = self.cfg.cheap_hub[0], self.cfg.cheap_hub[1], self.cfg.cheap_hub[2]
+            self._cheap = self.market.n_obs >= n and self.market.mu <= cut
+            self.say("CHEAP_WEEK", f"{self._cheap} mu={self.market.mu:.3f} n={self.market.n_obs} at {self.now}")
+        return bool(self._cheap)
 
     def pl_factor(self, drive: int) -> float:
         """Calibration of the on-time model by drive time (pl_cal): it over-predicts lateness of 1-6 h drives and

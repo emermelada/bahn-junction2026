@@ -358,3 +358,9 @@ PRESETS["v5Lfl10"] = PRESETS["v5Lf45"] + ["late_barrier_free_load=0.10"]
 # posted again as a NEW gig at the same fee (fresh notifications: ~10 views vs ~1 for a raise), pairing tried first on that second attempt;
 # no raise before the rescue (last call + alarm unchanged). On v5La.
 PRESETS["v5o"] = PRESETS["v5La"] + ["v5_open=(8,0.88)", "v5_repost=0.88", "fee1_repick=30", "v5_pair2=true"]
+# MARKET P3 (Franco 23:00): the competitor's level per option tier as slow zero-mean offsets on top of the pooled level (PRICING.md: the
+# pooled curve is 5.5 pts low on same_day-only requests and 5 pts high on next+3-day menus; ARCHIVE: cheap weeks cut same_day).
+PRESETS["v5La-pc1-p3"] = PRESETS["v5La-pc1"] + ["tier_lr=0.0015"]
+# MARKET P1, dense half only (ARCHIVE c_hubtier: no sparse surcharge, sparse cars earn the most even in cheap weeks): learned world level
+# <= 1.305 at Mon 12:00 after >= 25 results -> deliveries with >= 77 drivers within 30 min (top tercile) quote at max(0.95, cost_mult).
+PRESETS["v5La-pc1-p1"] = PRESETS["v5La-pc1"] + ["cheap_hub=(720,1.305,25,77,0.95)"]
