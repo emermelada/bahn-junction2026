@@ -123,6 +123,9 @@ class Config:
                                        # nd30 > 40 + 90-min relook kept warned 2.0/2.7% vs c3g 1.6/2.4%, waits to 1.25 0.7/1.2% vs 1.0/0.5%; nd30 <= 40 warned 3.0 -> 4.3% (SAFE_OPEN.md)
     stop_windows: bool = False         # pickup window ends at the car's last pickup, delivery window at deadline - stop_margin
     stop_margin: int = 60              # (Halal / jaffa: failed visits 10.6 -> 0, deliveries >24 h late fixed)
+    fee_cut_guard: tuple = ()          # (min P(on time) at quote, min governor projection, max mean booked/first fee of the last 60 bookings):
+                                       # fee_open_rule cuts only when all hold, else the opening is fee_open (() = off). Deep cuts failed H1 on one
+                                       # scarce week each; board W3 had booked/opening 1.27 vs 1.05-1.07 (EXTERNAL.md)
     desert_n: int = 0                  # a delivery town with fewer drivers living <= 60 road min is a desert: no fee_open_rule cut and the own
                                        # alarm at desert_alarm (0 = off). dev-46: 21% of won cars, ~2x late in every policy (DEV46.md)
     desert_alarm: int = 720            # minutes before the last pickup: escalate a desert car this early (others: alarm_minutes)
@@ -179,6 +182,9 @@ class Config:
                                        # pairs > 4 h ending at nd30 <= 10: 45% booked in 60 min, 18.5% warned vs singles 60% / 3.7% (research/re/drivers/PAIRS.md)
     bundle_open_dense: tuple = ()      # (min hours to the chain's last start, min drivers living <= 30 road min from its end, opening share of
                                        # the two typical fees); () = off. Pairs ending at nd30 >= 150 book 91% in 60 min at 0.84 vs 67% at <= 10 (PAIRS.md)
+    long_split: tuple = ()             # (min chain drive, minutes): a pair with this much driving still unbooked this long after posting is split
+                                       # into singles (() = off). Release pairs book within 3 h 82%; of those unbooked at 3 h only 32% ever book, and
+                                       # long ones carry 4.4 of 20.5 warned singles/wk (k-safe, research/re/drivers/RESCUES.md)
     bundle_short: bool = False         # pick the partner that makes the shortest chain (short chains book more often), not the one with most slack
     bundle_keep_drop: bool = False     # a dropped bundle with time to spare stays in the app as a bundle (split later if still unbooked)
     bundle3: bool = False              # a held or new car may join an open two-car chain as its first or third car

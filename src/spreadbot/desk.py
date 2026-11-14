@@ -139,6 +139,8 @@ class Desk:
         self.ontime = OnTime(self)
         self.gov = Governor(self)
         self.book_ratios: list[float] = []
+        self.gig_open: dict[str, int] = {}     # gig -> its first posted fee (relooks and escalations replace the schedule)
+        self.bo_ratios: list[float] = []       # booked fee / first posted fee, per booking: this week's ladder climb
         self.gov_logged = -1
         self.warned: set[str] = set()  # orders that had a deadline warning
         self._strict_cfg: Optional[Config] = None
@@ -274,6 +276,8 @@ class Desk:
             ob = self.orders.get(rec.legs[0][0])
             if ob:
                 self.book_ratios.append(e["feeCents"] / max(1.0, self.gig_base(rec)))
+                if rec.id in self.gig_open:
+                    self.bo_ratios.append(e["feeCents"] / max(1, self.gig_open[rec.id]))
                 if len({o for o, _ in rec.legs}) == 1:
                     o = ob.order
                     drive = sum(self.geo.drive(o["legs"][l]["pickup"]["placeId"], o["legs"][l]["delivery"]["placeId"]) for _, l in rec.legs)
@@ -1117,6 +1121,18 @@ class Desk:
                 x.first_post_at = self.now
         self.say("BUNDLE", first.order["id"] + "+" + second.order["id"] + f" {why} last={last} fee0={sched[0]['feeCents']}")
 
+    def chain_drive(self, rec: GigRec) -> int:
+        """Road minutes along a gig's stops."""
+        total, prev = 0, None
+        for st in rec.stops:
+            here = self.stop_place(st)
+            if here is None:
+                continue
+            if prev is not None:
+                total += self.geo.drive(prev, here)
+            prev = here
+        return total
+
     def unbundle(self, rec: GigRec, why: str) -> None:
         self.say("UNBUNDLE", f"{rec.id} {why}")
         oids = sorted({o for o, _ in rec.legs})
@@ -1263,6 +1279,8 @@ class Desk:
         q = ob.order["legs"][legs[-1]]["delivery"]["placeId"]
         if self.cfg.desert_n and self.desert(q):
             return default  # no cut where nobody lives near the delivery
+        if self.cfg.fee_cut_guard and not self.cut_ok(ob):
+            return default
         nd = self.home_near_delivery(q)
         day_mult = self.day_open(left, nd)
         if day_mult:
@@ -1271,6 +1289,17 @@ class Desk:
             if left >= hours and nd >= n:
                 return mult
         return default
+
+    def cut_ok(self, ob: OrderBook) -> bool:
+        """fee_cut_guard (p_ok_min, proj_min, bo_max): cut an opening only for a safe car in a week that is going well. Every deep
+        cut failed H1 on one scarce week (k-safe-f2: dev-65 0.896); board W3 15:00 had booked/opening 1.27 vs 1.05-1.07."""
+        p_ok_min, proj_min, bo_max = self.cfg.fee_cut_guard
+        if ob.p_ok < p_ok_min:
+            return False
+        if self.won_count >= 30 and self.gov.projection() < proj_min:
+            return False
+        xs = self.bo_ratios[-60:]
+        return not (len(xs) >= 30 and sum(xs) / len(xs) > bo_max)
 
     def day_open(self, left: float, nd: int) -> float:
         """fee_open_day: the opening for today's posting day, drivers near the delivery and hours to the last pickup; 0 = none."""
@@ -1509,6 +1538,7 @@ class Desk:
                 self.pending_posts = [(pa, w) for (pa, w) in self.pending_posts if pa is not a]
                 if res.get("ok"):
                     rec = GigRec(res["id"], a["stops"], a["audience"], a["schedule"], self.now)
+                    self.gig_open.setdefault(rec.id, a["schedule"][0]["feeCents"])
                     rec.repair = why == "repair"
                     self.gigs[rec.id] = rec
                     for key in rec.legs:
@@ -1540,6 +1570,7 @@ class Desk:
             rec = self.gigs.get(g["id"])
             if rec is None:
                 rec = GigRec(g["id"], g["stops"], g["audience"], g["schedule"], g["postedAt"])
+                self.gig_open.setdefault(rec.id, g["schedule"][0]["feeCents"])
                 self.gigs[rec.id] = rec
             rec.status, rec.driver = g["status"], g.get("driverId")
             if g["status"] in ("open", "booked", "working"):
@@ -1604,6 +1635,11 @@ class Desk:
                         self.unbundle(rec, "timeout")
                     elif self.cfg.repair_split and rec.repair and self.now - rec.posted_at >= self.cfg.repair_split:
                         self.unbundle(rec, "repair-split")  # the pair did not catch a driver fast: the cars go back alone
+                    elif self.cfg.long_split and self.now - rec.posted_at >= self.cfg.long_split[1] and                             self.chain_drive(rec) >= self.cfg.long_split[0]:
+                        # A long pair unbooked this long rarely books (32%): withdraw it; the next tick posts the cars alone
+                        # (posting in the same flush as the withdraw would race a restart's rejoin).
+                        self.say("UNBUNDLE", f"{rec.id} long-split")
+                        self.withdraw(rec.id)
         if self.cfg.relook_minutes:
             self.relook()
         if self.cfg.offer_home_n:

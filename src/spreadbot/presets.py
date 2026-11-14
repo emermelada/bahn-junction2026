@@ -161,3 +161,22 @@ PRESETS["k-safe-dcr"] = PRESETS["k-safe-dc"] + ["repost_past_last=1"]
 # + decline long (>= 4 h) cars while >= 3 of our long cars were warned in the last 24 h (H2 autopsy rule 1).
 PRESETS["k-safe-dcl"] = PRESETS["k-safe-dc"] + ["long_warn=(240,3,1440)"]
 PRESETS["k-safe-dcrl"] = PRESETS["k-safe-dcr"] + ["long_warn=(240,3,1440)"]
+# Fee push (board 15:00: EUR 35.4/order vs leaders 44.9; the gap is the fee): deep openings + cheap pairs; and one more opening step at 12 h everywhere.
+PRESETS["k-safe-f2pm"] = PRESETS["k-safe-f2"] + ["bundle_mult=0.72"]
+PRESETS["k-safe-f6"] = KSAFE_BASE + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92),(12,0,0.95))"]
+# k-safe bill: singles posted 12-24 h before the last pickup (held cars released at 16:00) open at 1.05 and book in a median 3 min.
+PRESETS["k-safe-f7"] = KSAFE_BASE + ["fee_open_rule=((24,80,0.85),(12,0,0.9),(6,80,0.95))"]
+# Deep openings with a safety net: cut only for cars with P(on time) >= 0.97, while the projection is >= 0.955 and the week's booked/first fee <= 1.12.
+PRESETS["k-safe-f2g"] = PRESETS["k-safe-f2"] + ["fee_cut_guard=(0.97,0.955,1.12)"]
+# Pair share (k-safe 31% of cars paired at 0.85x vs leaders 49-58% at ~0.76x; ~EUR 23 saved per car moved; GITHUB_LEADS.md 6-8):
+PRESETS["k-safe-bp"] = PRESETS["k-safe"] + ["repair_pairs=true", "repair_lead=180", "repair_mult=0.85", "repair_split=60"]  # board pairs (Halal +1.9k)
+PRESETS["k-safe-hold"] = PRESETS["k-safe"] + ["hold_minutes=60"]  # a new car waits up to 60 min for a partner (Halal +829/wk at 60 min)
+PRESETS["k-safe-km50"] = PRESETS["k-safe"] + ["bundle_km=50"]  # pair links up to 50 km (bahn67 +2.4% on one set)
+PRESETS["k-safe-kd"] = PRESETS["k-safe"] + ["bundle_keep_drop=true"]  # a dropped pair with time left stays a pair (re-external: split pairs 5-13% late; kept 78% rebooked at 0.86x)
+PRESETS["k-safe-ls"] = PRESETS["k-safe"] + ["long_split=(360,180)"]  # long pairs unbooked 3 h after posting go out as singles
+PRESETS["k-safe-b3"] = PRESETS["k-safe"] + ["bundle3=true", "bundle3_mult=0.75"]  # three-car chains (bahn67 +370/wk; never run on c3g)
+# PAIRS_MISSED.md: 66% of missed pairs = the partner was already booked (lone cars book in minutes); est. km50 + 120-min hold +472-583/wk.
+PRESETS["k-safe-kmh"] = PRESETS["k-safe"] + ["bundle_km=50", "hold_minutes=120", "hold_lead=360"]
+# k-safe-dc + re-drivers' long_split: a pair with >= 6 h of driving still unbooked 3 h after posting goes out as singles
+# (long pairs carry 4.4 of 20.5 warned singles a week; k-safe-ls vs k-safe: +540/+220, worst 0.960/0.948 vs 0.942).
+PRESETS["k-safe-dcls"] = PRESETS["k-safe-dc"] + ["long_split=(360,180)"]
