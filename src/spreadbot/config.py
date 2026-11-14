@@ -12,6 +12,10 @@ class Config:
     win_slope: float = 6.7             # same fit: win 0.87 at 1.0, 0.19 at 1.5
     mu_lr: float = 0.004               # world level: slow, ~100 quotes to move a lot
     day_lr: float = 0.012              # today's shift: fast, the day factor and the price war are per day
+    day_kalman: bool = False           # today's competitor level as two Kalman hypotheses (normal day / price-war day at 0.8x) instead of
+    kal_sd: float = 0.125              # the SGD day shift: prior sd of the day factor (log; alignas/Halal), times the world level here
+    kal_war: float = 0.8               # war-day level over usual (RULES: 20% under everywhere, 08-18, one weekday)
+    kal_war_sd: float = 0.04           # its sd (log)
     war_guard: bool = False            # freeze world and dealer learning on a day whose shift is below -war_shift
     war_shift: float = 0.12
     lane_w: float = 0.0                # weight of the cross-world lane table (Javier's lanes.json) in the competitor level

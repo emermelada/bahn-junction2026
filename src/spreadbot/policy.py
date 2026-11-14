@@ -101,18 +101,70 @@ class Market:
         self.place_shift: dict[tuple[str, int], float] = {}  # (pickup place, day): the outage region
         self.n_obs = 0
         self.day_obs: dict[int, list[bool]] = defaultdict(list)
+        # day_kalman: per day, hypotheses [weight, mean shift, variance] for (normal day, war day), in ratio units.
+        self.kal: dict[int, list[list[float]]] = {}
+        self.war_seen = False
+
+    def kal_day(self, day: int) -> list[list[float]]:
+        """Today's two hypotheses, made at the first quote or result of the day. The war comes once a week on a
+        weekday: its prior is 1 / (weekdays left), capped at 0.7, and small once a past day looked like it."""
+        if day not in self.kal:
+            prev = [d for d in self.kal if d < day]
+            if prev and self.kal[max(prev)][1][0] > 0.8:
+                self.war_seen = True
+            c = self.cfg
+            pw = 0.0 if day > 4 else (0.03 if self.war_seen else min(0.7, 1.0 / (5 - day)))
+            sd0, sdw = c.kal_sd * self.mu, c.kal_war_sd * self.mu
+            self.kal[day] = [[1 - pw, 0.0, sd0 * sd0], [pw, (c.kal_war - 1) * self.mu, sdw * sdw]]
+        return self.kal[day]
+
+    def base_for(self, dealer: str, day: int, place: str = "", lane: str = "") -> float:
+        return self.mu + self.dealer_shift[dealer] + self.place_shift.get((place, day), 0.0) + self.cfg.lane_w * lane_shift(lane)
 
     def mu_for(self, dealer: str, day: int, place: str = "", lane: str = "") -> float:
+        if self.cfg.day_kalman:
+            return self.base_for(dealer, day, place, lane) + sum(w * d for w, d, v in self.kal_day(day))
         return (self.mu + self.day_shift[day] + self.dealer_shift[dealer] + self.place_shift.get((place, day), 0.0)
                 + self.cfg.lane_w * lane_shift(lane))
 
     def p_win(self, ratio_eff: float, dealer: str, day: int, place: str = "", lane: str = "") -> float:
-        return sigmoid(self.cfg.win_slope * (self.mu_for(dealer, day, place, lane) - ratio_eff))
+        k = self.cfg.win_slope
+        if self.cfg.day_kalman:
+            # The mixture of both hypotheses, each widened by its own uncertainty (probit approximation).
+            b = self.base_for(dealer, day, place, lane)
+            return sum(w * sigmoid(k * (b + d - ratio_eff) / math.sqrt(1 + math.pi * k * k * v / 8)) for w, d, v in self.kal_day(day))
+        return sigmoid(k * (self.mu_for(dealer, day, place, lane) - ratio_eff))
+
+    def kal_observe(self, day: int, b: float, ratio_eff: float, won: bool) -> float:
+        """One result: weigh each hypothesis by how well it predicted it, then one EKF step on each. Returns P(war)."""
+        k, y = self.cfg.win_slope, 1.0 if won else 0.0
+        hs = self.kal_day(day)
+        for h in hs:
+            w, d, v = h
+            pp = sigmoid(k * (b + d - ratio_eff) / math.sqrt(1 + math.pi * k * k * v / 8))
+            h[0] = w * (pp if won else 1 - pp)
+            p = sigmoid(k * (b + d - ratio_eff))
+            hh = k * k * p * (1 - p)
+            v2 = v / (1 + hh * v)
+            h[1], h[2] = d + v2 * k * (y - p), v2
+        tot = sum(h[0] for h in hs) or 1.0
+        for h in hs:
+            h[0] = max(1e-6, h[0] / tot)
+        return hs[1][0]
 
     def observe(self, at: int, dealer: str, ratio_eff: float, won: bool, place: str = "", lane: str = "") -> None:
         day = at // DAY
         g = (1.0 if won else 0.0) - self.p_win(ratio_eff, dealer, day, place, lane)
         k = self.cfg.win_slope
+        if self.cfg.day_kalman:
+            # The day level lives in the two hypotheses; the world and dealer levels learn less while a war is likely,
+            # so a war day's losses do not drag tomorrow's prices down.
+            pw = self.kal_observe(day, self.base_for(dealer, day, place, lane), ratio_eff, won)
+            self.mu = min(max(self.mu + self.cfg.mu_lr * k * g * (1 - pw), 0.95), 1.9)
+            self.dealer_shift[dealer] = min(max(self.dealer_shift[dealer] + self.cfg.dealer_lr * k * g * (1 - pw), -0.3), 0.3)
+            self.n_obs += 1
+            self.day_obs[day].append(won)
+            return
         war = self.cfg.war_guard and self.day_shift[day] < -self.cfg.war_shift
         if not war:
             # On a price-war day (the competitor 20% under everywhere) only today's shift learns: tomorrow it is back.
