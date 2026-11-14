@@ -289,6 +289,7 @@ class Config:
     v5_pair2_hub: int = 0              # v5_pair2 only into a chain whose final delivery has >= this many drivers living <= 30 road min, and only
                                        # for a car with >= 6 h left (Franco's second-attempt cap; 0 = any end, any time)
     v5_pair2_fee: float = 0.0          # v5_pair2's pair opens at this share of the two typical fees (0 = bundle_mult x fee_open = 0.84)
+    v5_pair2_held: bool = False        # v5_pair2 may also take a held (won, unposted) car as the partner
     v5_short_open: float = 0.0         # ladder singles with < 8 h to the last pickup (fee1 cannot choose) open at this, not fee_open (0 = off)
                                        # (a censored-exposure version, 85f9226, was -301 (se 152) on WAR vs this one: kept this)
     # --- V5 HUB: pairs book by their END (research/re/drivers/PAIRS.md; research/re/v5/HUB_BUILD.md). Off by default.

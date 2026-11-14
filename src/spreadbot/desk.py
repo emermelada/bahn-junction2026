@@ -2089,11 +2089,37 @@ class Desk:
                     continue  # the chain must end at a driver-dense hub: drivers living there take it home (pairs book by their end)
                 if last is not None and (best is None or self.chain_key(last, first, second) > self.chain_key(best[0], best[1], best[2])):
                     best = (last, first, second, r2)
+        if self.cfg.v5_pair2_held:
+            # Also a held car (won, waiting for its release, unposted) as the partner: a far larger pool than the few sitting singles
+            # (v5La-P2 with sitting partners only: 1.6 pairs/wk of ~70 re-picks).
+            for oid2 in sorted(self.held):
+                other = self.orders.get(oid2)
+                if not other or other is ob or not self.simple(other) or other.order["status"] == "cancelled":
+                    continue
+                if any((oid2, l) in self.leg_gig or self._pending(oid2, l) for l in range(len(other.order["legs"]))):
+                    continue
+                if self.last_pickup(other, [0]) - self.now < V5_PAIR2_SLACK:
+                    continue
+                for first, second in ((ob, other), (other, ob)):
+                    last = self.chain(first, second)
+                    if last is not None and self.cfg.v5_pair2_hub and                             self.home_near_delivery(second.order["legs"][0]["delivery"]["placeId"], PAIR_END_RADIUS) < self.cfg.v5_pair2_hub:
+                        continue
+                    if last is not None and (best is None or self.chain_key(last, first, second) > self.chain_key(best[0], best[1], best[2])):
+                        best = (last, first, second, None)
         if best is None:
             self.pair_block_note([ob])
             return False
         self.pair_blocks.clear()
         last, first, second, r2 = best
+        if r2 is None:  # the partner is a held car: take it out of the hold, nothing to withdraw
+            for x in (first, second):
+                self.held.pop(x.order["id"], None)
+            self.say("V5_PAIR2", f"{rec.id}+held {first.order['id']}+{second.order['id']} last={last} sat {self.now - rec.posted_at} min")
+            if self.fee1_gig(rec):
+                self.fee1.close(rec, False, self.now)
+            self.withdraw(rec.id)
+            self.post_bundle(first, second, last, why="pair2")
+            return True
         self.say("V5_PAIR2", f"{rec.id}+{r2.id} {first.order['id']}+{second.order['id']} last={last} sat {self.now - rec.posted_at}"
                              f"+{self.now - r2.posted_at} min")
         for r in (rec, r2):

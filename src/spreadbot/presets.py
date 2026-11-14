@@ -373,3 +373,5 @@ PRESETS["v5La-P2"] = PRESETS["v5La"] + ["v5_pair2=true", "v5_pair2_hub=80", "v5_
 # P2 on the stack base v5S (LEAD 23:20): Franco's second-attempt cap. v5S already ranks pairs by their end (pair_end) and keeps long chains
 # out of empty towns; P2 adds the pair at the re-pick into a hub end (nd30 >= 80, >= 6 h left) at 0.94x the two typical fees.
 PRESETS["v5S-P2"] = PRESETS["v5S"] + ["v5_pair2=true", "v5_pair2_hub=80", "v5_pair2_fee=0.94"]
+# v5La-P2 fired 1.6x/wk of ~70 re-picks (-36, se 84: nothing to measure). P2w: hub nd30 >= 40 and held cars as partners too.
+PRESETS["v5S-P2w"] = PRESETS["v5S"] + ["v5_pair2=true", "v5_pair2_hub=40", "v5_pair2_fee=0.94", "v5_pair2_held=true"]
