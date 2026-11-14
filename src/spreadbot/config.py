@@ -237,6 +237,7 @@ class Config:
     fee1_desert_floor: float = 1.05    # desert deliveries (desert_n) never below this (the tail guard of d-feerd)
     fee1_long: tuple = ()              # (drive min, floor): long cars never below this fee. k-f1h WAR: cheaper long gigs got warned, long_warn
                                        # then declined long cars 38-40x/wk vs 27 (the highest-margin cars, EUR 63-77 each; -8.7 won/wk) (() = off)
+    fee1_long_ladder: bool = False     # long cars (fee1_long[0]) are not fee1 cars at all: the opening + ladder as before
     fee1_last_call: int = 0            # minutes before our alarm: a fee1 car still unbooked gets one more new post at a safe fee (0 = off)
     fee1_harm: float = 1.0             # weight of the harm a fee above the going fee does to our other waiting gigs (0 = off; Halal: -EUR 2,967/wk without)
     fee1_rel_share: float = 0.15       # share of a fee's pull that comes from our own other gigs: PROBE measured ~0.1-0.3 (DRIVERS.md: +10% on our

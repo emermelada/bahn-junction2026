@@ -194,3 +194,5 @@ PRESETS["k-f1h5f"] = PRESETS["k-f1h5"] + ["quote_cost_floor=true"]  # MARKET: qu
 # fee1 v6: sigma 0.30 (v5's bottom fees booked less than predicted) + a censored week-offset likelihood (night/alarm misses count
 # by their exposure; v5's offset sat at -0.02..-0.06 while first posts missed more than predicted).
 PRESETS["k-f1h6"] = PRESETS["k-f1h5f"] + ["fee1_sigma=0.30"]  # on MARKET's quote floor
+# fee1 v7: long cars (>= 4 h) leave fee1 for the old ladder (k-f1h5's worst weeks lost 11-28 orders to +12..+83 long_warn declines).
+PRESETS["k-f1h7"] = PRESETS["k-f1h6"] + ["fee1_long_ladder=true"]
