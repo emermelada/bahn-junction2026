@@ -201,3 +201,5 @@ PRESETS["v5a"] = PRESETS["k-f1h5f"] + ["long_warn_distinct=true", "fee1_long=(24
 # V5 FLEET (research/re/v5/FLEET_BUILD.md). v5f1: fee1 cars with >= 8 h lead open at a flat 0.90 (floors kept), the one re-pick
 # posts at 1.03 (a 0.90 opening ends at 0.945x over all attempts vs 0.80 picks' 0.91x after 1.6-1.7 gigs/car; openings2.py).
 PRESETS["v5f1"] = PRESETS["v5a"] + ["v5_open=(8,0.9)", "v5_repost=1.03"]
+# v5f2: + at the re-pick, pair the sitting car with another open unbooked single of ours (one driver, two cars, bundle_mult).
+PRESETS["v5f2"] = PRESETS["v5f1"] + ["v5_pair2=true"]
