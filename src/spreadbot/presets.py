@@ -56,3 +56,8 @@ PRESETS["c3gf"] = PRESETS["c3g"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))"]
 PRESETS["c3gf2"] = PRESETS["c3g"] + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92))"]  # deeper: drivers near the delivery skip the dear trip home
 PRESETS["c3ge"] = PRESETS["c3g"] + ["bundle_empty_end=(240,11)"]  # no long pairs ending where nobody lives
 PRESETS["c3go"] = PRESETS["c3g"] + ["offer_home_n=3"]  # offers to drivers who live near the delivery
+# re-drivers names (the short ones above are removed once their running tests end): d- prefix avoids clashes with re-market.
+PRESETS["d-fee"] = PRESETS["c3gf"]
+PRESETS["d-fee2"] = PRESETS["c3gf2"]
+PRESETS["d-pair"] = PRESETS["c3ge"]
+PRESETS["d-offer"] = PRESETS["c3go"]
