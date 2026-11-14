@@ -358,3 +358,7 @@ PRESETS["v5Lfl10"] = PRESETS["v5Lf45"] + ["late_barrier_free_load=0.10"]
 # posted again as a NEW gig at the same fee (fresh notifications: ~10 views vs ~1 for a raise), pairing tried first on that second attempt;
 # no raise before the rescue (last call + alarm unchanged). On v5La.
 PRESETS["v5o"] = PRESETS["v5La"] + ["v5_open=(8,0.88)", "v5_repost=0.88", "fee1_repick=30", "v5_pair2=true"]
+# LEAD fast-track stack (Sat 23:05): v5La + MARKET/ARCHIVE climbing pair fee (pc1) + V5 end-at-hub pairing (h2).
+# 42 non-holdout weeks vs v5La: +408 (se 181), 42/42 ranked, worst 0.921 (research/re/LOG.md 23:05; v1-stack/data/runs/stkB).
+# Out (measured vs v5La): B2 rescue cap ~0, lw5z2 ~+39, dc8 -34, v5o -222, v5Lf02 -273; v5La+pc1+B2+lw5z2 left fresh-20 at 0.889.
+PRESETS["v5S"] = PRESETS["v5La"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0.80))", "pair_end=(2.0,0)", "pair_long_empty=(240,10)"]
