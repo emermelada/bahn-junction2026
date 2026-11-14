@@ -1080,6 +1080,18 @@ class Desk:
                 x.first_post_at = self.now
         self.say("BUNDLE", first.order["id"] + "+" + second.order["id"] + f" {why} last={last} fee0={sched[0]['feeCents']}")
 
+    def chain_drive(self, rec: GigRec) -> int:
+        """Road minutes along a gig's stops."""
+        total, prev = 0, None
+        for st in rec.stops:
+            here = self.stop_place(st)
+            if here is None:
+                continue
+            if prev is not None:
+                total += self.geo.drive(prev, here)
+            prev = here
+        return total
+
     def unbundle(self, rec: GigRec, why: str) -> None:
         self.say("UNBUNDLE", f"{rec.id} {why}")
         oids = sorted({o for o, _ in rec.legs})
@@ -1560,6 +1572,11 @@ class Desk:
                         self.unbundle(rec, "timeout")
                     elif self.cfg.repair_split and rec.repair and self.now - rec.posted_at >= self.cfg.repair_split:
                         self.unbundle(rec, "repair-split")  # the pair did not catch a driver fast: the cars go back alone
+                    elif self.cfg.long_split and self.now - rec.posted_at >= self.cfg.long_split[1] and                             self.chain_drive(rec) >= self.cfg.long_split[0]:
+                        # A long pair unbooked this long rarely books (32%): withdraw it; the next tick posts the cars alone
+                        # (posting in the same flush as the withdraw would race a restart's rejoin).
+                        self.say("UNBUNDLE", f"{rec.id} long-split")
+                        self.withdraw(rec.id)
         if self.cfg.relook_minutes:
             self.relook()
         if self.cfg.offer_home_n:
