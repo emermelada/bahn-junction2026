@@ -127,7 +127,10 @@ class Market:
                 key = (other, day)
                 self.place_shift[key] = min(0.45, max(-0.3, self.place_shift.get(key, 0.0) + self.cfg.place_lr * w * k * g))
         self.mu = min(max(self.mu, 0.95), 1.9)
-        self.day_shift[day] = min(max(self.day_shift[day], -0.4), 0.4)
+        # war_floor: a price war cuts the competitor to ~0.8x its level (research/BOARD_GAP.md); the learner overshoots
+        # to 0.93-0.99x list, so clamp today's shift at -(1 - war_floor) x the world level instead of -0.4.
+        lo = -(1 - self.cfg.war_floor) * self.mu if self.cfg.war_floor else -0.4
+        self.day_shift[day] = min(max(self.day_shift[day], max(-0.4, lo)), 0.4)
         self.dealer_shift[dealer] = min(max(self.dealer_shift[dealer], -0.3), 0.3)
         self.n_obs += 1
         self.day_obs[day].append(won)
@@ -137,6 +140,8 @@ class Market:
         cfg = self.cfg
         best, best_ev = 0.0, 0.0
         r = cfg.min_ratio
+        if cfg.war_min_ratio and self.day_shift[day] < -cfg.war_shift:
+            r = cfg.war_min_ratio  # war day: the competitor is near list, a quote just under list still clears our cost
         while r <= cfg.max_ratio + 1e-9:
             price = list_cents * r * tf
             ev = self.p_win(r, dealer, day, place, lane) * (price * (1 - risk_frac) - cost - shadow)
