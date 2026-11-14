@@ -269,3 +269,7 @@ PRESETS["v5Lf02"] = PRESETS["v5La"] + ["late_barrier_free=0.02"]   # only the sa
 # a crowded day (fresh-20 Thursday) still charges every car.
 PRESETS["v5Lfl"] = PRESETS["v5Lf45"] + ["late_barrier_free_load=0.07"]
 PRESETS["v5Lfl10"] = PRESETS["v5Lf45"] + ["late_barrier_free_load=0.10"]
+# v5o (Franco 22:35, instance_directives.txt V5.1): every single with >= 8 h lead opens at 0.88x; unbooked after 30 min it is withdrawn and
+# posted again as a NEW gig at the same fee (fresh notifications: ~10 views vs ~1 for a raise), pairing tried first on that second attempt;
+# no raise before the rescue (last call + alarm unchanged). On v5La.
+PRESETS["v5o"] = PRESETS["v5La"] + ["v5_open=(8,0.88)", "v5_repost=0.88", "fee1_repick=30", "v5_pair2=true"]
