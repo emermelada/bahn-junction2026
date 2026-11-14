@@ -378,3 +378,6 @@ PRESETS["v5S-P2w"] = PRESETS["v5S"] + ["v5_pair2=true", "v5_pair2_hub=40", "v5_p
 # Franco 23:15 update: P2 adds no discount of its own; the second-attempt hub pair just takes v5S's pair pricing (climb 0.68 -> 0.80, then
 # 0.84) instead of the lone re-pick's ~1.03x. P2w (flat 0.94x) was +139 (se 96) vs v5S, 35/35, firing 2-6x/wk.
 PRESETS["v5S-P2s"] = PRESETS["v5S"] + ["v5_pair2=true", "v5_pair2_hub=40", "v5_pair2_held=true"]
+# ARCHIVE's autopsy of v5S (c_single_autopsy.out): re-posts with >= 24 h to the deadline cost EUR 776/wk over typical (re-pick 1.15x,
+# drop 1.22x). Cap them at max(1.0, previous fee) while >= 24 h remain; the climb (and the alarm) only inside 24 h.
+PRESETS["v5S-RC"] = PRESETS["v5S"] + ["fee1_repost_cap=24"]

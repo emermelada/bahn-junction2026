@@ -92,6 +92,16 @@ class Fee1:
                     ids.append(gid)
         return near
 
+    def prev_fee(self, oid: str, legs: list[int], base: float) -> Optional[float]:
+        """First fee (x typical) of the latest earlier single gig of these legs, or None for a first post."""
+        best = None
+        for gid in sorted(self.desk.gigs):
+            rec = self.desk.gigs[gid]
+            if {o for o, _ in rec.legs} == {oid} and any(l in legs for _, l in rec.legs) and rec.posted_at < self.desk.now:
+                if best is None or rec.posted_at > best.posted_at:
+                    best = rec
+        return None if best is None else best.schedule[0]["feeCents"] / max(1.0, base)
+
     def posts(self, oid: str, legs: list[int]) -> int:
         """Single-order gigs we posted for these legs of the order (the re-pick cap counts them; restart-proof)."""
         n = 0
@@ -172,6 +182,14 @@ class Fee1:
             return None  # narrow fee1: only cars with time and drivers near the delivery (where its cheap fees are); the rest keep the ladder
         floor = self.floor(ob, legs, desert)
         grid = [m for m in cfg.fee1_grid if m >= floor] or [max(cfg.fee1_grid)]
+        if cfg.fee1_repost_cap and last - d.now >= cfg.fee1_repost_cap * 60:
+            prev = self.prev_fee(ob.order["id"], legs, base)
+            if prev is not None:
+                # A re-post (re-pick or after a drop) with >= fee1_repost_cap hours left pays at most max(1.0, its previous fee): the
+                # fresh post's view burst does the work, the climb starts inside that window (ARCHIVE c_single_autopsy: re-posts with
+                # >= 24 h left paid 1.15x (re-pick) and 1.22x (drop), EUR 776/wk over typical; RoutePulse: drop floor last fee x 1.03).
+                cap = max(1.0, prev)
+                grid = [m for m in grid if m <= cap + 1e-9] or [min(grid)]
         mu1 = self.mu(ob, legs, d.now) + self.delta
         # A car that sat unbooked at fee m0: its residual is above (ln m0 - mu0) / sigma, it books now only above that
         miss = self.prior_miss(oid, legs, d.now)
