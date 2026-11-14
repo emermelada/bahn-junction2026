@@ -1,6 +1,6 @@
 """One queue for all practice runs of this worktree, so we never hold more than --par worlds at once.
 
-  python lab/build/queue.py --par 3          # reads data/queue.txt again before every launch
+  python lab/build/runq.py --par 3          # reads data/queue.txt again before every launch
 
 data/queue.txt, one job per line:  priority | tag | preset | k=v k=v ... | seeds
 Lower priority first; within a priority, seed by seed across jobs (so arms stay paired while they run).

@@ -22,6 +22,8 @@ class Config:
     max_ratio: float = 1.80
     shadow_cents: int = 0              # opportunity cost of one car of driver capacity
     min_ev_cents: int = 200            # expected margin below this is not worth a driver
+    pl_cal: tuple = ()                 # ((drive minutes under, factor), ...): scale the quoted P(late) in the risk price by drive time.
+                                       # 20,551 won orders of the c1/c3/c4/y4 runs: late/quoted = 0.55 (<1 h), 0.30-0.36 (1-4 h), 0.47 (4-6 h), 1.57 (>6 h)
     late_cost_frac: float = 2.0        # rc3: a late car costs refund + trust + gate risk; 2.0 with load 0.07 = y4, +24% over rc2 on 5 fresh weeks, 5/5 ranked
     drive_cost: bool = False           # expected fee by drive time (table in desk.py), not one average
     cost_prior: float = 1.15           # expected fee over typical fee with fee_plan (research: 0.9 books 64% in time)

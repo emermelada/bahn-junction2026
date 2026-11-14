@@ -472,7 +472,7 @@ class Desk:
             load = self.due_load(self.deadline_day(r, opt))
             per_car = cfg.load_flat_cents if cfg.load_flat_cents else r["referenceFeeCents"]
             load_cost = cfg.load_slope * per_car * max(0.0, load - cfg.load_free * self.capacity_factor()) / 0.05
-            risk_frac = (1 - p_ok) * cfg.late_cost_frac
+            risk_frac = (1 - p_ok) * cfg.late_cost_frac * self.pl_factor(drive)
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain) + cfg.trust_loss_w * (1 - p_ok) * t_loss
             # Under the on-time target, a safe car is worth more than its margin: it dilutes the late ones.
@@ -508,6 +508,14 @@ class Desk:
         if not prices:
             return decline_prices(r), f"DECLINE {head} {' '.join(info)}"
         return prices, f"{head} {' '.join(info)}"
+
+    def pl_factor(self, drive: int) -> float:
+        """Calibration of the on-time model by drive time (pl_cal): it over-predicts lateness of 1-6 h drives and
+        under-predicts it beyond 6 h (lab/build/fit_late.py)."""
+        for limit, f in self.cfg.pl_cal:
+            if drive < limit:
+                return f
+        return 1.0
 
     def deadline_day(self, r: dict, opt: dict) -> int:
         d = opt["deadline"]
