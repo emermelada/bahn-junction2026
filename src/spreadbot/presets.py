@@ -48,3 +48,5 @@ PRESETS["best"] = PRESETS["c1"]  # the current best version (team objective: raw
 PRESETS["c3bp"] = PRESETS["c3"] + ["repair_pairs=true", "repair_lead=180", "repair_mult=0.85", "repair_split=60"]
 PRESETS["c3rl"] = PRESETS["c3"] + ["relook_minutes=360"]
 PRESETS["c3bprl"] = PRESETS["c3bp"] + ["relook_minutes=360"]
+# The lateness model from all our weeks (late_gbm.py, AUC 0.897 vs 0.737) in place of the logistic: the main line since Sat 14 Nov.
+PRESETS["c3g"] = PRESETS["c3"] + ["ontime_model=gbm"]
