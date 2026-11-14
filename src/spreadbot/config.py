@@ -155,6 +155,10 @@ class Config:
                                        # min(1, quad_w x excess^2) x (EUR 5.20 + 1.35/road h + 0.24 x typical), and the day's free load
                                        # x clamp(1 - health_w x min(1.4, excess), health_min, 1). On 15:00 W3 RoutePulse halved its Tuesday
                                        # intake (55 vs ~78 ours) and made 14.1k vs our 6.3k (research/re/archive/R2_BADWEEKS.md 5.1). () = off
+    late_barrier_free: float = 0.0     # P(late) a car may have without paying the late barrier (0 = every car pays its P(late)):
+                                       # safe cars dilute the week's late share, so charging them shuts a behind-target week (dev-05)
+    late_barrier_free_load: float = 0.0  # the free share only for deadline days below this load (0 = every day): fresh-20 under the free
+                                       # share won 102 cars Wed, its Thursday held 110 cars and 31 went late (per-car P(late) misses congestion)
     late_barrier: tuple = ()           # (target, eur, grip, calm): Halal's late price (fleet.py:287-295@1ece2d5). Each quote's cost gets
                                        # P(late) x eur x min(2, used)^grip, used = expected late / (calm + orders) / (1 - target): a week
                                        # running short of on-time sells fewer, safer cars from Monday instead of buying on-time back at 2-4x

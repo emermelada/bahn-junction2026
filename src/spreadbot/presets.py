@@ -346,3 +346,15 @@ PRESETS["v5La95"] = PRESETS["v5aV2"] + ["late_barrier=(0.95,300,4,20)"]
 PRESETS["v5h1"] = PRESETS["v5La"] + ["pair_end=(2.0,0)"]
 PRESETS["v5h2"] = PRESETS["v5h1"] + ["pair_long_empty=(240,10)"]  # + R2: no chain > 4 h of road into an end with nd30 <= 10 (18.5% warned)
 PRESETS["v5h3"] = PRESETS["v5La"] + ["pair_long_empty=(240,10)"]  # R2 alone
+# v5Lf: v5La with the late barrier charging only lateness above the free share (dev-05: Monday cars 10/105 late -> proj 0.90 -> barrier
+# EUR 2-3.9k per late car on every car -> 0 orders Tue-Fri, EUR 1,449 @0.907 vs the release 273 orders @0.956, EUR 3,435).
+PRESETS["v5Lf45"] = PRESETS["v5La"] + ["late_barrier_free=0.045"]  # = 1 - target: cars at least as safe as the target pay nothing
+PRESETS["v5Lf02"] = PRESETS["v5La"] + ["late_barrier_free=0.02"]   # only the safest cars (p_ok >= 0.98) pay nothing
+# v5Lfl: the free share only on deadline days below the release's free load (0.07): light weeks like dev-05 keep selling safe cars,
+# a crowded day (fresh-20 Thursday) still charges every car.
+PRESETS["v5Lfl"] = PRESETS["v5Lf45"] + ["late_barrier_free_load=0.07"]
+PRESETS["v5Lfl10"] = PRESETS["v5Lf45"] + ["late_barrier_free_load=0.10"]
+# v5o (Franco 22:35, instance_directives.txt V5.1): every single with >= 8 h lead opens at 0.88x; unbooked after 30 min it is withdrawn and
+# posted again as a NEW gig at the same fee (fresh notifications: ~10 views vs ~1 for a raise), pairing tried first on that second attempt;
+# no raise before the rescue (last call + alarm unchanged). On v5La.
+PRESETS["v5o"] = PRESETS["v5La"] + ["v5_open=(8,0.88)", "v5_repost=0.88", "fee1_repick=30", "v5_pair2=true"]

@@ -602,7 +602,10 @@ class Desk:
                     short = cost * (cfg.short_fee[2] - 1)  # a long car won at short notice pays well over the usual fee
                     info.append(f"sfee={kind}/{lead_h:.1f}h")
             load_cost += short
-            load_cost += (1 - p_ok) * barrier  # late_barrier: what this car's lateness risk costs the week's on-time share
+            # late_barrier: what this car's lateness risk costs the week's on-time share. late_barrier_free: a car at most this likely
+            # to be late pays nothing (it dilutes the late ones: dev-05, v5La's barrier charged safe cars too and won 0 orders Tue-Fri).
+            free_late = cfg.late_barrier_free if not (cfg.late_barrier_free_load and load >= cfg.late_barrier_free_load) else 0.0
+            load_cost += max(0.0, 1 - p_ok - free_late) * barrier  # (a crowded deadline day: no free share, its safe cars go late too)
             load_cost += brake * (520 + 135 * drive / 60 + 0.24 * r["referenceFeeCents"])  # backlog_brake (RoutePulse's unit, cents)
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain) + cfg.trust_loss_w * (1 - p_ok) * t_loss
