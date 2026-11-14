@@ -17,3 +17,7 @@
 - The missed weeks (about 1 in 24) are weeks with a deep driver shortage where late orders pile up in small towns or after a burst of early wins; no early signal we tried (booking speed, warnings, town trouble) flags them in time.
 
 **For the human.** Ranking round at 09:00: `git pull && for i in (seq 5); while not make board; sleep 20; end; end`. Test final at 14:00: `make final` in its own terminal, on the machine that will run the final.
+
+## After the summary
+
+- Drop raise (`driver.drop_raise` 1.4: a gig given back by a driver, or after a no-show, with under 12 h to its last pickup is repriced to 1.4x at once): rc7-rc9 ranked 35 vs 35, +€93 mean, 18/36 up, worst three weeks €114 / €1,627 / €3,037 against -€345 / €1,627 / €2,503. rc10: 11/12 vs 11/12, -€38 mean, worst week €1,295 against €1,399. Noise; not adopted.
