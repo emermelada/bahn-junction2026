@@ -157,3 +157,6 @@ PRESETS["m13mc"] = PRESETS["k-safe"] + ["quote_move_cost=true"]
 PRESETS["m14safe"] = PRESETS["k-safe"] + ["safe_load_p=0.97"]
 # re-market: safe cars priced at their measured cost (fee 1.00x typical, late cost 0.25) and no second load charge, on k-safe.
 PRESETS["m15safe"] = PRESETS["k-safe"] + ["safe_load_p=0.97", "safe_cost=(0.97,1.0,0.25)"]
+# re-market: split arms: safe-car cost alone; safe-car load waiver only under day load 0.12.
+PRESETS["m16scost"] = PRESETS["k-safe"] + ["safe_cost=(0.97,1.0,0.25)"]
+PRESETS["m17sload"] = PRESETS["k-safe"] + ["safe_load_p=0.97", "safe_load_max=0.12"]

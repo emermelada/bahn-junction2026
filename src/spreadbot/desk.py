@@ -514,7 +514,7 @@ class Desk:
                 # Few drivers live near the delivery: an extra car there takes one of the few drivers our other cars need.
                 free, slope = cfg.load_free, cfg.load_desert_slope
             load_cost = slope * per_car * max(0.0, load - free * self.capacity_factor()) / 0.05
-            if cfg.safe_load_p and p_ok >= cfg.safe_load_p and cfg.ontime_model == "gbm":
+            if cfg.safe_load_p and p_ok >= cfg.safe_load_p and cfg.ontime_model == "gbm" and load < cfg.safe_load_max:
                 load_cost = 0.0  # the trees already price this day's load (due_load) into P(late): a car they call safe pays no second load charge
             risk_frac = (1 - p_ok) * cfg.late_cost_frac * self.pl_factor(drive)
             c_safe = cost
