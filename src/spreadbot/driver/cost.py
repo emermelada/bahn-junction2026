@@ -44,6 +44,10 @@ def unserviceable(request: PriceRequest, option: DeliveryOption, state: State) -
         cap = FLAGS["cars_per_driver_day"]
         if cap and won_cars(state, town, day) + 1 > cap * near:
             why.append("town_full")
+    batch = request["batchId"]
+    if FLAGS["max_per_batch"] and batch and sum(1 for o in state.orders.values() if o["status"] != "cancelled"
+                                                and state.requests[o["id"]]["batchId"] == batch) >= FLAGS["max_per_batch"]:
+        why.append("batch_full")
     if FLAGS["skip_trade_in"] and len(request["legs"]) == 2:
         why.append("trade_in")
     if FLAGS["skip_private"] and any(leg["pickup"]["privateAddress"] or leg["delivery"]["privateAddress"] for leg in request["legs"]):
