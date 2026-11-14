@@ -240,6 +240,31 @@ export class V2Desk implements Desk {
         }
       }
     }
+    if (this.cfg.flags.bundles && this.cfg.bundles.chain && (this.cfg.bundles.sweepMinAge ?? 0) > 0) this.sweepBundles()
+  }
+
+  /** Pairs single-car gigs that stayed unbooked for sweepMinAge minutes: drivers passed on each alone at its fee;
+   * as a chain (one trip out, one trip home) the pair pays a driver. At most one pairing per order per sweep. */
+  sweepBundles(): void {
+    const B = this.cfg.bundles
+    const used = new Set<string>()
+    for (const [gigId, action] of [...this.posts]) {
+      if (this.booked.has(gigId) || this.bundleGigs.has(gigId) || this.doomedGigs.has(gigId)) continue
+      if (action.stops.length !== 2 || action.stops.some((st) => st.window || st.withPlates)) continue
+      const id = action.stops[0]!.orderId
+      if (used.has(id) || this.legGigs.get(id)?.get(0) !== gigId) continue
+      const order = this.orders.get(id)
+      if (!order || order.legs.length !== 1 || this.urgent.has(id)) continue
+      const posted = this.books.gigs.get(gigId)?.postedAt ?? this.now
+      if (this.now - posted < B.sweepMinAge! || order.lastPickupAt - this.now < this.cfg.fees.rescue.warnMinBefore + 60) continue
+      const before = this.outbox.length
+      if (!this.tryBundle(order, gigId)) continue
+      // tryBundle withdrew the partner and queued the bundle; take this car's own gig off the app too.
+      this.legGigs.get(id)?.delete(0)
+      this.outbox.splice(before, 0, { type: "withdraw", gigId })
+      used.add(id)
+      for (const a of this.outbox.slice(before)) if (a.type === "post") for (const st of a.stops) used.add(st.orderId)
+    }
   }
 
   drain(): Action[] {
@@ -443,7 +468,7 @@ export class V2Desk implements Desk {
 
   /** 6.8 out-and-back bundle: the new car A->B with an open single car B'->A' already posted (B' near B, A' near A),
    * or the other way round, when one driver can do both on time within maxDriveMin. Fee = (both opening fees) x feeMult. */
-  tryBundle(order: Order): boolean {
+  tryBundle(order: Order, exclude?: string): boolean {
     if (this.urgent.has(order.id) || this.now >= order.lastPickupAt) return false
     const B = this.cfg.bundles
     const note = this.requests.get(order.id)?.note ?? null
@@ -452,7 +477,7 @@ export class V2Desk implements Desk {
     const a = order.legs[0]!
     let best: { gigId: string; partner: Order; first: Order; second: Order; drive: number } | null = null
     for (const [gigId, action] of this.posts) {
-      if (this.booked.has(gigId) || this.bundleGigs.has(gigId) || this.doomedGigs.has(gigId)) continue
+      if (gigId === exclude || this.booked.has(gigId) || this.bundleGigs.has(gigId) || this.doomedGigs.has(gigId)) continue
       if (action.stops.length !== 2 || action.stops.some((st) => st.window || st.withPlates)) continue
       const pid = action.stops[0]!.orderId
       if (pid === order.id || this.legGigs.get(pid)?.get(0) !== gigId) continue
