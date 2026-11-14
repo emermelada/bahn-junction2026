@@ -19,7 +19,7 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "harness"))
 from sweep import seeds_of  # noqa: E402
 
-BLACKOUT = [(12 * 60 + 20, 14 * 60 + 50), (18 * 60 + 20, 19 * 60 + 50)]  # laptop clock = Helsinki - 1 h
+BLACKOUT = [(12 * 60 + 20, 13 * 60 + 50), (18 * 60 + 20, 19 * 60 + 50)]  # laptop clock = Helsinki - 1 h
 
 
 def blocked() -> bool:
