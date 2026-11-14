@@ -203,6 +203,36 @@ class Market:
             r += 0.01
         return best, best_ev
 
+    def speed_offset(self, kind: str) -> int:
+        """The dealer's euros for speed below same_day: what a slower option's threshold lacks."""
+        a, b = self.cfg.speed_cents
+        return {"same_day": 0, "next_day": a}.get(kind, a + b)
+
+    def best_menu(self, dealer: str, day: int, list_fast: int, tf: float, cost: float, cands: list, place: str = "", lane: str = "") -> tuple[dict, float]:
+        """Menu pricing: the dealer compares options by price + speed offset, so P(win) follows the lowest such price.
+        Search that effective price; at each, the option with the best margin sets it; the others get the same margin."""
+        cfg = self.cfg
+        s0 = min(c[2] for c in cands)
+        best, best_ev, best_m = None, 0.0, 0.0
+        r = cfg.min_ratio
+        while r <= cfg.max_ratio + 1e-9:
+            eff = list_fast * r * tf
+            m = max(((eff - (s - s0) * tf) * (1 - risk) - cost - extra for _, lst, s, risk, extra in cands if eff - (s - s0) * tf >= lst * cfg.min_ratio * tf), default=None)
+            if m is not None:
+                ev = self.p_win(r, dealer, day, place, lane) * m
+                if ev > best_ev:
+                    best, best_ev, best_m = r, ev, m
+            r += 0.01
+        if best is None:
+            return {}, 0.0
+        prices = {}
+        for kind, lst, s, risk, extra in cands:
+            p = (best_m + cost + extra) / (1 - risk)
+            p = max(p, list_fast * best * tf - (s - s0) * tf, lst * cfg.min_ratio * tf)
+            if p <= lst * cfg.max_ratio * tf:
+                prices[kind] = int(round(p))
+        return prices, best_ev
+
 
 class Governor:
     """Projected on-time share = (orders on time + open orders weighted by their on-time chance) / orders.

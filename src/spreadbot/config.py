@@ -26,6 +26,9 @@ class Config:
     dealer_lr: float = 0.006           # per dealer: the competitor cuts where we win most
     min_ratio: float = 1.00            # never quote under list
     max_ratio: float = 1.80
+    menu: bool = False                 # one price in fastest-option euros, slower options cheaper by the dealer's speed value, every option
+                                       # at the same margin (dealer buys max(threshold - price); Halal: next = same - €14.5, 3 days = next - €6.1)
+    speed_cents: tuple = (1450, 610)   # the dealer's euros for same->next day and next->within 3 days (Halal's medians)
     shadow_cents: int = 0              # opportunity cost of one car of driver capacity
     min_ev_cents: int = 200            # expected margin below this is not worth a driver
     pl_cal: tuple = ()                 # ((drive minutes under, factor), ...): scale the quoted P(late) in the risk price by drive time.

@@ -50,3 +50,5 @@ PRESETS["c3rl"] = PRESETS["c3"] + ["relook_minutes=360"]
 PRESETS["c3bprl"] = PRESETS["c3bp"] + ["relook_minutes=360"]
 # The lateness model from all our weeks (late_gbm.py, AUC 0.897 vs 0.737) in place of the logistic: the main line since Sat 14 Nov.
 PRESETS["c3g"] = PRESETS["c3"] + ["ontime_model=gbm"]
+# re-market: menu pricing (one effective price, slower options cheaper by the dealer's speed value, every option at one margin).
+PRESETS["c3gm"] = PRESETS["c3g"] + ["menu=true"]

@@ -213,6 +213,11 @@ class Desk:
         if self.cfg.learn_fastest and not (fastest["kind"] in q and q[fastest["kind"]] < 3 * fastest["listPriceCents"]):
             return  # a loss here says the dealer wanted speed, not that our price was high
         ratios = [q[o["kind"]] / o["listPriceCents"] for o in r["options"] if o["kind"] in q and q[o["kind"]] < 3 * o["listPriceCents"]]
+        if self.cfg.menu and ratios:
+            # Menu pricing learns the lowest price + speed offset, in units of the fastest option's list.
+            s0 = self.market.speed_offset(fastest["kind"])
+            ratios = [min((q[o["kind"]] + (self.market.speed_offset(o["kind"]) - s0) * self.trust_factor(r["dealerId"])) / fastest["listPriceCents"]
+                          for o in r["options"] if o["kind"] in q and q[o["kind"]] < 3 * o["listPriceCents"])]
         if ratios:
             self.market.observe(at, r["dealerId"], min(ratios) / self.trust_factor(r["dealerId"]), won, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             self.n_quoted_outcomes += 1
@@ -463,6 +468,7 @@ class Desk:
         prices: dict = {}
         meta: dict = {}
         info = []
+        cands: list = []
         for opt in r["options"]:
             kind = opt["kind"]
             if kind not in cfg.quote_options:
@@ -486,6 +492,11 @@ class Desk:
             # Under the on-time target, a safe car is worth more than its margin: it dilutes the late ones.
             if gate and p_ok >= cfg.gate_safe_p:
                 trust_adj -= gate
+            if cfg.menu:
+                cands.append((kind, opt["listPriceCents"], self.market.speed_offset(kind), risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost))
+                meta[kind] = p_ok
+                info.append(f"{kind}:p={p_ok:.2f},L={load:.3f}")
+                continue
             ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, cost, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 info.append(f"{kind}:noev")
@@ -502,6 +513,16 @@ class Desk:
             prices[kind] = int(round(opt["listPriceCents"] * ratio * tf))
             meta[kind] = p_ok
             info.append(f"{kind}:r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f},L={load:.3f}")
+        if cfg.menu and cands:
+            place = r["legs"][0]["pickup"]["placeId"]
+            fast = r["options"][0]
+            prices, ev = self.market.best_menu(dealer, day, fast["listPriceCents"], tf, cost, cands, place, lane_of(r))
+            if ev < cfg.min_ev_cents:
+                prices = {}
+                info.append("menu:noev")
+            else:
+                info.append(f"menu:ev={ev/100:.0f} " + ",".join(f"{k}={v/next(o['listPriceCents'] for o in r['options'] if o['kind'] == k):.2f}" for k, v in prices.items()))
+            meta = {k: v for k, v in meta.items() if k in prices}
         if cfg.steer and "same_day" in prices and "next_day" in prices:
             # Steer dealers to next_day: it pays more per car, can wait for the evening release and pair, and a
             # pickup the day before the deadline costs less than one on the deadline day.
