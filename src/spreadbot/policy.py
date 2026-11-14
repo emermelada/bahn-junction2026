@@ -76,6 +76,22 @@ class OnTime:
         return sigmoid(z + self.desk.cfg.ontime_shift), f["slack"]
 
 
+_LANES: dict = {}
+
+
+def lane_shift(lane: str) -> float:
+    """The competitor's lane factor that holds in every world (RULES), as a shift of the ratio that wins as often.
+    Fitted by Javier on 303,778 quotes over 443 level 8 weeks (lanes.json, from main: lab/a/lane_table.py)."""
+    if not lane:
+        return 0.0
+    if not _LANES:
+        import json
+        import os
+        with open(os.path.join(os.path.dirname(__file__), "lanes.json"), encoding="utf-8") as f:
+            _LANES.update(json.load(f)["shift"])
+    return max(-0.35, min(0.35, _LANES.get(lane, 0.0)))
+
+
 class Market:
     def __init__(self, desk: "Desk"):
         self.desk, self.cfg = desk, desk.cfg
@@ -86,15 +102,16 @@ class Market:
         self.n_obs = 0
         self.day_obs: dict[int, list[bool]] = defaultdict(list)
 
-    def mu_for(self, dealer: str, day: int, place: str = "") -> float:
-        return self.mu + self.day_shift[day] + self.dealer_shift[dealer] + self.place_shift.get((place, day), 0.0)
+    def mu_for(self, dealer: str, day: int, place: str = "", lane: str = "") -> float:
+        return (self.mu + self.day_shift[day] + self.dealer_shift[dealer] + self.place_shift.get((place, day), 0.0)
+                + self.cfg.lane_w * lane_shift(lane))
 
-    def p_win(self, ratio_eff: float, dealer: str, day: int, place: str = "") -> float:
-        return sigmoid(self.cfg.win_slope * (self.mu_for(dealer, day, place) - ratio_eff))
+    def p_win(self, ratio_eff: float, dealer: str, day: int, place: str = "", lane: str = "") -> float:
+        return sigmoid(self.cfg.win_slope * (self.mu_for(dealer, day, place, lane) - ratio_eff))
 
-    def observe(self, at: int, dealer: str, ratio_eff: float, won: bool, place: str = "") -> None:
+    def observe(self, at: int, dealer: str, ratio_eff: float, won: bool, place: str = "", lane: str = "") -> None:
         day = at // DAY
-        g = (1.0 if won else 0.0) - self.p_win(ratio_eff, dealer, day, place)
+        g = (1.0 if won else 0.0) - self.p_win(ratio_eff, dealer, day, place, lane)
         k = self.cfg.win_slope
         war = self.cfg.war_guard and self.day_shift[day] < -self.cfg.war_shift
         if not war:
@@ -113,14 +130,14 @@ class Market:
         self.n_obs += 1
         self.day_obs[day].append(won)
 
-    def best_ratio(self, dealer: str, day: int, list_cents: int, tf: float, cost: float, risk_frac: float, shadow: float, place: str = "") -> tuple[float, float]:
+    def best_ratio(self, dealer: str, day: int, list_cents: int, tf: float, cost: float, risk_frac: float, shadow: float, place: str = "", lane: str = "") -> tuple[float, float]:
         """The ratio over list (before trust) with the best expected margin, and that margin."""
         cfg = self.cfg
         best, best_ev = 0.0, 0.0
         r = cfg.min_ratio
         while r <= cfg.max_ratio + 1e-9:
             price = list_cents * r * tf
-            ev = self.p_win(r, dealer, day, place) * (price * (1 - risk_frac) - cost - shadow)
+            ev = self.p_win(r, dealer, day, place, lane) * (price * (1 - risk_frac) - cost - shadow)
             if ev > best_ev:
                 best, best_ev = r, ev
             r += 0.01

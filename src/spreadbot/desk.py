@@ -28,6 +28,10 @@ EXPENSIVE_COEF = {"log_drive": 1.5401, "log_ref": -2.0677, "log_sup_p30": -0.033
                   "premium": 0.663, "private": 0.7154, "note": -0.0284, "load": 13.862, "tradein": -0.5628, "intercept": 10.0344}
 
 
+def lane_of(r: dict) -> str:
+    return r["legs"][0]["pickup"]["placeId"] + ">" + r["legs"][-1]["delivery"]["placeId"]
+
+
 def business_hours(a: int, b: int) -> float:
     """Request hours (Mon-Fri 08:00-18:00) between world minutes a and b."""
     total = 0
@@ -98,6 +102,7 @@ class Desk:
         self.bundle_last: dict[str, int] = {}  # order -> last minute to start its bundle
         self.morning_drops: dict[int, int] = defaultdict(int)
         self.due_count: dict[int, int] = defaultdict(int)
+        self.batch_won: dict[str, int] = defaultdict(int)
         self.need_resync = False
         self.cost_pred_sum = 0.0  # this week's bookings: the table's ratio, summed
         self.cost_paid_sum = 0.0  # and the ratio they paid
@@ -170,6 +175,8 @@ class Desk:
         if o["id"] in self.orders:
             return
         ob = OrderBook(o, e["at"])
+        if self.requests.get(o["id"], {}).get("batchId"):
+            self.batch_won[self.requests[o["id"]]["batchId"]] += 1
         if self.cfg.hot_open and o["id"] in self.requests:
             ob.p_exp = self.p_expensive(self.requests[o["id"]], o)
         self.due_count[min(self.deadline(o, l) for l in range(len(o["legs"]))) // DAY] += 1 if o["id"] in self.requests else 0
@@ -190,7 +197,7 @@ class Desk:
             return
         ratios = [q[o["kind"]] / o["listPriceCents"] for o in r["options"] if o["kind"] in q and q[o["kind"]] < 3 * o["listPriceCents"]]
         if ratios:
-            self.market.observe(at, r["dealerId"], min(ratios) / self.trust_factor(r["dealerId"]), won, r["legs"][0]["pickup"]["placeId"])
+            self.market.observe(at, r["dealerId"], min(ratios) / self.trust_factor(r["dealerId"]), won, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             self.n_quoted_outcomes += 1
             if won:
                 self.n_won_quoted += 1
@@ -401,6 +408,8 @@ class Desk:
         tf = self.trust_factor(dealer)
         day = r["respondBy"] // DAY
         bar = self.gov.bar()
+        if cfg.max_per_batch and r.get("batchId") and self.batch_won[r["batchId"]] >= cfg.max_per_batch:
+            return decline_prices(r), f"DECLINE batch {r['batchId']} full"
         if self.crunch_day == self.now // DAY:
             bar = max(bar, cfg.theta_tight)
         gate = 0.0
@@ -440,7 +449,7 @@ class Desk:
             # Under the on-time target, a safe car is worth more than its margin: it dilutes the late ones.
             if gate and p_ok >= cfg.gate_safe_p:
                 trust_adj -= gate
-            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, cost, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"])
+            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, cost, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 info.append(f"{kind}:noev")
                 continue
