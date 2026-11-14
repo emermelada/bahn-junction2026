@@ -226,3 +226,8 @@ PRESETS["k-f1h5fV2s"] = PRESETS["k-f1h5fV2"] + ["strict_warn=0.07"]
 PRESETS["k-f1h5fV2m"] = PRESETS["k-f1h5fV1"] + ["load_free=0.10", "load_slope=2"]
 # V1b: pairs count 0.6 only once a driver holds them (V2/V2m broke fresh-20: open pairs that split in a scarce week hid load).
 PRESETS["k-f1h5fV1b"] = PRESETS["k-f1h5fV1"] + ["load_bundle_booked=true"]
+# V1 + wider pairing (k-safe-kmh's: 50 km links, hold a new car 120 min for a partner; it raised pairs 0.33 -> 0.38 but earned 0 while
+# the day's load counted every car; with V1 the freed drivers can admit cars). ARCHIVE c_vol: volume makes pairs, pairs never bought volume.
+PRESETS["k-f1h5fV1p"] = PRESETS["k-f1h5fV1"] + ["bundle_km=50", "hold_minutes=120", "hold_lead=360"]
+# Coarse fee1 grid as a safety margin (Halal: a finer grid cost -624/wk, "the coarse steps act as a safety margin"; ARCHIVE suggestion).
+PRESETS["k-f1h5fG"] = PRESETS["k-f1h5f"] + ["fee1_grid=(0.85,1.0,1.15,1.3,1.5)"]
