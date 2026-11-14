@@ -46,4 +46,11 @@ Both are Python bots on the same kit. Same-week results are at the end.
 | Tests | none beyond A/B harness | unit tests, determinism check, `make check` |
 
 ## Same weeks (dev-07..18, level 8)
-Filled in from the runs in `data/jruns/` and `data/runs/`; see the table in the session report.
+
+| | Ranked | Min on-time | Median | Mean |
+|---|---|---|---|---|
+| main | 12/12 | 0.903 | 6,176 | 6,059 |
+| rc2 (v1) | 12/12 | 0.938 | 9,422 | 9,661 |
+| v1 preset `money` (m12) | 8/12 | 0.884 | 11,342 | 11,462 |
+
+rc2 earns more than main on all 12 weeks. Details: `docs/log/frank-20261114-1000-money-first.md`.
