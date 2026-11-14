@@ -42,6 +42,7 @@ class Config:
                                        # 0.65/0.4/0.6, the full parts over-react (research/re/market/PRICING.md) (() = 1/1/1)
     short_fee: tuple = ()              # (hours, drive min, mult): an option whose estimated last pickup is < hours after respondBy and drive >= min quotes the fee x mult; such cars paid 1.26x the assumed fee vs 1.00-1.10 elsewhere (research/re/market/SHORT_NOTICE.md) (() = off)
     shadow_cents: int = 0              # opportunity cost of one car of driver capacity
+    class_cost: tuple = ()             # (private pickup, private delivery) fee over the dealer-to-dealer fee in the quote: 1.072, 1.032 measured (() = off)
     min_ev_cents: int = 200            # expected margin below this is not worth a driver
     pl_cal: tuple = ()                 # ((drive minutes under, factor), ...): scale the quoted P(late) in the risk price by drive time.
                                        # 20,551 won orders of the c1/c3/c4/y4 runs: late/quoted = 0.55 (<1 h), 0.30-0.36 (1-4 h), 0.47 (4-6 h), 1.57 (>6 h)

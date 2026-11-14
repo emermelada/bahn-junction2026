@@ -499,6 +499,14 @@ class Desk:
                 # Our long cars are going unbooked this week: a new long car would wait for drivers who are not there.
                 return decline_prices(r), f"DECLINE long {drive} min: {recent} long cars warned in {cfg.long_warn[2]} min"
         cost = r["referenceFeeCents"] * (self.drive_cost_mult(drive) if cfg.drive_cost else self.cost_mult())
+        if cfg.class_cost:
+            # Drivers want more for a private address (HANDBOOK): paid 1.19x typical at a private pickup, 1.145x at a private
+            # delivery, 1.11x dealer to dealer (34 c3g weeks); the dealer's price does not carry it.
+            L0, Ln = r["legs"][0], r["legs"][-1]
+            if L0["pickup"]["privateAddress"]:
+                cost *= cfg.class_cost[0]
+            elif Ln["delivery"]["privateAddress"]:
+                cost *= cfg.class_cost[1]
         if cfg.hold_price and self.pairs_with_held(r):
             cost *= cfg.bundle_mult  # a held car for the same day starts or ends near this one: the evening release pairs them
         elif cfg.bundle_price and self.chainable(r):

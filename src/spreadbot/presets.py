@@ -180,3 +180,5 @@ PRESETS["k-safe-kmh"] = PRESETS["k-safe"] + ["bundle_km=50", "hold_minutes=120",
 # k-safe-dc + re-drivers' long_split: a pair with >= 6 h of driving still unbooked 3 h after posting goes out as singles
 # (long pairs carry 4.4 of 20.5 warned singles a week; k-safe-ls vs k-safe: +540/+220, worst 0.960/0.948 vs 0.942).
 PRESETS["k-safe-dcls"] = PRESETS["k-safe-dc"] + ["long_split=(360,180)"]
+# re-market: the quote charges private-address cars the fee drivers ask for them (1.19x / 1.145x vs 1.11x typical).
+PRESETS["m19class"] = PRESETS["k-safe-dc"] + ["class_cost=(1.072,1.032)"]
