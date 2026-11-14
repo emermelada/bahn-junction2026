@@ -155,3 +155,4 @@ PRESETS["k-safe-hold"] = PRESETS["k-safe"] + ["hold_minutes=60"]  # a new car wa
 PRESETS["k-safe-km50"] = PRESETS["k-safe"] + ["bundle_km=50"]  # pair links up to 50 km (bahn67 +2.4% on one set)
 PRESETS["k-safe-kd"] = PRESETS["k-safe"] + ["bundle_keep_drop=true"]  # a dropped pair with time left stays a pair (re-external: split pairs 5-13% late; kept 78% rebooked at 0.86x)
 PRESETS["k-safe-ls"] = PRESETS["k-safe"] + ["long_split=(360,180)"]  # long pairs unbooked 3 h after posting go out as singles
+PRESETS["k-safe-b3"] = PRESETS["k-safe"] + ["bundle3=true", "bundle3_mult=0.75"]  # three-car chains (bahn67 +370/wk; never run on c3g)
