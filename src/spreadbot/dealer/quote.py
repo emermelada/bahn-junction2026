@@ -53,7 +53,8 @@ def quote(request: PriceRequest, state: State) -> dict[str, int]:
         record_quote(state, request["id"], ratio)
     for o in request["options"]:
         cost = costs[o["kind"]]
-        price = round(o["listPriceCents"] * trust * (ratio + FLAGS["same_day_extra"] * (o["kind"] == "same_day")))
+        steer = o["kind"] == "same_day" and (not FLAGS["steer_only"] or len(request["options"]) > 1)
+        price = round(o["listPriceCents"] * trust * (ratio + FLAGS["same_day_extra"] * steer))
         floor = FLAGS["min_margin_cents"]
         if cost.serviceable and floor is not None and price - cost.fee_cents < floor and FLAGS["max_ratio"]:
             price = max(price, cost.fee_cents + floor)  # price to cost: let the dealer decide instead of declining
