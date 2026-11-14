@@ -62,3 +62,5 @@ PRESETS["d-fee2"] = PRESETS["c3gf2"]
 PRESETS["d-pair"] = PRESETS["c3ge"]
 PRESETS["d-offer"] = PRESETS["c3go"]
 PRESETS["d-feer"] = PRESETS["d-fee"] + ["relook_minutes=90", "relook_mult=1.05"]  # a low opening unbooked after 90 min goes back to 1.05 now
+# d-fee's low openings where < 40 drivers live near the delivery doubled the warned share (3.2% -> 6.7%) for 7% less fee; >= 40: flat, -11%.
+PRESETS["d-fee3"] = PRESETS["c3g"] + ["fee_open_rule=((24,40,0.92),(12,80,0.95))"]
