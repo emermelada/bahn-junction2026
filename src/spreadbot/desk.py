@@ -1521,7 +1521,7 @@ class Desk:
                 if len({o for o, _ in rec.legs}) > 1 and all(o in self.bundle_soon for o, _ in rec.legs):
                     continue  # a short-notice chain splits by its own clock (tick above)
                 alarm = self.cfg.alarm_minutes
-                if self.cfg.desert_n and ob and self.desert(self.stop_place(rec.stops[-1]) or ""):
+                if self.cfg.desert_n and ob and len({o for o, _ in rec.legs}) == 1 and self.desert(self.stop_place(rec.stops[-1]) or ""):
                     alarm = max(alarm, self.cfg.desert_alarm)  # few drivers live near this delivery: escalate while there is time
                 if ob and self.last_pickup(ob, [l for _, l in rec.legs]) - self.now < alarm:
                     ob.urgent = True
