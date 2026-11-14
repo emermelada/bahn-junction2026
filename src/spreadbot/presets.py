@@ -145,3 +145,5 @@ PRESETS["k-safe-pm"] = PRESETS["k-safe"] + ["bundle_mult=0.72"]  # pair opening 
 # Fee push (board 15:00: EUR 35.4/order vs leaders 44.9; the gap is the fee): deep openings + cheap pairs; and one more opening step at 12 h everywhere.
 PRESETS["k-safe-f2pm"] = PRESETS["k-safe-f2"] + ["bundle_mult=0.72"]
 PRESETS["k-safe-f6"] = KSAFE_BASE + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92),(12,0,0.95))"]
+# k-safe bill: singles posted 12-24 h before the last pickup (held cars released at 16:00) open at 1.05 and book in a median 3 min.
+PRESETS["k-safe-f7"] = KSAFE_BASE + ["fee_open_rule=((24,80,0.85),(12,0,0.9),(6,80,0.95))"]
