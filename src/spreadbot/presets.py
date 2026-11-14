@@ -187,3 +187,4 @@ PRESETS["k-f1"] = PRESETS["k-safe-dcl"] + ["fee1=true"]
 # prices on the same cars (the load charge binds: quoting at a 5% lower cost was -396/wk at equal orders, m25-fma).
 PRESETS["kdcl-hold"] = PRESETS["k-safe-dcl"] + ["quote_cost_hold=1.05"]
 PRESETS["k-f1h"] = PRESETS["k-f1"] + ["quote_cost_hold=1.05"]
+PRESETS["k-f1hf"] = PRESETS["k-f1h"] + ["quote_cost_floor=true"]  # the hold as a floor: a scarce week (fees above 1.05x) still raises the quote

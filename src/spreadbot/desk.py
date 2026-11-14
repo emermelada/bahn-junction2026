@@ -514,6 +514,9 @@ class Desk:
                 # Our long cars are going unbooked this week: a new long car would wait for drivers who are not there.
                 return decline_prices(r), f"DECLINE long {drive} min: {recent} long cars warned in {cfg.long_warn[2]} min"
         cost = r["referenceFeeCents"] * (cfg.quote_cost_hold or (self.drive_cost_mult(drive) if cfg.drive_cost else self.cost_mult()))
+        if cfg.quote_cost_hold and cfg.quote_cost_floor and len(self.book_ratios) >= cfg.cost_prior_n:
+            # Our savings stay margin, but a week where drivers cost more than usual (scarcity) must still raise the quote.
+            cost = max(cost, r["referenceFeeCents"] * self.cost_mult())
         if cfg.hold_price and self.pairs_with_held(r):
             cost *= cfg.bundle_mult  # a held car for the same day starts or ends near this one: the evening release pairs them
         elif cfg.bundle_price and self.chainable(r):
