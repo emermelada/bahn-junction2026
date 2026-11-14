@@ -39,3 +39,18 @@ hold16 vs base by seed: +1792, +3179, -666, +2631, +1218, +1315, -35, +833, -169
 By seed: +1655, +699, +211, -868, +1957, -1932, +4941, +3476, -655, +459, +1892, +4273.
 
 **Keep.** `hold=true hold_hour=16` is the candidate default for rc3.
+
+## Money preset and lateness pricing on top of the release (dev-07..18; "gated" = margin counted only on ranked weeks)
+
+| Tag | Change on top of hold 16:00 | Ranked | Min on-time | p10 | Mean | Gated mean | Orders |
+|---|---|---|---|---|---|---|---|
+| e2-hold16 | none | 12/12 | 0.931 | 6,826 | 10,690 | 10,690 | 299 |
+| x2-money-h16 | money preset | 9/12 | 0.890 | 9,305 | 12,733 | 9,211 | 367 |
+| y1-money-g92-h16 | money + guard 0.92 (g2 alone: 12/12, 10,496) | 10/12 | 0.891 | 9,604 | 11,999 | 10,130 | 360 |
+| y2-h16-late12 | late_cost_frac 1.2 | 12/12 | 0.948 | 5,718 | 10,425 | 10,425 | 280 |
+| y3-h16-late12-load06 | late 1.2, load_free 0.06 | 12/12 | 0.943 | 7,706 | 11,085 | 11,085 | 301 |
+| **y4-h16-late20-load07** | **late 2.0, load_free 0.07** | **12/12** | 0.932 | **8,066** | **11,579** | **11,579** | 291 |
+
+Fresh dev-19..30, money + hold 16: mean 13,234 but 10/12 ranked (gated 11,245) vs money alone 12,063, 9/12.
+
+y4 beats the base on all 12 seeds (+1,918/week, +20%); its worst week is 8,066 vs 5,608. Pricing lateness harder (P(late) x 2.0 x price) moves the gate risk into the quote: long and thin-town cars get dear, and the freed on-time budget buys more safe cars (load_free 0.07). Next: push further (late 3-4, load 0.08-0.10), then a fresh check.
