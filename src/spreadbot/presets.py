@@ -217,3 +217,5 @@ PRESETS["k-f1h5fV1"] = PRESETS["k-f1h5f"] + ["load_bundle_w=0.6"]
 # V2: + the load barrier at the measured knee (fee/typ flat to day load 0.12, late 4-5% to 0.12): c3g +944/+868/+1,057 on the three
 # tuning sets; killed then for one week at 0.914 without long_warn/desert guards, which this stack has.
 PRESETS["k-f1h5fV2"] = PRESETS["k-f1h5fV1"] + ["load_free=0.12", "load_slope=2"]
+# V2 with a hard day cap: no new car due on a day whose load is already 0.15 (late 11.9% at 0.14-0.16 vs 4-5% under 0.12, feeload.py).
+PRESETS["k-f1h5fV2c"] = PRESETS["k-f1h5fV2"] + ["load_cap=0.15"]
