@@ -82,3 +82,5 @@ PRESETS["d-fee2d"] = PRESETS["d-fee2"] + ["desert_n=11", "desert_alarm=720"]
 # Safe low openings (SAFE_OPEN.md): cut only where warned and waited-to-1.25 stayed at c3g; 1.05 where <= 40 drivers live near the delivery.
 PRESETS["d-safe"] = PRESETS["c3g"] + ["fee_open_day=((0,3,81,24,0.85),(0,6,41,24,0.92),(0,1,81,12,0.95))",
                                       "relook_minutes=90", "relook_mult=1.05"]
+# Cuts in sparse towns pay (d-fee3 +65, d-safe +149/+248 vs d-feer +309/+344): widen d-feer's 12-24 h step to every town.
+PRESETS["d-feer4"] = PRESETS["c3g"] + ["fee_open_rule=((24,0,0.92),(12,0,0.95))", "relook_minutes=90", "relook_mult=1.05"]
