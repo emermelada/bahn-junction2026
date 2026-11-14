@@ -181,3 +181,7 @@ PRESETS["k-safe-lskd"] = PRESETS["k-safe"] + ["long_split=(360,180)", "bundle_ke
 # k-safe-dc + re-drivers' long_split: a pair with >= 6 h of driving still unbooked 3 h after posting goes out as singles
 # (long pairs carry 4.4 of 20.5 warned singles a week; k-safe-ls vs k-safe: +540/+220, worst 0.960/0.948 vs 0.942).
 PRESETS["k-safe-dcls"] = PRESETS["k-safe-dc"] + ["long_split=(360,180)"]
+# re-drivers arms on the new best k-safe-dc (k-safe + drop_calm_hours 16):
+PRESETS["k-safe-dckd"] = PRESETS["k-safe-dc"] + ["bundle_keep_drop=true"]
+PRESETS["k-safe-dcb3"] = PRESETS["k-safe-dc"] + ["bundle3=true", "bundle3_mult=0.75"]
+PRESETS["k-safe-dckmh"] = PRESETS["k-safe-dc"] + ["bundle_km=50", "hold_minutes=120", "hold_lead=360"]
