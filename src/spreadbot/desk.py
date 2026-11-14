@@ -1509,6 +1509,11 @@ class Desk:
             return dedupe([{"at": now + int(h * HOUR), "feeCents": max(1, int(round(base * m)))} for h, m in cfg.late_plan])
         if ob.urgent or last - now < 2 * HOUR:
             return steep(now, base, cfg, plan=self.steep_plan_now(ob))
+        if cfg.prewarn_repost and last - now <= cfg.prewarn_repost * HOUR:
+            prev = self.prewarn_prev(ob, legs, last)
+            if prev is not None:
+                # Pre-warning fresh re-post: the same fee the withdrawn gig showed now, as a new gig (a new view burst; no cut, no raise)
+                return [{"at": now, "feeCents": current_fee(prev.schedule, now)}]
         if cfg.fee1:
             try:
                 q = ob.order["legs"][legs[-1]]["delivery"]["placeId"]
@@ -1944,6 +1949,11 @@ class Desk:
                         self.withdraw(rec.id)
         if self.cfg.relook_minutes:
             self.relook()
+        if self.cfg.prewarn_repost:
+            try:
+                self.prewarn_withdraw()
+            except Exception as exc:  # never skip the alarm escalation below
+                self.say("ERR", f"prewarn {type(exc).__name__}: {exc}")
         if self.cfg.fee1 and self.cfg.fee1_repick:
             try:
                 self.fee1_repick()
@@ -2128,6 +2138,43 @@ class Desk:
             self.withdraw(r.id)
         self.post_bundle(first, second, last, why="pair2")
         return True
+    def prewarn_withdraw(self) -> None:
+        """prewarn_repost (Franco): a single gig still unbooked prewarn_repost hours before its last pickup, posted before that mark and
+        not yet escalated, is withdrawn; the next tick posts the car again at the same fee (schedule(): prewarn_prev), so drivers are
+        notified again before our alarm (6 h) and the world's warning (3 h). A raise reaches ~1 view, a new post ~10 (MECHANICS.md)."""
+        cfg = self.cfg
+        H = cfg.prewarn_repost * HOUR
+        for gid in sorted(self.gigs):
+            rec = self.gigs[gid]
+            if rec.status != "open" or rec.escalated or len({o for o, _ in rec.legs}) != 1:
+                continue
+            ob = self.orders.get(rec.legs[0][0])
+            if not ob or ob.urgent:
+                continue
+            legs = [l for _, l in rec.legs]
+            last = self.last_pickup(ob, legs)
+            q = ob.order["legs"][legs[-1]]["delivery"]["placeId"]
+            alarm = max(cfg.alarm_minutes, cfg.desert_alarm) if (cfg.desert_n and self.desert(q)) else cfg.alarm_minutes
+            if not (last - H <= self.now and rec.posted_at < last - H and last - self.now > alarm + 30):
+                continue
+            if self.fee1_gig(rec):
+                self.fee1.close(rec, False, self.now)
+            self.say("PREWARN_REPOST", f"{gid} {ob.order['id']} left {(last - self.now) // 60} h at {current_fee(rec.schedule, self.now)}")
+            self.withdraw(gid)
+
+    def prewarn_prev(self, ob: OrderBook, legs: list[int], last: int) -> Optional[GigRec]:
+        """The gig prewarn_withdraw took down: the latest gig of these legs, a single never booked, withdrawn, posted before the
+        prewarn mark (read from the gigs, so a restart rebuilds it). None: this post is not a pre-warning re-post."""
+        oid, best = ob.order["id"], None
+        for gid in sorted(self.gigs):
+            rec = self.gigs[gid]
+            if any(o == oid and l in legs for o, l in rec.legs) and (best is None or rec.posted_at > best.posted_at):
+                best = rec
+        if (best is None or best.status != "withdrawn" or best.fee or len({o for o, _ in best.legs}) != 1
+                or best.escalated or best.posted_at >= last - self.cfg.prewarn_repost * HOUR):
+            return None
+        return best
+
     def ladder_from_now(self, ob: OrderBook, legs: list[int], cur: int) -> list[dict]:
         """The relative ladder from now for a sitting gig: fee_open (never under its current fee), then the fee_rel steps before the
         last pickup. Two or more steps, so the gig is no longer a fee1 gig."""

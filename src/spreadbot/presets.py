@@ -386,3 +386,6 @@ PRESETS["v5S-RC"] = PRESETS["v5S"] + ["fee1_repost_cap=24"]
 # not a desert delivery, P(on time) at the win >= 0.97. Gate thresholds: ARCHIVE's split of RC vs v5S (non-holdout) may move them.
 RCG_SWITCH = ["scarcity=(9.0,9.0)", "scarcity_z=(1.002,0.044,0.037,0.029,3.536,8.0,720)"]
 PRESETS["v5S-RCg"] = PRESETS["v5S"] + ["fee1_repost_cap=24", "fee1_repost_gate=(1,240,1,0.97)"] + RCG_SWITCH
+# P1 (Franco post-01:20): pre-warning fresh re-post. 7 h before the last pickup an unbooked single is withdrawn and posted again at the
+# same fee (timing only: a new post notifies drivers again before the 6 h alarm and the 3 h warning; no cut, no escalation).
+PRESETS["v5S-P1"] = PRESETS["v5S"] + ["prewarn_repost=7"]
