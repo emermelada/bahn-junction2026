@@ -43,6 +43,7 @@ function fold(text: string): string {
     .replace(/[éè]/g, "e")
     .replace(/ü/g, "u")
     .replace(/[–—−]/g, "-")
+    .replace(/\bpuolta\b/g, "puoli") // "ennen puolta neljää" = before half past three
     .replace(/\ba\.m\.?/g, "am")
     .replace(/\bp\.m\.?/g, "pm")
     .replace(/\s+/g, " ")
@@ -52,18 +53,18 @@ function fold(text: string): string {
 /** Finnish clock-hour words in all the cases notes use: "kolme", "kolmelta" (at), "kolmesta" (from),
  * "kolmeen" (until/by), "kolmen" (genitive, "kolmen jälkeen"). Checked in this order (9 before 1, 11 before 1). */
 const FI_NUM: [RegExp, number][] = [
-  [/^yhdeksa(n|lta|sta|an)$/, 9],
-  [/^kahdeksa(n|lta|sta|an)$/, 8],
-  [/^(yksi|yhde(n|lta|sta)|yhteen)toista$/, 11],
-  [/^(kaksi|kahde(n|lta|sta)|kahteen)toista$/, 12],
-  [/^(yksi|yhde(n|lta|sta)|yhteen)$/, 1],
-  [/^(kaksi|kahde(n|lta|sta)|kahteen)$/, 2],
-  [/^kolme(n|lta|sta|en)?$/, 3],
-  [/^nelja(n|lta|sta|an)?$/, 4],
-  [/^(viisi|viide(n|lta|sta)|viiteen)$/, 5],
-  [/^(kuusi|kuude(n|lta|sta)|kuuteen)$/, 6],
-  [/^seitsema(n|lta|sta|an)$/, 7],
-  [/^kymmene(n|lta|sta|en)$/, 10],
+  [/^yhdeksa(n|lta|sta|an|a)$/, 9],
+  [/^kahdeksa(n|lta|sta|an|a)$/, 8],
+  [/^(yksi|yhde(n|lta|sta)|yhteen|yhta)toista$/, 11],
+  [/^(kaksi|kahde(n|lta|sta)|kahteen|kahta)toista$/, 12],
+  [/^(yksi|yhde(n|lta|sta)|yhteen|yhta)$/, 1],
+  [/^(kaksi|kahde(n|lta|sta)|kahteen|kahta)$/, 2],
+  [/^kolme(n|lta|sta|en|a)?$/, 3],
+  [/^nelja(n|lta|sta|an|a)?$/, 4],
+  [/^(viisi|viide(n|lta|sta)|viiteen|viitta)$/, 5],
+  [/^(kuusi|kuude(n|lta|sta)|kuuteen|kuutta)$/, 6],
+  [/^seitsema(n|lta|sta|an|a)$/, 7],
+  [/^(kymmene(n|lta|sta|en)|kymmenta)$/, 10],
 ]
 const SV_NUM: Record<string, number> = { ett: 1, tva: 2, tre: 3, fyra: 4, fem: 5, sex: 6, sju: 7, atta: 8, nio: 9, tio: 10, elva: 11, tolv: 12 }
 const EN_NUM: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 }
@@ -240,8 +241,8 @@ const SLOT = /\b(paikalla|kotona|tavattavissa|myyja\w*|omistaja\w*|seller|owner|
 /** Rule: plates needed ("ei kilpiä", "no plates", "utan skyltar"). */
 const PLATES = [
   /\bei (rekisteri)?kilpia\b|\b(rekisteri)?kilvet\b.*\b(puuttuu|puuttuvat|poistettu|irrotettu|pois)\b|\b(siirto|koe)kilv\w*|\bei rekkareita\b|\brekkarit\b.*\bpuuttu\w*|\bilman (rekisteri)?kilpia\b/,
-  /\bno (trade |number |licen[cs]e |registration )?plates\b|\bplates\b.*\b(removed|missing|off)\b|\bwithout plates\b|\btrade plates\b|\btransfer plates\b|\bbring plates\b/,
-  /\butan (registrerings)?skyltar\b|\binga skyltar\b|\bskyltar(na)?\b.*\b(saknas|borttagna|avtagna)\b|\b(prov|saluvagns|flytt)skyltar\b/,
+  /\bno (trade |number |licen[cs]e |registration )?plates\b|\bplates\b.*\b(removed|missing|off)\b|\bwithout plates\b|\btrade plates\b|\btransfer plates\b|\bbring plates\b|\bunregistered\b/,
+  /\butan (registrerings)?skyltar\b|\b(inga|saknar) skyltar\b|\bskyltar(na)?\b.*\b(saknas|borttagna|avtagna)\b|\b(prov|saluvagns|flytt)skyltar\b/,
 ]
 const PLATES_NOT = /\b(ei tarvita|not needed|no need|behovs inte|kilvet paikallaan|plates on|has plates)\b/
 
@@ -319,14 +320,13 @@ function isClockToken(tok: Tok | undefined): boolean {
   return !!tok && (/^\d{1,2}[:.]\d{2}$/.test(tok.t) || (/^\d{1,2}$/.test(tok.t) && Number(tok.t) <= 24))
 }
 
-type Scan = { days: DayItem[]; times: TimeItem[]; ranges: RangeItem[]; weekdayRange: boolean }
+type Scan = { days: DayItem[]; times: TimeItem[]; ranges: RangeItem[] }
 
 function scan(text: string, arrivalDay: number): Scan {
   const tk = tokens(text)
   const days: DayItem[] = []
   const times: TimeItem[] = []
   const ranges: RangeItem[] = []
-  let weekdayRange = false
   const used = new Set<number>()
   const word = (i: number) => tk[i]?.t ?? ""
 
@@ -367,8 +367,7 @@ function scan(text: string, arrivalDay: number): Scan {
     if (wd !== null) {
       const isDayToken = (j: number) => weekdayOf(word(j)) !== null || word(j) in WEEKDAY_SHORT_SAFE || word(j) in WEEKDAY_SHORT_RISKY
       if ((word(i + 1) === "-" && isDayToken(i + 2)) || (word(i - 1) === "-" && isDayToken(i - 2))) {
-        weekdayRange = true // "ma-pe", "mon-fri": opening days, not a day
-        continue
+        continue // "ma-pe", "mon-fri": opening days, not a day
       }
       days.push({ at: i, offset: weekdayOffset(arrivalDay, wd), negated: negatedAt(i) })
     }
@@ -472,7 +471,7 @@ function scan(text: string, arrivalDay: number): Scan {
       for (let k = i; k < i + c[1]; k++) used.add(k)
     }
   }
-  return { days, times, ranges, weekdayRange }
+  return { days, times, ranges }
 }
 
 // ───────────────────────────── 5. Reading ─────────────────────────────
@@ -562,7 +561,10 @@ export function readNote(note: Note | null, request: PriceRequest): NoteFacts | 
       const before = sentence.slice(Math.max(0, m.index - 12), m.index)
       if (!NEGATOR.test(before)) facts.manual = true
     }
-    if (SUMMER.test(sentence) && SUMMER_ON.test(sentence) && !SUMMER_STORED.test(sentence)) facts.summerTyres = true
+    // per comma piece: "auto vielä kesärenkailla, renkaat kyydissä" is on summer tyres (the winters ride along)
+    for (const piece of sentence.split(/,\s*/)) {
+      if (SUMMER.test(piece) && SUMMER_ON.test(piece) && !SUMMER_STORED.test(piece)) facts.summerTyres = true
+    }
 
     // ── times, read per clause ──
     const payment = PAYMENT.test(sentence)
