@@ -778,6 +778,11 @@ class Desk:
             lastc = min(lastc, self.last_pickup(self.orders[o], [l]) - at)
             at += self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) + cfg.v2_handling_min
             prev = L["delivery"]["placeId"]
+        if lastc - self.now < cfg.unbundle_minutes:
+            # too close to its last start for a chain (the tick would split it at once): the car goes alone
+            self.post(ob, legs, why)
+            self.say("V2POST", f"{oid} day={day} alone-soon p_late={p_late:.2f}{' hot' if hot else ''} {why}")
+            return
         stops = []
         for o, l in chain:
             stops += self.stops_for(self.orders[o], l)
