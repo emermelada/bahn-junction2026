@@ -147,3 +147,5 @@ PRESETS["k-safe-f2pm"] = PRESETS["k-safe-f2"] + ["bundle_mult=0.72"]
 PRESETS["k-safe-f6"] = KSAFE_BASE + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92),(12,0,0.95))"]
 # k-safe bill: singles posted 12-24 h before the last pickup (held cars released at 16:00) open at 1.05 and book in a median 3 min.
 PRESETS["k-safe-f7"] = KSAFE_BASE + ["fee_open_rule=((24,80,0.85),(12,0,0.9),(6,80,0.95))"]
+# Deep openings with a safety net: cut only for cars with P(on time) >= 0.97, while the projection is >= 0.955 and the week's booked/first fee <= 1.12.
+PRESETS["k-safe-f2g"] = PRESETS["k-safe-f2"] + ["fee_cut_guard=(0.97,0.955,1.12)"]
