@@ -114,6 +114,7 @@ class Desk:
         self.cost_pred_sum = 0.0  # this week's bookings: the table's ratio, summed
         self.cost_paid_sum = 0.0  # and the ratio they paid
         self._nearby: dict[str, list[tuple[str, float]]] = {}
+        self.snow: list[tuple[int, int, frozenset]] = []  # forecast snow: (from, to, places), a day ahead (RULES)
         self.fast_book: list[tuple[int, bool]] = []  # (posted at, booked within an hour at the opening fee) per first post
         self.first_posts: dict[str, int] = {}  # gig -> posted at, for first posts still being judged
         self.crunch_day = -1
@@ -446,7 +447,14 @@ class Desk:
                 self.late_orders.add(oid)
 
     def on_forecast(self, e: dict) -> None:
+        self.snow.append((e["from"], e["to"], frozenset(e["placeIds"])))
         self.say("FORECAST", f"{e['from']}-{e['to']} {e['placeIds']}")
+
+    def snow_hit(self, r: dict, deadline: int) -> bool:
+        """Snow forecast on the deadline's day at the car's pickup or delivery place."""
+        d0 = deadline // DAY * DAY
+        places = {r["legs"][0]["pickup"]["placeId"], r["legs"][-1]["delivery"]["placeId"]}
+        return any(a < d0 + DAY and b > d0 and places & ps for a, b, ps in self.snow)
 
     # ------------------------------------------------------------------ pricing
     def trust_factor(self, dealer: str) -> float:
@@ -495,6 +503,8 @@ class Desk:
                 continue
             p_ok, slack = self.ontime.p_ok(r, opt["deadline"], kind)
             p_ok = min(0.99, p_ok * cal)
+            if cfg.snow_pl and self.snow_hit(r, opt["deadline"]):
+                p_ok = max(0.0, p_ok - cfg.snow_pl)  # cars due on a forecast snow day at their places: 10.2% late vs 2.7% (the trees have no snow)
             if self.flu_days and self.deadline_day(r, opt) in self.flu_days:
                 p_ok = max(0.0, 1 - (1 - p_ok) * cfg.flu_mult)  # due on a flu day (see on_gig_dropped)
             if p_ok < bar or slack < cfg.min_slack_h:

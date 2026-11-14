@@ -160,3 +160,5 @@ PRESETS["m15safe"] = PRESETS["k-safe"] + ["safe_load_p=0.97", "safe_cost=(0.97,1
 # re-market: split arms: safe-car cost alone; safe-car load waiver only under day load 0.12.
 PRESETS["m16scost"] = PRESETS["k-safe"] + ["safe_cost=(0.97,1.0,0.25)"]
 PRESETS["m17sload"] = PRESETS["k-safe"] + ["safe_load_p=0.97", "safe_load_max=0.12"]
+# re-market: snow forecasts priced into P(late) (+0.08 on the deadline day at the car's places), on k-safe.
+PRESETS["m18snow"] = PRESETS["k-safe"] + ["snow_pl=0.08"]

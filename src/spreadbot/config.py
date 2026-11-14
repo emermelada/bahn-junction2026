@@ -97,6 +97,7 @@ class Config:
     cong_horizon: int = 18 * 60        # only gigs whose last pickup is within this many minutes
     # --- load: our cars due per day over the world's drivers
     load_free: float = 0.07            # rc3: with late 2.0 the long and thin-town cars get dear, so the safe ones can take more load (y4)
+    snow_pl: float = 0.0               # added to P(late) for a car due on a forecast snow day at its pickup/delivery: 10.2% vs 2.7% late (re-external, RULES_GAPS.md) (0 = off)
     safe_cost: tuple = ()              # (P(on time) from, fee over typical, late cost frac): price safe cars at what they really cost; measured 0.99x fee,
                                        # refunds 0.3-0.9% of price vs 1.05x and 1.2-3.6% charged (research/re/market/SAFE_DECLINES.md) (() = off)
     safe_load_p: float = 0.0           # no load charge for a car whose gbm P(on time) is at least this: the trees have due_load as a feature, the charge counts load twice (0 = off)
