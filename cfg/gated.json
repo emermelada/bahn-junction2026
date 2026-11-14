@@ -1,5 +1,5 @@
 {
- "name": "gated-m19",
+ "name": "gated-b1",
  "flags": {
   "gate": true,
   "capacity": true,
@@ -9,12 +9,16 @@
   "triage": true,
   "pricing": true,
   "trust": true,
-  "notes": true
+  "notes": true,
+  "bundles": true
  },
  "pricing": {
   "clamp": {
    "lo": 1.05,
    "hi": 1.75
+  },
+  "model": {
+   "on": true
   }
  },
  "governor": {
@@ -41,6 +45,22 @@
  },
  "capacity": {
   "batchMax": 4,
-  "batchPerReach": 0.1
+  "batchPerReach": 0.1,
+  "dayMult": [
+   1,
+   1,
+   1,
+   1,
+   0.5,
+   1,
+   1
+  ]
+ },
+ "bundles": {
+  "chain": true,
+  "pairRoadMin": 30,
+  "feeMult": 0.85,
+  "maxDriveMin": 480,
+  "minSaving": 0.15
  }
 }

@@ -76,3 +76,24 @@ More rejected arms: price floor 1.65 (v2-g1 €1.9k with 41 wins), floor 1.45, s
 | Worst on time | 95.43% | 95.48% |
 
 This fails the strict margin rule (n−1 seeds better). Adopted anyway, because on time is the binding risk in the final and the failed-visit saving is mechanical, not noise.
+
+## Session 2 (Sat 06:00–08:00): theory, model pricing, chains — €5.9k → €9.4k/week
+
+**Why the gap to the leaders.** The board exposes `wonOrders` per run (`node src/tools/top.ts`): the top 10 win 400–460 orders/week at €35–43 each; m19 won ~200 at €29. The typical fee is ≈ the list price on every lane band (ref/list 0.89–1.03).
+
+**Theory.** Interval-censored fit over ~20 runs per gate seed (the same requests quoted at different prices across runs; outcome is a deterministic threshold per request in 281/300 cases): the ratio at which a request flips to lost is lognormal, **median 1.36 x list, sigma 0.23** — P(win) 0.91 at 1.0, 0.71 at 1.2, 0.58 at 1.3, 0.45 at 1.4, 0.34 at 1.5. Pricing every request of spread-1 at argmax P(x/trust)·(x − fee/list) gives, without any capacity limit: €15.6k/week with no trust, **€22.4k with the top-4 dealers at full trust from Tuesday** (€12.3k / €18.6k at fees 1.1 x ref). €70k/5 weeks is inside the theory; the binding constraint is delivering ~450–500 orders on time.
+
+**Bug found.** The interval pricer learnt trust-inflated ratios: trusted dealers' wins lifted every dealer's price, so the mean quote crept 1.24 → 1.54 → 1.71 → 1.74 → 1.74 x list Monday to Friday and Friday wins collapsed.
+
+| Arm | Change | Gate mean (5 seeds) | vs m19 | Worst on time |
+|---|---|---|---|---|
+| m19 | previous final | €5,940 | — | 97.4% |
+| p1 | `pricing.model`: margin-optimal quote under the fitted threshold, online world/day/lane/dealer offsets, trust-scaled threshold, fee estimate as cost | €7,722 | 5/5 better | 92.7% |
+| p3 | p1 + Friday capacity x0.5 (`capacity.dayMult`) | €7,933 | 5/5 | 93.9% |
+| **b1** | p3 + **chain bundles** (`bundles.chain`: a car whose delivery is ≤30 road min from another open car's pickup goes in one gig, fee 0.85 x both) | **€9,392** | **5/5 (4/5 vs p3)** | **95.4%** |
+
+b1 per seed: spread-1 9,503 · v2-g1 9,189 · v2-g2 13,396 · v2-g3 7,033 · v2-g4 7,837. 63% of single-car wins are chainable at win time; 55–92 chains/week, 93% of them booked; fee per car −4% to −30%, on time up to 99.5% (a chain is one trip out and one trip home for the driver, and one gig of the driver's daily quota for two cars).
+
+p3 held-out (5 of 10 seeds before the slots went to b-arms): +€1,119/seed vs m19, 4/5 better (v2-h1 −€406 at 92.2%).
+
+Rejected this session: anchor bonus (cheap quotes to build trust; trust counts on delivery, ~1 day after the win, so it pulls full trust forward by half a day only: −€950 and −€1,350), sigma 0.18 (−€1k), same_day priced 1.3 x (−€1.1k on spread-1), opening the gate without chains (v3, v5: unranked 86.9–89.6% on v2-g1; Friday same_day and long next_day go late), Friday capacity x0.35 (= x0.5).
