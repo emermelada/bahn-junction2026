@@ -50,3 +50,16 @@ Gate seeds: `spread-1, v2-g1..v2-g4`. Gate rule: every seed ranked at ≥ 93% on
 
 - Stride loop deterministic to the cent (M8 spread-1 twice: €7,962.02).
 - Final loop rehearsal (`src/run-final.ts` + `src/ticker.ts`, 2× final pace, two `kill -9` restarts): ranked 96.3%, €5,780; rebuild from 4,523 events in 29 ms; quote lag 0 world minutes; the world refuses duplicate gigs. Same seed under the stride loop: €6,637 (the gap is the requests lost during the two forced outages).
+
+## Final-config choice: m18 = M8 + batch cap scaled by pickup reach (Sat 05:30)
+
+The bulk order (33–38 cars from one yard) and other 10–25-car batches appear in every world. In held-out `v2-h2`, 12 within_3_days cars from one Oulu yard all waited for the last day and 10 went late: M8 fell to **90.2%** on time. Cap: at most `max(4, 0.1 × reach30(pickup))` admitted requests per batch (Helsinki pool ≈ uncapped, Oulu 6, Lahti 4).
+
+| Seeds | M8 mean | m18 mean | Worst on time M8 → m18 |
+|---|---|---|---|
+| Gate (5) | €6,498 | €5,988 | 96.6% → 96.3% |
+| Held-out h1–h10 (10, never tuned on) | €5,856 | €5,763 (better on 6/10) | **90.2% → 95.4%** |
+
+Adopted for the final: about −€100 to −€500/week for a 5-point higher floor on the one metric that zeroes the score.
+
+More rejected arms: price floor 1.65 (v2-g1 €1.9k with 41 wins), floor 1.45, steeper ladder (mean €5,732), higher price prior (€6,077), admit tier C via governor (v2-g1 92.3%, FAIL), higher fee bands (€5,317), stronger evening step, bundles (16/week, mean €6,425, 2/5), flat batch cap 6 / plan-day cliff (−€500–1,000).
