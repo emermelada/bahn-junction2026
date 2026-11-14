@@ -6,7 +6,7 @@ PY := PYTHONPATH=src .venv/bin/python
 LEVEL ?= 8
 SEED ?= dev-01
 
-.PHONY: setup test check play board sweep compare emulate chaos final
+.PHONY: setup test check play board final-frank sweep compare emulate chaos final
 SET ?= dev
 TAG ?= adhoc
 N ?= 20
@@ -40,6 +40,10 @@ emulate:
 chaos:
 	$(PY) harness/chaos.py --seed $(SEED) --from-minute 4320 --speed 4 --kills 2
 
-# The final (or a test final), under a supervisor that restarts the bot whenever it exits with an error.
+# The final (or a test final) with Franko's v1 bot, preset chains (k18): the team's bot from 14 Nov.
+final-frank:
+	harness/final_frank.sh
+
+# The final (or a test final) with our bot, under a supervisor that restarts it whenever it exits with an error.
 final:
 	until $(PY) -m spreadbot.runtime.live_runner --final; do echo "bot exited, restarting in 2 s"; sleep 2; done
