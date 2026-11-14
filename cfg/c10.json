@@ -1,0 +1,69 @@
+{
+ "name": "c10-b1-ret75-score",
+ "flags": {
+  "gate": true,
+  "capacity": true,
+  "ladder": true,
+  "governor": true,
+  "fees": true,
+  "triage": true,
+  "pricing": true,
+  "trust": true,
+  "notes": true,
+  "bundles": true
+ },
+ "pricing": {
+  "clamp": {
+   "lo": 1.05,
+   "hi": 1.75
+  },
+  "model": {
+   "on": true
+  }
+ },
+ "governor": {
+  "fridayTierAOnlyFrom": 100000
+ },
+ "gate": {
+  "nextDay": {
+   "maxDriveMin": 240
+  },
+  "poolBrake": {
+   "warnings": 2,
+   "windowMin": 1440
+  },
+  "sameDay": {
+   "maxDriveMin": 240,
+   "slackHours": 3,
+   "reach30Pickup": 3
+  },
+  "downgrades": [
+   "private_pickup",
+   "trade_in",
+   "unparsed_note"
+  ]
+ },
+ "capacity": {
+  "batchMax": 4,
+  "batchPerReach": 0.1,
+  "dayMult": [
+   1,
+   1,
+   1,
+   1,
+   0.5,
+   1,
+   1
+  ]
+ },
+ "bundles": {
+  "chain": true,
+  "pairRoadMin": 30,
+  "feeMult": 0.85,
+  "maxDriveMin": 480,
+  "minSaving": 0.15,
+  "returnMult": 0.75,
+  "returnRoadMin": 45,
+  "returnScore": true
+ }
+}

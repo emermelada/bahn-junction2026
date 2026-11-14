@@ -68,7 +68,7 @@ async function runJobs(jobs: { cfg: Cfg; seed: string; tag: string }[], policy: 
   while (next < jobs.length) {
     if (running >= max || (await freeSlots()) <= 0) {
       if (!said && running === 0) (console.log("waiting for a free practice slot..."), (said = true))
-      await new Promise((done) => setTimeout(done, running >= max ? 2000 : 20_000))
+      await new Promise((done) => setTimeout(done, running >= max ? 2000 : 4000))
       continue
     }
     const job = jobs[next++]!
