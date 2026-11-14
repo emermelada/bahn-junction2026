@@ -220,6 +220,8 @@ class Config:
                                        # next-day cars with last pickup 12-14 h held to 16:00 are 25% late vs 11% posted at once (176 c3 weeks)
     hold_all: bool = False             # hold every car (default: only cars that could be paired, see simple())
     hold_open: bool = True             # at a release, also pair with our open unbooked single gigs
+    batch_hours: tuple = ()            # batch dispatch: hours of the day at which cars the evening release would post at once are released together (() = off)
+    batch_min_left: int = 12 * 60      # only while this long remains to the last pickup after the batch (Halal: holding to 07:00 of the last day 11.1% late)
     hold_price: bool = False           # quote a car that pairs with a held car (same pickup day, near) at the bundle cost
     bundle_keep: float = 0.0          # a dropped bundle with this many hours to spare stays a bundle, raised to this x its base (0 = split)
     hold_km: float = 0.0               # air km from A's delivery to B's pickup for a release pair (0 = bundle_km)

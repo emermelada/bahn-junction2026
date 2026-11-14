@@ -313,3 +313,6 @@ PRESETS["k-f1h5fV1g2"] = PRESETS["k-f1h5fV1"] + ["vol_guard=(100,0.09,1.15)"]
 R1 = ["fee1_grid=(0.62,0.68,0.75,0.82,0.90,1.00,1.15,1.30)", "fee1_window_fee=true",
       "fee1_clear=(0.2771,-0.0694,0.0153,-0.1463,-0.0037,0.0635,0.1097,0.3214,0.2609)"]
 PRESETS["v5La-R1"] = PRESETS["v5La"] + R1
+# R2, batch dispatch: cars with >= 12 h left after the next 07:00 / 12:00 / 16:00 batch wait for it and are paired against the
+# whole pool (held + open singles); pairs now buy volume (load_bundle_w 0.6 in v5La). Pair radius 40 km (km50 raised pairs +3-7 pts).
+PRESETS["v5La-R2"] = PRESETS["v5La"] + ["batch_hours=(7,12,16)", "bundle_km=40"]

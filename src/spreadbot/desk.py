@@ -1217,7 +1217,20 @@ class Desk:
             rel = max(rel, 6 * DAY + self.cfg.hold_hour * 60)  # due on the last Monday: book it on Sunday for Monday
         if self.cfg.hold_min_left and self.last_pickup(ob, list(range(len(o["legs"])))) - rel < self.cfg.hold_min_left:
             return None  # too little time between the release and the last pickup: drivers need the evening and morning to book it
-        return rel if rel > self.now else None
+        if rel > self.now:
+            return rel
+        if self.cfg.batch_hours:
+            # Batch dispatch: a car the evening release would post at once waits for the next batch, so it is paired against the whole
+            # pool (held cars + our open singles) instead of booking alone in minutes (PAIRS_MISSED: 66% of missed pairs = partner
+            # already booked; 180-266 cars/wk are posted at the win). Only while batch_min_left remains after the batch.
+            last = self.last_pickup(ob, list(range(len(o["legs"]))))
+            day = self.now // DAY
+            for d in (day, day + 1):
+                for h in sorted(self.cfg.batch_hours):
+                    t = d * DAY + h * 60
+                    if t > self.now + 5:
+                        return t if last - t >= self.cfg.batch_min_left else None
+        return None
 
     def release_held(self) -> None:
         """Posts the cars whose release has come: pairs first (a max greedy matching), then singles."""
