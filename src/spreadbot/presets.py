@@ -228,3 +228,6 @@ PRESETS["v5f3"] = PRESETS["v5f2"] + ["v5_short_open=0.95"]
 # V5 stacks (fleet + quote): the fee-first fleet's saving spent on safe volume, with the Tuesday scarcity switch turning both off.
 PRESETS["v5s1"] = PRESETS["v5f1"] + ["safe_admit=(0.97,0.95,0.12)"]
 PRESETS["v5s3"] = PRESETS["v5f3"] + ["safe_admit=(0.97,0.95,0.12)"] + SCARCITY
+# v5q2f: the switch on the fee signal alone, checked Tue 24:00 - Wed 12:00, no long declines (QUOTE_BUILD.md: the spec rule fires on 70%
+# of normal fee1 weeks by Thu 00:00, mostly via warned/won >= 0.06; fee >= 1.08 alone to Wed 12:00: 72% of bad weeks, 20% of normal).
+PRESETS["v5q2f"] = PRESETS["v5q1"] + ["scarcity=(1.08,9.0)", "scarcity_until=3600", "scarcity_risk=1.5"]
