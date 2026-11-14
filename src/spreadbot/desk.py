@@ -106,6 +106,7 @@ class Desk:
         self.gig_viewers: dict[str, list[str]] = {}  # gig -> drivers who viewed it, in order
         self.bundle_last: dict[str, int] = {}  # order -> last minute to start its bundle
         self.held: dict[str, int] = {}  # order -> release minute (evening release)
+        self._brake_at, self._brake_u, self._brake_x = -1, 0, 0.0  # backlog_brake cache (minute, cars, excess)
         self.chain_held: dict[str, int] = {}  # order -> minute to stop holding it for a chain partner and post it alone (chain planner)
         self.bundle_soon: set[str] = set()  # orders in a chain posted at short notice (split later, at bundle_soon_slack)
         self.morning_drops: dict[int, int] = defaultdict(int)
@@ -528,6 +529,7 @@ class Desk:
             gate = cfg.gate_bonus_cents * min(1.0, max(0.0, (cfg.gate_target - self.gov.projection()) / cfg.gate_span))
         cal = self.gov.calibration() if cfg.calibrate else 1.0
         barrier = barrier_cents(self.gov.projection(), len(self.orders), cfg.late_barrier) if cfg.late_barrier else 0.0
+        brake = 1.45 * min(1.0, cfg.backlog_brake[4] * self.brake_excess() ** 2) if cfg.backlog_brake else 0.0
         drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
         if cfg.long_warn and drive >= cfg.long_warn[0]:
             recent = sum(1 for t in self.long_warns if t >= self.now - cfg.long_warn[2])
@@ -596,6 +598,7 @@ class Desk:
                     info.append(f"sfee={kind}/{lead_h:.1f}h")
             load_cost += short
             load_cost += (1 - p_ok) * barrier  # late_barrier: what this car's lateness risk costs the week's on-time share
+            load_cost += brake * (520 + 135 * drive / 60 + 0.24 * r["referenceFeeCents"])  # backlog_brake (RoutePulse's unit, cents)
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain) + cfg.trust_loss_w * (1 - p_ok) * t_loss
             # Under the on-time target, a safe car is worth more than its margin: it dilutes the late ones.
@@ -663,6 +666,8 @@ class Desk:
         head = f"bar={bar:.2f} bl={backlog} tg={t_gain/100:.0f} tf={tf:.2f} mu={self.market.mu_for(dealer, day, r["legs"][0]["pickup"]["placeId"]):.3f} cost={cost/100:.0f}"
         if cfg.late_barrier:
             head += f" lb={barrier/100:.0f}"  # late_barrier: euros per expected late car right now
+        if cfg.backlog_brake:
+            head += f" bk={self._brake_u}/{brake:.2f}"  # backlog_brake: driverless cars due soon / charge in units
         if not prices:
             return decline_prices(r), f"DECLINE {head} {' '.join(info)}"
         return prices, f"{head} {' '.join(info)}"
@@ -770,13 +775,42 @@ class Desk:
     def capacity_factor(self) -> float:
         """How easily our gigs find drivers this week: the share of first posts booked within an hour at the
         opening fee, over the share we usually see (0.7). More easy bookings, more room per day."""
+        f = 1.0
+        if self.cfg.backlog_brake and self.cfg.backlog_brake[5]:
+            _, _, _, _, _, hw, hmin = self.cfg.backlog_brake
+            f = min(1.0, max(hmin, 1.0 - hw * min(1.4, self.brake_excess())))  # drivers are not taking our cars: less room per day
         if not self.cfg.adaptive_load:
-            return 1.0
+            return f
         done = [ok for (at, ok) in self.fast_book[-60:]]
         if len(done) < 15:
-            return 1.0
+            return f
         rate = (sum(done) + 0.7 * 10) / (len(done) + 10)
-        return min(self.cfg.cap_max, max(self.cfg.cap_min, rate / 0.7))
+        return f * min(self.cfg.cap_max, max(self.cfg.cap_min, rate / 0.7))
+
+    def unbooked_due(self) -> int:
+        """Our won cars still without a driver whose last pickup is within the brake's horizon (backlog_brake)."""
+        horizon = self.cfg.backlog_brake[3] * HOUR
+        n = 0
+        for oid in sorted(self.orders):
+            if oid in self.ontime_orders or oid in self.late_orders:
+                continue
+            ob = self.orders[oid]
+            legs = [l for l, t in enumerate(ob.order["deliveredAt"]) if t is None]
+            if not legs or all((g := self.leg_gig.get((oid, l))) and self.gigs[g].status in ("booked", "working", "done") for l in legs):
+                continue
+            if self.last_pickup(ob, legs) - self.now <= horizon:
+                n += 1
+        return n
+
+    def brake_excess(self) -> float:
+        """How far our driverless backlog is over its soft limit, in units of scale (backlog_brake); cached per world minute."""
+        if self._brake_at != self.now:
+            soft_frac, soft_min, scale, *_ = self.cfg.backlog_brake
+            self._brake_u = self.unbooked_due()
+            soft = max(soft_min, soft_frac * len(self.roster))
+            self._brake_x = max(0.0, (self._brake_u - soft) / scale)
+            self._brake_at = self.now
+        return self._brake_x
 
     def due_load(self, day: int) -> float:
         """Our orders due on this day (won, not cancelled), over the number of drivers in the world."""
@@ -1826,6 +1860,10 @@ class Desk:
             self.gov_logged = self.now // (2 * HOUR)
             self.say("GOV", f"proj={self.gov.projection():.3f} cal={self.gov.calibration():.3f} won={self.won_count} "
                             f"ontime={len(self.ontime_orders)} late={len(self.late_orders)} bar={self.gov.bar():.2f}")
+            if self.cfg.backlog_brake:
+                x = self.brake_excess()
+                self.say("BRAKE", f"U={self._brake_u} soft={max(self.cfg.backlog_brake[1], self.cfg.backlog_brake[0] * len(self.roster)):.0f} "
+                                  f"excess={x:.2f} cap={self.capacity_factor():.3f}")
 
     def relook(self) -> None:
         """Second look: a single gig nobody booked for relook_minutes is short of its clearing fee. Raise it once, now,

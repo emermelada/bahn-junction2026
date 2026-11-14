@@ -237,3 +237,8 @@ PRESETS["k-f1h5f-lb"] = PRESETS["k-f1h5f"] + LATE_BARRIER
 PRESETS["k-f1h5f-lbc"] = PRESETS["k-f1h5f"] + LATE_BARRIER + STEEP_CAP
 PRESETS["k-safe-dcl-cap"] = PRESETS["k-safe-dcl"] + STEEP_CAP
 PRESETS["k-safe-dcl-lb"] = PRESETS["k-safe-dcl"] + LATE_BARRIER
+# ARCHIVE: RoutePulse's backlog brake (research/re/archive/R2_BADWEEKS.md 5.1) on V5's volume arm, for V5's scarcity gate (fresh-10/20 >= 0.91).
+BRAKE = ["backlog_brake=(0.03,10,16,24,0.24,0.10,0.86)"]
+PRESETS["v5aV2b"] = PRESETS["v5aV2"] + BRAKE
+PRESETS["k-f1h5f-bk"] = PRESETS["k-f1h5f"] + BRAKE
+PRESETS["v5aV2b0"] = PRESETS["v5aV2"] + ["backlog_brake=(0.03,10,16,24,0.0,0.0,1.0)"]  # dry: logs BRAKE U only, no effect
