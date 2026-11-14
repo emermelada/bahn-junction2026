@@ -991,7 +991,10 @@ class Desk:
         if cfg.bundle_soon_lead and max(self.now + cfg.bundle_lead, first.order["legs"][0]["pickup"]["window"]["from"]) - self.now < cfg.bundle_soon_lead:
             mult = cfg.bundle_soon_mult  # starts soon: drivers' days are mostly planned, pay nearly two gigs' worth
             self.bundle_soon.update((first.order["id"], second.order["id"]))
-        out = [{"at": self.now, "feeCents": int(round(typical * mult * cfg.fee_open))}]
+        opening = mult * cfg.fee_open
+        if cfg.bundle_open_dense and last - self.now >= cfg.bundle_open_dense[0] * HOUR and                 self.home_near_delivery(second.order["legs"][0]["delivery"]["placeId"]) >= cfg.bundle_open_dense[1]:
+            opening = min(opening, cfg.bundle_open_dense[2])  # the chain ends where many drivers live: their ride home is free
+        out = [{"at": self.now, "feeCents": int(round(typical * opening))}]
         prev = out[0]["feeCents"]
         # Raises: fee_rel scaled by the bundle discount, or bundle_rel as shares of the two typical fees.
         steps = list(cfg.bundle_rel) if cfg.bundle_rel else [(h, m * mult) for h, m in cfg.fee_rel]

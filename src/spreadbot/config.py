@@ -138,6 +138,8 @@ class Config:
     bundle_min_lead: int = 0           # minutes from now to the chain's start; k5: 46% booked under 2 h, 70% at 18-30 h
     bundle_empty_end: tuple = ()       # (drive min, drivers): no chain over this drive whose end has fewer drivers living <= 30 road min (() = off);
                                        # pairs > 4 h ending at nd30 <= 10: 45% booked in 60 min, 18.5% warned vs singles 60% / 3.7% (research/re/drivers/PAIRS.md)
+    bundle_open_dense: tuple = ()      # (min hours to the chain's last start, min drivers living <= 30 road min from its end, opening share of
+                                       # the two typical fees); () = off. Pairs ending at nd30 >= 150 book 91% in 60 min at 0.84 vs 67% at <= 10 (PAIRS.md)
     bundle_short: bool = False         # pick the partner that makes the shortest chain (short chains book more often), not the one with most slack
     bundle_keep_drop: bool = False     # a dropped bundle with time to spare stays in the app as a bundle (split later if still unbooked)
     bundle3: bool = False              # a held or new car may join an open two-car chain as its first or third car

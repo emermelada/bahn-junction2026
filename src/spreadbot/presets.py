@@ -59,3 +59,4 @@ PRESETS["d-fee3"] = PRESETS["c3g"] + ["fee_open_rule=((24,40,0.92),(12,80,0.95))
 PRESETS["d-pair"] = PRESETS["c3g"] + ["bundle_empty_end=(240,11)"]  # no long pairs ending where nobody lives
 # killed: hold_min_left=1440 (-434), offer_home_n=3 (-220, 1.5% of offers accepted)
 PRESETS["c3gf"] = PRESETS["d-fee"]  # old name of the d-fee runs (tag d-c3gf); re-market's c3gf, if merged, takes precedence
+PRESETS["d-pfee"] = PRESETS["c3g"] + ["bundle_open_dense=(12,80,0.76)"]  # cheaper pairs that end where many drivers live
