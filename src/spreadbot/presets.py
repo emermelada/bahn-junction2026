@@ -106,6 +106,12 @@ PRESETS["d-fee2d"] = PRESETS["d-fee2"] + ["desert_n=11", "desert_alarm=720"]
 # Safe low openings (SAFE_OPEN.md): cut only where warned and waited-to-1.25 stayed at c3g; 1.05 where <= 40 drivers live near the delivery.
 PRESETS["d-safe"] = PRESETS["c3g"] + ["fee_open_day=((0,3,81,24,0.85),(0,6,41,24,0.92),(0,1,81,12,0.95))",
                                       "relook_minutes=90", "relook_mult=1.05"]
+# Cuts in sparse towns pay (d-fee3 +65, d-safe +149/+248 vs d-feer +309/+344): widen d-feer's 12-24 h step to every town.
+PRESETS["d-feer4"] = PRESETS["c3g"] + ["fee_open_rule=((24,0,0.92),(12,0,0.95))", "relook_minutes=90", "relook_mult=1.05"]
+# Every team above us opens at 0.80-0.92 (Halal flat avg 0.93, alignas 0.90, RoutePulse 0.85-0.89 floor 0.74, umarbek 0.80; TOP_TEAMS.md).
+PRESETS["d-low"] = PRESETS["c3g"] + ["fee_open_rule=((24,80,0.80),(12,0,0.88))", "desert_n=11", "desert_alarm=720"]
+# ... and with no scheduled raises (drivers wait for raises they have seen; Halal: one flat fee per gig): only the own alarm escalates.
+PRESETS["d-flat"] = PRESETS["d-low"] + ["fee_rel=()"]
 # Stack + re-drivers' desert rule (no fee cut, alarm 12 h before the last pickup, for cars to towns with <= 10 drivers within 60 min)
 # + my load_desert_n (full load charge there): both from DEV46.md.
 DESERT = ["desert_n=11", "desert_alarm=720", "load_desert_n=10"]
@@ -133,3 +139,11 @@ FLU = ["flu_drops=8", "flu_mult=1.9"]
 PRESETS["k-safef"] = PRESETS["k-safe"] + FLU
 PRESETS["k-s5f"] = PRESETS["k-s5"] + FLU
 PRESETS["c3gf8"] = PRESETS["c3g"] + FLU
+# re-drivers arms on the new bar k-safe: its fee part swapped for d-fee2d's deeper openings (d-fee2d vs c3g +732/+710).
+KSAFE_BASE = PRESETS["c3g"] + MON2S + ["desert_n=11", "desert_alarm=720"]
+PRESETS["k-safe-f2"] = KSAFE_BASE + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92))"]
+PRESETS["k-safe-pf"] = PRESETS["k-safe"] + ["bundle_open_dense=(12,80,0.76)"]  # + cheaper pairs that end where many drivers live
+# k-safe-f2 cost dev-46 0.942 -> 0.924; keep only the dense-town deep cut (0.85 where >= 80 drivers live near the delivery) on k-safe.
+PRESETS["k-safe-f5"] = PRESETS["k-safe"] + ["fee_open_rule=((24,80,0.85),(24,0,0.92),(12,80,0.95))"]
+# Pairs: k-safe pays 0.85x for paired cars (31% of cars); bahn67 0.76x (49-58% paired), Halal 0.70x for two new cars (GITHUB_LEADS.md 6-7).
+PRESETS["k-safe-pm"] = PRESETS["k-safe"] + ["bundle_mult=0.72"]  # pair opening 0.72 x 1.05 = 0.76 of the two typical fees
