@@ -21,6 +21,13 @@ class Config:
     lane_w: float = 0.0                # weight of the cross-world lane table (Javier's lanes.json) in the competitor level
     max_per_batch: int = 0             # decline once we hold this many orders from one batch (a yard sending many cars)
     place_lr: float = 0.0              # per (pickup place, day) shift, spread over 80 km: the outage (0 = off)
+    outage_z: float = 0.0              # the outage (HANDBOOK: one pickup region = town + 80 km, 08-18, one non-war day, backup ~30% dearer): flag the
+                                       # region once the log-likelihood of +outage_up there reaches this, then price it up until 18:00 (0 = off)
+    outage_up: float = 0.25            # the flagged region's competitor level, times (1 + this)
+    outage_min: int = 4                # results in the region before it can be flagged
+    quote_move_cost: bool = False      # quote each option at move_cost (the fee rule's opening: 0.92-0.95x where drivers live near the delivery), not the flat cost
+    dist_lr: float = 0.0               # the competitor's price list changes shape once a week (HANDBOOK): learn a slope of its level on ln(km),
+                                       # c3g residuals show a lasting step of ~0.14 ratio per ln km on one Tue-Thu morning (PRICE_EVENTS.md) (0 = off)
     learn_fastest: bool = False        # learn the competitor only from requests where we quoted the fastest option: with only a slower
                                        # option quoted the dealer often wants speed (win 0.31 vs 0.52 at the same ratio, 16,818 quotes), which drags mu down
     dealer_lr: float = 0.006           # per dealer: the competitor cuts where we win most
