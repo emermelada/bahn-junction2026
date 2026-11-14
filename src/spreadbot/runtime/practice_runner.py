@@ -18,7 +18,7 @@ from spread.types import Action, DeskEventKind, WorldMap
 
 from spreadbot.core.declog import DecLog
 from spreadbot.core.state import State
-from spreadbot.dealer import win_model
+from spreadbot.dealer import week_level, win_model
 from spreadbot.dealer.quote import decline, quote
 from spreadbot.driver.dispatch import dispatch
 
@@ -41,7 +41,7 @@ def next_stop(now: int, ends_at: int) -> dict[str, Any]:
     return {"until": WAKE_ON, "max": min(ends_at, now + TICK)}
 
 
-OBSERVERS = [win_model.observe]  # each side's trackers, fed every new event after State has folded it
+OBSERVERS = [win_model.observe, week_level.observe]  # each side's trackers, fed every new event after State has folded it
 
 
 def observe(event: dict, state: State) -> None:

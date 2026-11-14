@@ -40,10 +40,10 @@ def dispatch(state: State, now: int) -> list[Action]:
             elif oid in state.urgent and gig["scheduledAt"] < state.urgent[oid]:
                 actions.append({"type": "reprice", "gigId": gid, "schedule": fees(state, order, _cars(gig), now, base=gig_base(state, gig))})
                 state.log(now, "reprice_urgent", gid, order=oid)
-            elif FLAGS["raise_lead"] and oid not in state.urgent and now >= (due := order["lastPickupAt"] - FLAGS["raise_lead"]) \
-                    and gig["scheduledAt"] < due:
-                actions.append({"type": "reprice", "gigId": gid, "schedule": fees(state, order, _cars(gig), now, raised=True, base=gig_base(state, gig))})
-                state.log(now, "reprice_early", gid, order=oid)
+            elif oid not in state.urgent and (ratio := raise_due(order, gig, now)):
+                actions.append({"type": "reprice", "gigId": gid, "schedule": fees(state, order, _cars(gig), now, raised=ratio,
+                                                                                  base=gig_base(state, gig))})
+                state.log(now, "reprice_early", gid, order=oid, ratio=ratio)
         need = [leg for leg in state.undelivered(order) if (oid, leg) not in state.gig_of or leg in freed]
         need = [leg for leg in need if not _backing_off(state, (oid, leg), now)]
         if not need:
@@ -87,7 +87,7 @@ def post(state: State, order: Order, legs: list[int], now: int) -> Action:
     return {"type": "post", "stops": stops, "audience": audience, "schedule": fees(state, order, len(legs), now)}
 
 
-def fees(state: State, order: Order, cars: int, now: int, raised: bool = False, base: Optional[float] = None) -> list[FeeStep]:
+def fees(state: State, order: Order, cars: int, now: int, raised: float = 0.0, base: Optional[float] = None) -> list[FeeStep]:
     fee = base if base is not None else state.requests[order["id"]]["referenceFeeCents"] * cars / len(order["legs"])
     if FLAGS["fee_ladder"]:
         ratio = 0.8 + rng(state.world_id, order["id"], cars).random() * FLAGS["fee_ladder"]
@@ -103,8 +103,8 @@ def fees(state: State, order: Order, cars: int, now: int, raised: bool = False, 
         lo, hi = FLAGS["fee_open_mid"], FLAGS["fee_open_mid"]
     if order["id"] in state.urgent:  # the top fee or 1.5 times at once, then a quarter more every half hour
         steps = [(k * 30, max(1.5, hi) + k / 4) for k in range(5)]
-    elif raised:  # one early raise for a gig still open close to its last pickup, before the deadline warning
-        steps = [(0, FLAGS["fee_raise"])]
+    elif raised:  # a raise for a gig still open as its last pickup nears, before the deadline warning
+        steps = [(0, raised)]
     elif hi <= lo:  # one flat fee: drivers who see no raises have nothing to wait for
         steps = [(0, lo)]
     else:  # from the opening fee up to the top, in five hourly steps (the starter: 1.0 to 1.5)
@@ -112,6 +112,17 @@ def fees(state: State, order: Order, cars: int, now: int, raised: bool = False, 
     if state.level == 1:
         steps = steps[:1]
     return [{"at": now + dt, "feeCents": max(1, int(fee * f + 0.5))} for dt, f in steps]
+
+
+def raise_due(order: Order, gig, now: int) -> float:
+    """The fee ratio of the latest raise that is due and not yet applied, or 0. Raises come only for a gig still
+    open as its last pickup nears: the early one (raise_mid_lead) to fee_raise_mid, the late one (raise_lead) to
+    fee_raise. A gig that books at its opening fee never shows drivers a raise."""
+    for lead, ratio in ((FLAGS["raise_lead"], FLAGS["fee_raise"]), (FLAGS["raise_mid_lead"], FLAGS["fee_raise_mid"])):
+        due = order["lastPickupAt"] - lead
+        if lead and now >= due and gig["scheduledAt"] < due:
+            return ratio
+    return 0.0
 
 
 def retry_from(state: State, order: Order, leg: int, now: int) -> int:

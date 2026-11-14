@@ -12,6 +12,7 @@ from spread.types import PriceRequest
 from spreadbot.core.rng import rng
 from spreadbot.core.state import State
 from spreadbot.dealer.flags import FLAGS
+from spreadbot.dealer import week_level
 from spreadbot.dealer.trust import trust_factor
 from spreadbot.dealer.win_model import curve, record_quote
 from spreadbot.driver.cost import estimate_cost
@@ -19,6 +20,7 @@ from spreadbot.driver.cost import estimate_cost
 DECLINE_RATIO = 5  # RULES: a quote far above list loses and costs nothing; 5x list is far above the 26-54% range
 CANDIDATES = [1.10 + 0.02 * k for k in range(31)]  # 1.10 .. 1.70
 JITTER = 0.04
+WEEK_CAP = 0.25  # the level runs 26-54% above list at level 8: never move more than about that spread
 LANE_CAP = 0.35  # no lane moves the ratio more than this: the table's p10-p90 is -0.30 to +0.25  # exploration around the chosen ratio, so the curve sees both sides of it
 
 
@@ -31,6 +33,9 @@ def quote(request: PriceRequest, state: State) -> dict[str, int]:
     trust = trust_factor(state, request["dealerId"]) if FLAGS["trust"] else 1.0
     costs = {o["kind"]: estimate_cost(request, o, state) for o in request["options"]}
     ratio = FLAGS["quote_ratio"] + FLAGS["lane_weight"] * lane_shift(request)
+    if FLAGS["week_level"]:
+        ratio += max(-WEEK_CAP, min(WEEK_CAP, FLAGS["week_level"] * week_level.shift(state)))
+        week_level.record(state, request["id"], ratio)  # the ratio the dealer sees, before trust and the same_day extra
     if FLAGS["learn_price"]:
         ratio = best_ratio(request, state, trust, costs)
         ratio += (rng(state.world_id, request["id"], "jitter").random() * 2 - 1) * JITTER

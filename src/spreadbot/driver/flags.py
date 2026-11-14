@@ -8,6 +8,8 @@ FLAGS = {
     "fee_top": 1.4,  # the schedule rises to this multiple; <= fee_open means one flat fee, which teaches no waiting
     "raise_lead": 360,  # minutes before lastPickupAt at which a still-open gig gets one raise to fee_raise; 0 is off (b7)
     "fee_raise": 1.8,  # that one raise, as a multiple of the typical fee
+    "raise_mid_lead": 0,  # minutes before lastPickupAt for an earlier, smaller raise to fee_raise_mid; 0 is off
+    "fee_raise_mid": 1.1,  # the earlier raise, for gigs opened low (fee_open_long below 1)
     "bundle": False,  # post two single cars as one chain when car A delivers near car B's pickup
     "bundle_factor": 0.8,  # the chain's fee as a share of the two single fees
     "bundle_hold": 120,  # minutes a new car waits for a partner before it is posted alone

@@ -56,3 +56,19 @@ class CurveTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WeekLevelTest(unittest.TestCase):
+    def test_dear_week_moves_price_up(self):
+        from spreadbot.core.state import State
+        from spreadbot.dealer import week_level
+        from tests.a.test_state import MAP
+        s, r = State("w", 8, 0, 9000, MAP), random.Random(4)
+        for k in range(300):  # a dear week: wins as if the competitor sat 0.15 higher than average
+            ratio = r.uniform(1.3, 1.6)
+            won = r.random() < 1 / (1 + math.exp(-(week_level.A0 + 8 * 0.15 - 8 * ratio)))
+            week_level.record(s, f"R{k}", ratio)
+            week_level.observe({"kind": "order_won", "at": k, "order": {"id": f"R{k}"}} if won else
+                               {"kind": "order_lost", "at": k, "requestId": f"R{k}"}, s)
+        s.now = 300
+        self.assertAlmostEqual(week_level.shift(s), 0.15, delta=0.06)
