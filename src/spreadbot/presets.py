@@ -132,3 +132,5 @@ PRESETS["k-safe"] = PRESETS["c3g"] + MON2S + ["fee_open_rule=((24,0,0.92),(12,80
 PRESETS["m11out"] = PRESETS["k-safe"] + ["outage_z=4.5", "outage_up=0.3"]
 # re-market: the weekly change of shape of the competitor's price list, as a slope on ln(km), on the k-safe bar.
 PRESETS["m12dist"] = PRESETS["k-safe"] + ["dist_lr=0.002"]
+# re-market: quote the fee rule's cheaper opening as the cost (wins the cars drivers near the delivery take cheaply), on k-safe.
+PRESETS["m13mc"] = PRESETS["k-safe"] + ["quote_move_cost=true"]

@@ -515,7 +515,11 @@ class Desk:
                 meta[kind] = p_ok
                 info.append(f"{kind}:p={p_ok:.2f},L={load:.3f}")
                 continue
-            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, cost, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
+            c_opt = cost
+            if cfg.quote_move_cost:
+                # The fee rule opens cheap where drivers live near the delivery and the pickup is far off: quote that cost.
+                c_opt = cost * self.move_cost(r, opt) / max(1.0, r["referenceFeeCents"] * self.cost_mult())
+            ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, c_opt, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 info.append(f"{kind}:noev")
                 continue
