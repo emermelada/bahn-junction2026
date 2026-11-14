@@ -459,8 +459,13 @@ export class V2Desk implements Desk {
       const partner = this.orders.get(pid)
       if (!partner || partner.legs.length !== 1 || this.urgent.has(pid) || this.now >= partner.lastPickupAt) continue
       const b = partner.legs[0]!
-      if (this.geo.road(a.delivery.placeId, b.pickup.placeId) > B.pairRoadMin || this.geo.road(b.delivery.placeId, a.pickup.placeId) > B.pairRoadMin) continue
+      // Out-and-back needs both hops short; a chain (bundles.chain) needs only the hop from the first car's delivery
+      // to the second car's pickup: one driver moves two cars with one trip out and one trip home.
+      const there = this.geo.road(a.delivery.placeId, b.pickup.placeId) <= B.pairRoadMin
+      const back = this.geo.road(b.delivery.placeId, a.pickup.placeId) <= B.pairRoadMin
+      if (B.chain ? !(there || back) : !(there && back)) continue
       for (const [first, second] of [[order, partner], [partner, order]] as const) {
+        if (B.chain && this.geo.road(first.legs[0]!.delivery.placeId, second.legs[0]!.pickup.placeId) > B.pairRoadMin) continue
         const drive = this.pairDrive(first, second)
         if (drive === null) continue
         if (!best || drive < best.drive) best = { gigId, partner, first, second, drive }
