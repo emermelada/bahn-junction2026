@@ -283,7 +283,11 @@ def main() -> int:
     ap.add_argument("--save-events", action="store_true")
     ap.add_argument("--quiet", action="store_true")
     ap.add_argument("--board", action="store_true", help="play the team's next ranking run (humans only)")
+    ap.add_argument("--preset", default="", help="named overrides from presets.py, e.g. money")
     args = ap.parse_args()
+    if args.preset:
+        from .presets import PRESETS
+        args.set = PRESETS[args.preset] + (args.set or [])
     return practice(args) if args.mode == "practice" else final(args)
 
 
