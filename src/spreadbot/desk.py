@@ -517,6 +517,11 @@ class Desk:
             if cfg.safe_load_p and p_ok >= cfg.safe_load_p and cfg.ontime_model == "gbm":
                 load_cost = 0.0  # the trees already price this day's load (due_load) into P(late): a car they call safe pays no second load charge
             risk_frac = (1 - p_ok) * cfg.late_cost_frac * self.pl_factor(drive)
+            c_safe = cost
+            if cfg.safe_cost and p_ok >= cfg.safe_cost[0] and cfg.ontime_model == "gbm":
+                # Safe cars pay 0.99x the typical fee (we charge 1.05x) and lose 0.3-0.9% of price to refunds (we charge 1.2-3.6%).
+                c_safe = r["referenceFeeCents"] * cfg.safe_cost[1]
+                risk_frac = (1 - p_ok) * cfg.safe_cost[2]
             short = 0.0
             if cfg.short_fee and drive >= cfg.short_fee[1]:
                 lead_h = (self.est_last_pickup(r, opt["deadline"]) - r["respondBy"]) / 60
@@ -534,7 +539,7 @@ class Desk:
                 meta[kind] = p_ok
                 info.append(f"{kind}:p={p_ok:.2f},L={load:.3f}")
                 continue
-            c_opt = cost
+            c_opt = c_safe
             if cfg.quote_move_cost:
                 # The fee rule opens cheap where drivers live near the delivery and the pickup is far off: quote that cost.
                 c_opt = cost * self.move_cost(r, opt) / max(1.0, r["referenceFeeCents"] * self.cost_mult())

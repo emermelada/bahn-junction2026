@@ -97,6 +97,8 @@ class Config:
     cong_horizon: int = 18 * 60        # only gigs whose last pickup is within this many minutes
     # --- load: our cars due per day over the world's drivers
     load_free: float = 0.07            # rc3: with late 2.0 the long and thin-town cars get dear, so the safe ones can take more load (y4)
+    safe_cost: tuple = ()              # (P(on time) from, fee over typical, late cost frac): price safe cars at what they really cost; measured 0.99x fee,
+                                       # refunds 0.3-0.9% of price vs 1.05x and 1.2-3.6% charged (research/re/market/SAFE_DECLINES.md) (() = off)
     safe_load_p: float = 0.0           # no load charge for a car whose gbm P(on time) is at least this: the trees have due_load as a feature, the charge counts load twice (0 = off)
     load_free_mon2: float = 0.0        # load_free for cars due on the last Monday (0 = load_free): Friday noev is 80-94% the load charge, Mon2 cars 2.4-3.2% late (research/re/market/WAR_FRIDAY.md)
     mon2_max_drive: int = 0            # load_free_mon2 only for drives under this (min): long Mon2 gigs wait ~77 h, 29-44% late (research/re/market/MON2_LATE.md) (0 = all)
