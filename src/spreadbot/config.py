@@ -150,6 +150,7 @@ class Config:
     long_warn: tuple = ()              # (drive min, n, window min): decline cars with drive >= this while >= n of our long cars got a
                                        # deadline warning in the last window min (() = off). Both unranked fresh weeks: 2-3x the usual long
                                        # cars, 36-39% late, warned 5x as often, P(on time) at quote ~0.94 as usual (research/re/H2_AUTOPSY.md)
+    long_warn_distinct: bool = False   # long_warn counts distinct warned cars, not warning events (one car can be warned 5x)
     crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar
     view_raise_n: int = 0              # this many viewers and no booking: raise to view_raise_mult at once
     view_raise_after: int = 45

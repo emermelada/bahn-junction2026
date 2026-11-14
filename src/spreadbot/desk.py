@@ -109,6 +109,7 @@ class Desk:
         self.night_drops: dict[int, int] = defaultdict(int)  # drops 00:00-01:00 per day (flu nights)
         self.flu_days: set = set()
         self.long_warns: list[int] = []  # minutes of deadline warnings on our long-drive orders (long_warn)
+        self.long_warn_ids: list[tuple[int, str]] = []  # (minute, order) of the same warnings (long_warn_distinct)
         self.due_count: dict[int, int] = defaultdict(int)
         self.batch_won: dict[str, int] = defaultdict(int)
         self.need_resync = False
@@ -447,6 +448,7 @@ class Desk:
             o = ob.order
             if sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in o["legs"]) >= self.cfg.long_warn[0]:
                 self.long_warns.append(e["at"])
+                self.long_warn_ids.append((e["at"], e["orderId"]))
         self.say("DEADLINE_CLOSE", f"{e['orderId']} lastPickupAt={e['lastPickupAt']}")
         self.dispatch_order(e["orderId"], "deadline_close")
         for leg in self.undelivered(e["orderId"]):
@@ -510,6 +512,10 @@ class Desk:
         drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
         if cfg.long_warn and drive >= cfg.long_warn[0]:
             recent = sum(1 for t in self.long_warns if t >= self.now - cfg.long_warn[2])
+            if cfg.long_warn_distinct:
+                # Count cars, not warning events: a car re-planned after a missed collection is warned again and again
+                # (ARCHIVE D_LONGWARN.md: dev-40, one car warned 5x drove 85 declines).
+                recent = len({o for t, o in self.long_warn_ids if t >= self.now - cfg.long_warn[2]})
             if recent >= cfg.long_warn[1]:
                 # Our long cars are going unbooked this week: a new long car would wait for drivers who are not there.
                 return decline_prices(r), f"DECLINE long {drive} min: {recent} long cars warned in {cfg.long_warn[2]} min"

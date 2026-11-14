@@ -202,3 +202,6 @@ PRESETS["k-f1h8"] = PRESETS["k-f1h7"] + ["fee1_only=(20,30)", "fee1_max_posts=2"
 # fee1 first pick only: a miss joins the old ladder in place at the 6 h re-pick, no last call (ARCHIVE B_REPORT: first picks +540/wk on
 # every week class, re-posts -103..-220, long_warn -46..-157).
 PRESETS["k-f1h5fL"] = PRESETS["k-f1h5f"] + ["fee1_after_ladder=true", "fee1_last_call=0"]
+# long_warn on distinct cars (ARCHIVE D_LONGWARN.md: the guard counted warning events; one re-planned car warned 5x set off 85 declines).
+PRESETS["k-f1h5fD"] = PRESETS["k-f1h5f"] + ["long_warn_distinct=true"]
+PRESETS["k-safe-dclD"] = PRESETS["k-safe-dcl"] + ["long_warn_distinct=true"]
