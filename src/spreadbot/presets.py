@@ -50,17 +50,12 @@ PRESETS["c3rl"] = PRESETS["c3"] + ["relook_minutes=360"]
 PRESETS["c3bprl"] = PRESETS["c3bp"] + ["relook_minutes=360"]
 # The lateness model from all our weeks (late_gbm.py, AUC 0.897 vs 0.737) in place of the logistic: the main line since Sat 14 Nov.
 PRESETS["c3g"] = PRESETS["c3"] + ["ontime_model=gbm"]
-# Candidates (claude/re-drivers): post next-day cars with an early last pickup at once; opening fee by slack and drivers near the delivery.
-PRESETS["c3gh"] = PRESETS["c3g"] + ["hold_min_left=1440"]
-PRESETS["c3gf"] = PRESETS["c3g"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))"]
-PRESETS["c3gf2"] = PRESETS["c3g"] + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92))"]  # deeper: drivers near the delivery skip the dear trip home
-PRESETS["c3ge"] = PRESETS["c3g"] + ["bundle_empty_end=(240,11)"]  # no long pairs ending where nobody lives
-PRESETS["c3go"] = PRESETS["c3g"] + ["offer_home_n=3"]  # offers to drivers who live near the delivery
-# re-drivers names (the short ones above are removed once their running tests end): d- prefix avoids clashes with re-market.
-PRESETS["d-fee"] = PRESETS["c3gf"]
-PRESETS["d-fee2"] = PRESETS["c3gf2"]
-PRESETS["d-pair"] = PRESETS["c3ge"]
-PRESETS["d-offer"] = PRESETS["c3go"]
+# Candidates (claude/re-drivers), research/re/drivers/NOTES.md. d-fee: PASSES dev-07..18 +369, dev-43..54 +429, WAR +708 vs c3g.
+PRESETS["d-fee"] = PRESETS["c3g"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))"]  # opening fee by slack and drivers near the delivery
+PRESETS["d-fee2"] = PRESETS["c3g"] + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92))"]  # deeper: drivers near the delivery skip the dear trip home
 PRESETS["d-feer"] = PRESETS["d-fee"] + ["relook_minutes=90", "relook_mult=1.05"]  # a low opening unbooked after 90 min goes back to 1.05 now
 # d-fee's low openings where < 40 drivers live near the delivery doubled the warned share (3.2% -> 6.7%) for 7% less fee; >= 40: flat, -11%.
 PRESETS["d-fee3"] = PRESETS["c3g"] + ["fee_open_rule=((24,40,0.92),(12,80,0.95))"]
+PRESETS["d-pair"] = PRESETS["c3g"] + ["bundle_empty_end=(240,11)"]  # no long pairs ending where nobody lives
+# killed: hold_min_left=1440 (-434), offer_home_n=3 (-220, 1.5% of offers accepted)
+PRESETS["c3gf"] = PRESETS["d-fee"]  # old name of the d-fee runs (tag d-c3gf); re-market's c3gf, if merged, takes precedence
