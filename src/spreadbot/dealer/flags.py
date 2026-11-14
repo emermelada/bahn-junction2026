@@ -1,6 +1,6 @@
 """Dealer-side switches. Each idea sits behind one, so harness/sweep.py --flag dealer.<name>=<value> can ablate it."""
 FLAGS = {
-    "quote_ratio": 1.4,  # price = ratio x list; the ladder wins ~40% at 1.4 (docs/log a-...-price-ladder); 1.0 is the kit starter
+    "quote_ratio": 1.45,  # price = ratio x list; 1.45 vs 1.4 on 36 fresh weeks: ranked 35 vs 33, same mean money (docs/log ratio-145)
     "min_margin_cents": 1500,  # decline an option whose price minus the planned fee is below this; None is off (b4 vs b2: +€4-8k)
     "trust_invest": 0.0,  # quote this much lower to big dealers until their trust count is full (25); 0 is off
     "outage_up": 0.0,  # ratio added in a region where we win nearly everything today (competitor outage); 0 is off
