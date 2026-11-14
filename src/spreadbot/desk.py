@@ -1499,9 +1499,11 @@ class Desk:
             last = self.last_pickup(ob, [l for _, l in rec.legs])
             if last - self.now < 2 * HOUR:
                 continue  # the rescue path (alarm, warning) takes over
+            # The gig's own fee is the floor: after a restart the world's snapshot still says which step it was posted at.
+            posted = current_fee(rec.schedule, self.now) / max(1.0, self.base_fee(ob, [l for _, l in rec.legs])) + 0.01
             step = 0.0
             for hours_before, mult in cfg.fee_rel:
-                if self.now >= last - int(hours_before * HOUR) and mult > max(cfg.fee_open, ob.repost_mult):
+                if self.now >= last - int(hours_before * HOUR) and mult > max(cfg.fee_open, ob.repost_mult, posted):
                     step = max(step, mult)
             if step:
                 ob.repost_mult = step
