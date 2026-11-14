@@ -90,3 +90,5 @@ GATE = ["gate_bonus_cents=4000", "gate_target=0.94", "gate_span=0.02", "gate_saf
 PRESETS["k-s1d"] = PRESETS["k-s1"] + GATE
 PRESETS["k-s3d"] = PRESETS["k-s3"] + GATE
 PRESETS["c3gd"] = PRESETS["c3g"] + GATE
+# Stronger guard: the projection is up to +0.02..0.03 optimistic (projerr.py), so start diluting under 0.955, full bonus at 0.925.
+PRESETS["k-s3e"] = PRESETS["k-s3"] + ["gate_bonus_cents=4000", "gate_target=0.955", "gate_span=0.03", "gate_safe_p=0.95"]
