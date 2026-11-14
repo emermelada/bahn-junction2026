@@ -54,6 +54,8 @@ class Config:
     gate_target: float = 0.935
     gate_span: float = 0.02            # full bonus this far under target
     gate_safe_p: float = 0.95
+    load_cap: float = 0.0              # no quote for an option whose deadline day already holds this share of the roster (0 = off):
+                                       # late 4-6% under day load 0.12, 8% at 0.12-0.14, 12-13% above (research/re/lateload.py, tuning runs)
     gate_load_max: float = 0.0         # no gate bonus for a car whose deadline day is already this loaded (0 = off): late share climbs
                                        # from 0.046 at day load 0.08-0.10 to 0.084 at 0.12-0.14 and 0.122 above (research/re/lateload.py)
     steer: float = 0.0                 # with both quoted: same_day at least next_day / steer (dealers take next_day under ~0.85x)

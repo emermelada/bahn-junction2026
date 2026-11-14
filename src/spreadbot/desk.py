@@ -487,6 +487,9 @@ class Desk:
             # (lab: 2.7% late under 6% of drivers, 8.7% at 9-12%, 12% above 15%), so a busy day's next car costs more.
             dday = self.deadline_day(r, opt)
             load = self.due_load(dday)
+            if cfg.load_cap and load >= cfg.load_cap:
+                info.append(f"{kind}:skip(load={load:.3f})")  # a day this full makes its cars late (12-13% at 0.14+ vs 4-6% under 0.12)
+                continue
             free = cfg.load_free_mon2 if (cfg.load_free_mon2 and dday >= 7) else cfg.load_free
             per_car = cfg.load_flat_cents if cfg.load_flat_cents else r["referenceFeeCents"]
             slope = cfg.load_slope

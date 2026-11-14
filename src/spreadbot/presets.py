@@ -98,3 +98,6 @@ PRESETS["k-s3x"] = PRESETS["k-s3"] + ["load_desert_n=10"]
 # k-s3d with the bonus only on deadline days under load 0.12 (the knee), so dilution does not overload a day.
 PRESETS["k-s3dl"] = PRESETS["k-s3d"] + ["gate_load_max=0.12"]
 PRESETS["k-s3xdl"] = PRESETS["k-s3x"] + GATE + ["gate_load_max=0.12"]
+# k-s3dl with a hard cap on any deadline day's load: the stacks push days to 0.20-0.23 where piles go late.
+PRESETS["k-s3c15"] = PRESETS["k-s3dl"] + ["load_cap=0.15"]
+PRESETS["k-s3c17"] = PRESETS["k-s3dl"] + ["load_cap=0.17"]
