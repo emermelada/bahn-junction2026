@@ -74,7 +74,10 @@ export class Quoter {
         const cViaGovernor = flags.gate && tier === "C" && flags.governor && this.cfg.governor.admitC && f.slackHours >= this.cfg.governor.cMinSlack
         if (flags.gate && tier === "C" && !cViaGovernor) why = "tier C"
         if (!why && this.cfg.capacity.batchMax > 0 && request.batchId && (this.batchAdmitted.get(request.batchId) ?? 0) >= Math.max(this.cfg.capacity.batchMax, Math.round(this.cfg.capacity.batchPerReach * this.geo.reach30(pickup).all))) (tier = "C"), (why = "batch cap")
-        if (!why && flags.gate && option.kind === "next_day" && f.drive > this.cfg.gate.nextDay.maxDriveMin) (tier = "C"), (why = "long next_day")
+        // A long next_day takes a driver's whole day: admit it only while the late budget has room (longIfHeadroom),
+        // so worlds with spare drivers take the long lanes and tight worlds keep their drivers for the short ones.
+        const longRoom = this.cfg.gate.nextDay.longIfHeadroom
+        if (!why && flags.gate && option.kind === "next_day" && f.drive > this.cfg.gate.nextDay.maxDriveMin && !(longRoom !== undefined && flags.governor && this.governor.headroom(now, 1, atRisk, this.pendingExtra()) >= longRoom)) (tier = "C"), (why = "long next_day")
         // Friday same_day that cannot start before fridayLatestStart: 29% late at volume (thin Friday afternoon supply).
         const fri = this.cfg.gate.sameDay.fridayLatestStart
         if (!why && flags.gate && fri !== undefined && option.kind === "same_day") {
