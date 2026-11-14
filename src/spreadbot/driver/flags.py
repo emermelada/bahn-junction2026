@@ -24,7 +24,7 @@ FLAGS = {
     "gov_tight": 0.05,  # projected late share above which the governor goes tight (plan: budget 5%)
     "gov_rescue": 0.08,  # and above which it goes to rescue (never spend 10%)
     "governor": True,  # risk_mode from the projected late share; tight and rescue make serviceability stricter (b7: 3/3 ranked)
-    "max_per_batch": 0,  # decline once we hold this many orders from one batchId (a yard sending many cars); 0 is off
+    "max_per_batch": 6,  # decline once we hold this many orders from one batchId (a yard sending many cars); 0 is off (rc4 10/12 -> 12/12, rc5 12/12)
     "orders_per_driver_day": 0.0,  # cap on won orders per last-pickup day, per driver in the world; 0 is off
     "cars_per_driver_day": 0.0,  # cap on cars won per pickup town and ready day, per nearby driver; 0 is off
     "fee_ladder": 0.0,  # lab only: >0 posts every gig at one flat fee, a random multiple of the typical fee in [0.8, 0.8 + fee_ladder]
