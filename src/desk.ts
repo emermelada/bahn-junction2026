@@ -78,7 +78,8 @@ export class V2Desk implements Desk {
       const pLate = feas && f.gate ? 1 - cfg.governor.pOnTime[feas.tier] : 0
       // Long drives (a driver's whole day, far from home, the trip home bought on the day) cost more than the band estimate.
       const long = feas && feas.drive >= M.longFrom ? M.longMult : 1
-      const cost = (this.fees.estimate(request) * long) / option.listPriceCents + pLate * M.lateLoss
+      // carCost: a shadow price per car (cents) for the scarce driver it uses: cheap short lanes must earn it too.
+      const cost = (this.fees.estimate(request) * long + M.carCost * request.legs.length) / option.listPriceCents + pLate * M.lateLoss
       return this.pricing.quoteRatio(request, option, this.now, f.capacity ? this.capacity.dealerPenalty(request.dealerId, this.now) : 0, cost)
     }
   }
