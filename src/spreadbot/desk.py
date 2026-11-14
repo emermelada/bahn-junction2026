@@ -146,6 +146,13 @@ class Desk:
         self.warned: set[str] = set()  # orders that had a deadline warning
         self._strict_cfg: Optional[Config] = None
         self._fee1 = None  # Fee1 engine (fee1.py), built on first use when cfg.fee1
+        self.scarce = False  # scarcity switch: this week drivers are scarce (FLEET's cheap openings read it too)
+        self.scarce_hour = -1  # last hour boundary (minute // 60) the scarcity rule was checked at
+        self.book_log: list[tuple[int, float]] = []  # (minute, booked fee / typical) of single-order gigs (scarcity)
+        self.warn_log: list[tuple[int, str]] = []  # (minute, order) of deadline warnings (scarcity)
+        self.won_log: list[int] = []  # minutes of our wins (scarcity)
+        self.admitted: set[str] = set()  # requests quoted by safe_admit
+        self.admits: dict[int, int] = defaultdict(int)  # day of quote -> safe_admit quotes (rebuilt by the replay of price requests)
 
     # ------------------------------------------------------------------ helpers
     def say(self, code: str, detail: str = "") -> None:
@@ -179,6 +186,11 @@ class Desk:
     # ------------------------------------------------------------------ events
     def handle(self, e: dict) -> None:
         k = e["kind"]
+        if self.cfg.scarcity and not self.scarce:
+            try:
+                self.check_scarcity(e.get("at", self.now))
+            except Exception as exc:
+                self.say("ERR", f"scarcity {type(exc).__name__}: {exc}")
         try:
             fn = getattr(self, "on_" + k, None)
             if fn:
@@ -212,6 +224,7 @@ class Desk:
         ob.p_ok = self.quote_meta.get(o["id"], {}).get(o["option"], 0.85)
         self.orders[o["id"]] = ob
         self.won_count += 1
+        self.won_log.append(e["at"])
         self.observe_outcome(o["id"], e["at"], True)
         if self.cfg.hold:
             rel = self.release_at(ob)
@@ -295,6 +308,7 @@ class Desk:
                 if rec.id in self.gig_open:
                     self.bo_ratios.append(e["feeCents"] / max(1, self.gig_open[rec.id]))
                 if len({o for o, _ in rec.legs}) == 1:
+                    self.book_log.append((e["at"], e["feeCents"] / max(1.0, self.gig_base(rec))))
                     o = ob.order
                     drive = sum(self.geo.drive(o["legs"][l]["pickup"]["placeId"], o["legs"][l]["delivery"]["placeId"]) for _, l in rec.legs)
                     for limit, mult in DRIVE_COST:
@@ -444,6 +458,7 @@ class Desk:
         ob.urgent = True
         ob.order["lastPickupAt"] = e["lastPickupAt"]
         self.warned.add(e["orderId"])
+        self.warn_log.append((e["at"], e["orderId"]))
         if self.cfg.long_warn:
             o = ob.order
             if sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in o["legs"]) >= self.cfg.long_warn[0]:
@@ -519,6 +534,9 @@ class Desk:
             if recent >= cfg.long_warn[1]:
                 # Our long cars are going unbooked this week: a new long car would wait for drivers who are not there.
                 return decline_prices(r), f"DECLINE long {drive} min: {recent} long cars warned in {cfg.long_warn[2]} min"
+        if self.scarce and cfg.scarcity_long and drive >= cfg.scarcity_long:
+            # A scarce week: long cars wait for drivers who are not there (long_warn's class, decided for the whole week).
+            return decline_prices(r), f"DECLINE scarce long {drive} min"
         cost = r["referenceFeeCents"] * (cfg.quote_cost_hold or (self.drive_cost_mult(drive) if cfg.drive_cost else self.cost_mult()))
         if cfg.quote_cost_hold and cfg.quote_cost_floor:
             # fee1's savings stop the quote's fall below the hold, nothing more: never under the base's quote, and a week where
@@ -564,6 +582,8 @@ class Desk:
                 free, slope = cfg.load_free, cfg.load_desert_slope
             load_cost = slope * per_car * max(0.0, load - free * self.capacity_factor()) / 0.05
             risk_frac = (1 - p_ok) * cfg.late_cost_frac * self.pl_factor(drive)
+            if self.scarce:
+                risk_frac *= cfg.scarcity_risk  # a scarce week's late risk is above the model's: risky classes quoted up
             short = 0.0
             if cfg.short_fee and drive >= cfg.short_fee[1]:
                 lead_h = (self.est_last_pickup(r, opt["deadline"]) - r["respondBy"]) / 60
@@ -587,7 +607,17 @@ class Desk:
                 c_opt = cost * self.move_cost(r, opt) / max(1.0, r["referenceFeeCents"] * self.cost_mult())
             ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, c_opt, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             if ratio <= 0 or ev < cfg.min_ev_cents:
-                info.append(f"{kind}:noev")
+                adm = self.safe_admit(r, opt, p_ok, drive, dday, load, dealer, day, tf, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost)
+                if adm is None:
+                    info.append(f"{kind}:noev")
+                    continue
+                ratio, ev, c_adm = adm
+                if r["id"] not in self.admitted:  # one count per request (a rejoin quotes open requests again)
+                    self.admitted.add(r["id"])
+                    self.admits[self.now // DAY] += 1
+                prices[kind] = int(round(opt["listPriceCents"] * ratio * tf))
+                meta[kind] = p_ok
+                info.append(f"{kind}:admit(r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f},c={c_adm/100:.0f},L={load:.3f},n={self.admits[self.now // DAY]})")
                 continue
             if cfg.trust_invest and self.investing(dealer, p_ok):
                 # Build a big dealer's trust fast: win its safe cars with high probability while each still
@@ -629,6 +659,66 @@ class Desk:
         if not prices:
             return decline_prices(r), f"DECLINE {head} {' '.join(info)}"
         return prices, f"{head} {' '.join(info)}"
+
+    def safe_admit(self, r: dict, opt: dict, p_ok: float, drive: int, dday: int, load: float, dealer: str, day: int, tf: float,
+                   risk_frac: float, extra: float) -> Optional[tuple[float, float, float]]:
+        """A safe car the quote cost declines for no margin: (ratio, ev, cost) at the true fleet cost, or None. Admits only, never
+        reprices a car we quote anyway (MARKET: quoting everything at the lower cost was -396/wk at equal orders, the load charge binds)."""
+        cfg = self.cfg
+        if not cfg.safe_admit or self.scarce or cfg.menu:
+            return None
+        p_min, mult, max_load = cfg.safe_admit
+        q = r["legs"][-1]["delivery"]["placeId"]
+        if p_ok < p_min or drive >= cfg.safe_admit_drive or load >= max_load or (dday == 4 and not cfg.safe_admit_fri):
+            return None
+        if cfg.desert_n and self.desert(q):
+            return None
+        c = r["referenceFeeCents"] * mult
+        if cfg.safe_admit_fee1 and cfg.fee1:
+            fq = self.fee1.quote_cost(r, opt)
+            if fq is not None:
+                c = min(c, fq[1])  # fee1's own expected fee + rescue cost of moving this car alone
+        ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, c, risk_frac, extra, r["legs"][0]["pickup"]["placeId"], lane_of(r))
+        if ratio <= 0 or ev < cfg.min_ev_cents:
+            return None
+        return ratio, ev, c
+
+    def switch_cfg(self, kw: dict) -> None:
+        """From now on the week runs on cfg with these overrides: price(), due_load() and dispatch read self.cfg; the market's copy and
+        a strict governor's cached config follow (the replay flips at the same event, so a restart rebuilds the same config)."""
+        old = self.cfg
+        self.base_cfg = old
+        self.cfg = old.with_(**kw)
+        for part in (self.market, self.ontime, self.gov):
+            if getattr(part, "cfg", None) is old:
+                part.cfg = self.cfg
+        if self._strict_cfg is not None:
+            self._strict_cfg = self._strict_cfg.with_(**kw)
+
+    def check_scarcity(self, t: int) -> None:
+        """The week-level switch: at each hour boundary H from scarcity_from to scarcity_until that time t has passed, the last 24 h
+        before H (events at < H only, so a replay flips at the same H) are scarce if booked single-gig fee/typical >= fee_typ or warned
+        cars / won cars >= warned_share. Sticky: once scarce, scarce for the week."""
+        cfg = self.cfg
+        hi = min(t, cfg.scarcity_until) // 60
+        h = max(self.scarce_hour + 1, -(-cfg.scarcity_from // 60))
+        while h <= hi and not self.scarce:
+            self.scarce_hour = h
+            H = h * 60
+            fees = [x for at, x in self.book_log if H - DAY <= at < H]
+            won = sum(1 for at in self.won_log if H - DAY <= at < H)
+            warned = len({o for at, o in self.warn_log if H - DAY <= at < H})
+            fee = sum(fees) / len(fees) if len(fees) >= cfg.scarcity_min_n else 0.0
+            share = warned / won if won >= cfg.scarcity_min_n else 0.0
+            f_lim, w_lim = cfg.scarcity
+            if fee >= f_lim or share >= w_lim:
+                self.scarce = True
+                self.say("SCARCE", f"at {H}: fee/typ={fee:.3f} (n={len(fees)}, >= {f_lim}) warned/won={warned}/{won}={share:.3f} (>= {w_lim})"
+                         f": no safe_admit, long >= {cfg.scarcity_long} declined, risk x{cfg.scarcity_risk}, set {dict(cfg.scarce_set)}")
+                if cfg.scarce_set:
+                    self.switch_cfg(dict(cfg.scarce_set))
+            h += 1
+        self.scarce_hour = max(self.scarce_hour, hi)
 
     def pl_factor(self, drive: int) -> float:
         """Calibration of the on-time model by drive time (pl_cal): it over-predicts lateness of 1-6 h drives and

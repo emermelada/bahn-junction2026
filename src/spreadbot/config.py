@@ -258,6 +258,24 @@ class Config:
     backhaul_wait: int = 90            # minutes the driver may wait for the pickup window or the site to open
     backhaul_free_by: int = 17 * 60    # only drivers who finish by this minute of the day
     backhaul_home_by: int = 21 * 60    # the second car is delivered by this minute of the day
+    # --- V5 quote: admit safe cars at the true fleet cost; a week-level scarcity switch (research/re/v5/QUOTE_BUILD.md)
+    safe_admit: tuple = ()             # (p_min, cost_mult, max_load): a car we would decline for no margin (noev) gets a second look at
+                                       # cost = typical x cost_mult (safe_admit_fee1: or fee1's estimate) if P(on time) >= p_min, short, not a desert and its
+                                       # day's load < max_load; () = off. FLEET: 285 safe cars + 80 no-margin declines lost a week (VOLUME.md)
+    safe_admit_drive: int = 240        # only cars under this many drive minutes (long_warn's long class: long cars carry the late tail)
+    safe_admit_fee1: bool = False      # also take fee1's planned cost (fee + rescue) when lower: off, its plans run optimistic (it plans
+                                       # ~0.8-0.9x on long leads; lone cars realised ~1.04x typical under the release)
+    safe_admit_fri: bool = False       # off: no admits due on Friday (day 4): extra volume lands there at ~10% marginal late (SAFE_VOLUME.md)
+    scarcity: tuple = ()               # (fee_typ, warned_share): the week is scarce once, from Tue 24:00, the last 24 h's booked single-gig
+                                       # fee/typical >= fee_typ or warned/won >= warned_share (probe/SCARCITY.md: Tue fee >= 1.08 flags 24% of bad
+                                       # weeks at 3% false alarms; warned/won median 0.063 bad vs 0.031 normal); () = off
+    scarcity_from: int = 2880          # first check at Tue 24:00: no Monday signal exists (SCARCITY.md, AUC 0.51-0.55)
+    scarcity_until: int = 4320         # last hourly check before Thu 00:00: a later flip guards little (Friday has the Friday guard)
+    scarcity_min_n: int = 20           # bookings and wins in the 24 h window needed for a ratio (a normal Tuesday has ~100 of each)
+    scarcity_long: int = 0             # scarce week: decline cars with drive >= this many minutes (long_warn's class, for the week; 0 = off)
+    scarcity_risk: float = 1.0         # scarce week: risk_frac x this, so risky classes are quoted up (1.0 = off)
+    scarce_set: tuple = ()             # ((name, value), ...): config overrides from the flip on, e.g. a volume arm's load params back to the
+                                       # release's (k-f1h5fV2: +779 on WAR but fresh-10 0.891 / fresh-20 0.893 vs 0.939 / 0.927)
     # --- experiments (research runs only)
     experiment_quote: bool = False
     exp_quote_lo: float = 1.0

@@ -198,3 +198,17 @@ PRESETS["k-safe-dclD"] = PRESETS["k-safe-dcl"] + ["long_warn_distinct=true"]
 # V5a: long cars (>= 4 h drive) may go down to 0.90 under fee1 (they paid 1.00-1.05x at 24 h+ leads: EUR ~900/wk above 0.90x,
 # research/re/v5/lead_open_f1h5f.out); the guard counts warned cars, not warning events (ARCHIVE D_LONGWARN.md).
 PRESETS["v5a"] = PRESETS["k-f1h5f"] + ["long_warn_distinct=true", "fee1_long=(240,0.9)"]
+# V5 quote (research/re/v5/QUOTE_BUILD.md). v5q1: a car declined for no margin (noev) gets a second look at the true fleet cost
+# (0.95x typical, or fee1's own estimate if lower) when P(on time) >= 0.97, drive < 4 h, not a desert, its day's load < 0.12, not Friday.
+PRESETS["v5q1"] = PRESETS["v5a"] + ["safe_admit=(0.97,0.95,0.12)"]
+# v5q2: + the scarcity switch from Tue 24:00 (last 24 h fee/typ >= 1.08 or warned/won >= 0.06): no admits, long cars declined, risk x1.5.
+SCARCITY = ["scarcity=(1.08,0.06)", "scarcity_long=240", "scarcity_risk=1.5"]
+PRESETS["v5q2"] = PRESETS["v5q1"] + SCARCITY
+# v5q3: v5q2 with admits allowed on Friday too.
+PRESETS["v5q3"] = PRESETS["v5q2"] + ["safe_admit_fri=true"]
+# FLEET's volume arm V2 (load_bundle_w 0.6, load_free 0.12, load_slope 2: +779 on WAR, but fresh-10 0.891 / fresh-20 0.893 vs release
+# 0.939 / 0.927) with the scarcity switch turning its load params back to the release's (0.07, 1.0, 1.0) once the week is scarce.
+PRESETS["k-f1h5fV1"] = PRESETS["k-f1h5f"] + ["load_bundle_w=0.6"]  # as on claude/fleet-run (v1-fleet-run presets.py)
+PRESETS["k-f1h5fV2"] = PRESETS["k-f1h5fV1"] + ["load_free=0.12", "load_slope=2"]
+PRESETS["v5q2V"] = PRESETS["k-f1h5fV2"] + ["long_warn_distinct=true"] + SCARCITY + [
+    "scarce_set=(('load_free',0.07),('load_slope',1.0),('load_bundle_w',1.0))"]
