@@ -221,3 +221,6 @@ PRESETS["k-f1h5fV2"] = PRESETS["k-f1h5fV1"] + ["load_free=0.12", "load_slope=2"]
 PRESETS["k-f1h5fV2c"] = PRESETS["k-f1h5fV2"] + ["load_cap=0.15"]
 # V2 + strict governor once 7% of our orders had a deadline warning (V2's worst weeks: 8-9% warned vs 3-6% normal; base dev-43 8%).
 PRESETS["k-f1h5fV2s"] = PRESETS["k-f1h5fV2"] + ["strict_warn=0.07"]
+# Kill V2s: strict_warn 0.07 fired in 6/8 weeks, on-time unchanged (0.918 vs 0.921), -500..-2,100 where it fired: too late a signal.
+# V2m: the gentler volume arm, barrier at day load 0.10 (between V1 +154 / worst 0.946 and V2 +780 / worst 0.921).
+PRESETS["k-f1h5fV2m"] = PRESETS["k-f1h5fV1"] + ["load_free=0.10", "load_slope=2"]
