@@ -14,7 +14,14 @@
 | e1-hold18 | 18:00 | 12/12 | 0.922 | 5,385 | 10,247 | 10,364 | 300 |
 | **e2-hold16** | **16:00** | **12/12** | **0.931** | **6,826** | 9,452 | **10,690** | 299 |
 | e3-hold20 | 20:00 | 12/12 | 0.931 | 5,074 | 10,188 | 9,987 | 297 |
-| f1-hold14 (7 of 12 seeds) | 14:00 | 7/7 | 0.944 | | | +1,358 vs base on the same 7 | |
+| f1-hold14 (8 of 12 seeds, batch cut by a memory reap) | 14:00 | 8/8 | 0.944 | | | +1,149 vs base on the same 8 | 296 |
+| f2-hold12 | 12:00 | 12/12 | 0.925 | 5,503 | 10,243 | 10,326 | 301 |
+| f3-h16-keep | 16:00, dropped pair kept at 0.95x | 12/12 | 0.928 | 6,620 | 9,621 | 10,662 | 298 |
+| f4-h16-price | 16:00, quote at bundle cost if a held car pairs | 12/12 | 0.924 | 5,357 | 9,128 | 9,745 | 311 |
+| f5-h16-km40 | 16:00, pairs up to 40 km | 12/12 | 0.948 | 6,656 | 10,368 | 10,735 | 300 |
+| f6-h16-mult85 | 16:00, pair fee 0.85x | 12/12 | 0.938 | 5,809 | 10,264 | 10,648 | 298 |
+
+Release hour peaks at 14:00-16:00. Kill: bundle_keep (noise), hold_price (-945: wins 12 more cars a week at prices that do not pay), bundle_mult 0.85 (noise). hold_km 40 equals 16:00 on 8 of 12 seeds; its better min on-time is one seed (dev-18): noise, keep the simpler default.
 
 hold16 vs base by seed: +1792, +3179, -666, +2631, +1218, +1315, -35, +833, -169, +1154, +1965, -870.
 18:00 was too late: release pairs left unbooked into the night (no notifications 23:00-07:00) were split by the 6 h alarm the next day. About 105 cars/week rode in release pairs (offline estimate: 110-165).
