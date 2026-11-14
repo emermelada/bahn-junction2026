@@ -158,3 +158,4 @@ PRESETS["k-safe-ls"] = PRESETS["k-safe"] + ["long_split=(360,180)"]  # long pair
 PRESETS["k-safe-b3"] = PRESETS["k-safe"] + ["bundle3=true", "bundle3_mult=0.75"]  # three-car chains (bahn67 +370/wk; never run on c3g)
 # PAIRS_MISSED.md: 66% of missed pairs = the partner was already booked (lone cars book in minutes); est. km50 + 120-min hold +472-583/wk.
 PRESETS["k-safe-kmh"] = PRESETS["k-safe"] + ["bundle_km=50", "hold_minutes=120", "hold_lead=360"]
+PRESETS["k-safe-lskd"] = PRESETS["k-safe"] + ["long_split=(360,180)", "bundle_keep_drop=true"]  # both pair fixes
