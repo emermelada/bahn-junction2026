@@ -219,3 +219,5 @@ PRESETS["k-f1h5fV1"] = PRESETS["k-f1h5f"] + ["load_bundle_w=0.6"]
 PRESETS["k-f1h5fV2"] = PRESETS["k-f1h5fV1"] + ["load_free=0.12", "load_slope=2"]
 # V2 with a hard day cap: no new car due on a day whose load is already 0.15 (late 11.9% at 0.14-0.16 vs 4-5% under 0.12, feeload.py).
 PRESETS["k-f1h5fV2c"] = PRESETS["k-f1h5fV2"] + ["load_cap=0.15"]
+# V2 + strict governor once 7% of our orders had a deadline warning (V2's worst weeks: 8-9% warned vs 3-6% normal; base dev-43 8%).
+PRESETS["k-f1h5fV2s"] = PRESETS["k-f1h5fV2"] + ["strict_warn=0.07"]
