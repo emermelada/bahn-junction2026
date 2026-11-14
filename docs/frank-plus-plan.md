@@ -1,5 +1,16 @@
 # Improving Franko's v1 (preset `chains`, k18): findings and plan
 
+## Handoff to Franko (14 Nov, ~11:00)
+
+Javier moves to another challenge. Everything we found is on branch **`a/frank-plus`**, two commits on top of `origin/branch-v1-frank` (6030678), nothing else changed:
+
+| Commit | What | Evidence |
+|---|---|---|
+| 629708e | preset `chains_plus` = `chains` (k18) + `max_per_batch=6` | rc10, 12 fresh weeks: mean €11,041 vs €10,791, ranked 12/12 vs 12/12, min on-time 91.8% vs 90.1% |
+| 48a67ba | flag `bundle_price_strict` (default off): chain-aware quoting only when the planner's own chain test passes against a held car | see "Chain-aware quoting" below |
+
+To take them: `git fetch && git checkout branch-v1-frank && git merge origin/a/frank-plus` (or cherry-pick the two commits). Then play with `--preset chains_plus`. On Linux from Javier's repo: `make final-frank` (final or test final) and `make board-frank` (one ranking run) run `chains_plus` from a worktree `../frank-plus`.
+
 From Javier's side, 14 Nov. Franko's v1 is the team's bot from now on. These are measurements on seeds Franko never used (rc10-01..12) and what we propose next. Nothing here is committed to Franko's branches; code changes go on `a/frank-plus`.
 
 ## Where k18 stands
