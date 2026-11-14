@@ -143,6 +143,8 @@ class Config:
     # --- evening release: hold cars picked up on a later day, release them together and pair them first
     hold: bool = True                  # rc3: a car for a later day waits for its release (+14% on dev-19..30, 12/12 ranked)
     hold_hour: int = 16                # release at 16:00 the day before: 14-16 best; at 18-20 pairs stay unbooked into the night
+    hold_min_left: int = 0             # post at once a car whose last pickup is less than this many minutes after its release (0 = off):
+                                       # next-day cars with last pickup 12-14 h held to 16:00 are 25% late vs 11% posted at once (176 c3 weeks)
     hold_all: bool = False             # hold every car (default: only cars that could be paired, see simple())
     hold_open: bool = True             # at a release, also pair with our open unbooked single gigs
     hold_price: bool = False           # quote a car that pairs with a held car (same pickup day, near) at the bundle cost

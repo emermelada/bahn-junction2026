@@ -905,6 +905,8 @@ class Desk:
         rel = (frm // DAY - 1) * DAY + self.cfg.hold_hour * 60
         if self.cfg.hold_weekend and self.last_pickup(ob, list(range(len(o["legs"])))) // DAY == 7:
             rel = max(rel, 6 * DAY + self.cfg.hold_hour * 60)  # due on the last Monday: book it on Sunday for Monday
+        if self.cfg.hold_min_left and self.last_pickup(ob, list(range(len(o["legs"])))) - rel < self.cfg.hold_min_left:
+            return None  # too little time between the release and the last pickup: drivers need the evening and morning to book it
         return rel if rel > self.now else None
 
     def release_held(self) -> None:
