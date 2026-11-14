@@ -188,3 +188,7 @@ PRESETS["k-f1"] = PRESETS["k-safe-dcl"] + ["fee1=true"]
 PRESETS["kdcl-hold"] = PRESETS["k-safe-dcl"] + ["quote_cost_hold=1.05"]
 PRESETS["k-f1h"] = PRESETS["k-f1"] + ["quote_cost_hold=1.05"]
 PRESETS["k-f1hf"] = PRESETS["k-f1h"] + ["quote_cost_floor=true"]  # the hold as a floor: a scarce week (fees above 1.05x) still raises the quote
+# MARKET: per-car fee shape in the quote (fee_gbm.py; on k-safe-dcl: EUR -58, on time 0.965 -> 0.974 at equal orders) on top of fee1 + hold,
+# to take back the late singles fee1 adds (+3.5/wk on WAR).
+PRESETS["kdcl-fm"] = PRESETS["k-safe-dcl"] + ["fee_model=1.0"]
+PRESETS["k-f1hm"] = PRESETS["k-f1h"] + ["fee_model=1.0"]
