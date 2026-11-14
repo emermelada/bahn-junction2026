@@ -102,8 +102,6 @@ class Config:
     steep_rescue: tuple = (2.0, 2.5, 3.0, 3.5, 4.0)
     late_plan: tuple = ((0, 1.2), (4, 1.5), (12, 2.0))  # (hours from now, fee): a car that is late anyway, no steep fees
     crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar
-    relook_minutes: int = 0            # a single unbooked this long after posting gets one flat raise (rival Halal's second look, +88 orders with board pairs); 0 = off
-    relook_mult: float = 1.2           # that fee over typical: the next step above fee_open 1.05 (TOP_TEAMS.md 1(b))
     view_raise_n: int = 0              # this many viewers and no booking: raise to view_raise_mult at once
     view_raise_after: int = 45
     view_raise_mult: float = 1.5

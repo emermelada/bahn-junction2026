@@ -1443,21 +1443,6 @@ class Desk:
                         self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": rec.schedule})
                         self.say("VIEWRAISE", f"{rec.id} views={len(self.gig_viewers[rec.id])} {cur}->{fee}")
                     rec.view_raised = True
-        if self.cfg.relook_minutes:
-            # Second look (rival Halal, research/TOP_TEAMS.md): a single still unbooked this long after posting gets one
-            # higher flat fee, once; later raises stay above it. After a restart the fee check stops a second raise.
-            for rec in list(self.gigs.values()):
-                if rec.status != "open" or rec.escalated or getattr(rec, "relooked", False) or len({o for o, _ in rec.legs}) != 1:
-                    continue
-                if self.now - rec.posted_at < self.cfg.relook_minutes:
-                    continue
-                rec.relooked = True
-                fee = int(round(self.gig_base(rec) * self.cfg.relook_mult))
-                cur = current_fee(rec.schedule, self.now)
-                if fee > cur:
-                    rec.schedule = dedupe([{"at": self.now, "feeCents": fee}] + [x for x in rec.schedule if x["at"] > self.now and x["feeCents"] > fee])
-                    self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": rec.schedule})
-                    self.say("RELOOK", f"{rec.id} {cur}->{fee}")
         if self.cfg.own_alarm:
             for rec in list(self.gigs.values()):
                 if rec.status != "open" or rec.escalated:
