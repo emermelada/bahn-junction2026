@@ -156,3 +156,5 @@ PRESETS["m13mc"] = PRESETS["k-safe"] + ["quote_move_cost=true"]
 
 # Drops with time to spare: post again at the opening fee instead of escalating (claude/spec-drops).
 PRESETS["k-safe-dc"] = PRESETS["k-safe"] + ["drop_calm_hours=16"]
+# k-safe-dc + repost an unbooked gig 1 min after its last pickup, so a driver can book the late car at once (Burger Han).
+PRESETS["k-safe-dcr"] = PRESETS["k-safe-dc"] + ["repost_past_last=1"]

@@ -1462,6 +1462,26 @@ class Desk:
         self.offered.add((g.id, driver))
         self.say("BOFFER", f"{g.id} {driver} {fee} x{fee / max(1.0, base):.2f} tr={tr} from={rec.id}")
 
+    def repost_past_last(self) -> None:
+        """An open gig whose order's last pickup has passed keeps the order's windows it was posted with, so no driver can
+        book it until it expires (RULES: a driver must reach every stop inside its window; w-c3g: 13.9 gig_expired/week).
+        Posted again now, its stops run to the end of the world: a driver books it at once and the car is less late
+        (refund 10% within 2 h vs 25% after; research/re/external/RIVAL_FEES.md #5)."""
+        for gid in sorted(self.gigs):
+            rec = self.gigs[gid]
+            if rec.status != "open":
+                continue
+            oids = sorted({o for o, _ in rec.legs})
+            if len(oids) != 1 or oids[0] not in self.orders:
+                continue
+            ob = self.orders[oids[0]]
+            legs = sorted(l for _, l in rec.legs)
+            last = self.last_pickup(ob, legs)
+            if rec.posted_at < last <= self.now - self.cfg.repost_past_last:
+                self.say("REPOST_PASTLAST", f"{gid} {oids[0]} last pickup {last}, now {self.now}")
+                self.withdraw(gid)
+                self.post(ob, legs, "past-last")
+
     def withdraw(self, gid: str) -> None:
         rec = self.gigs[gid]
         rec.status = "withdrawn"
@@ -1556,6 +1576,8 @@ class Desk:
             if self.now - t0 > 60:
                 self.fast_book.append((t0, False))
                 del self.first_posts[gid]
+        if self.cfg.repost_past_last:
+            self.repost_past_last()
         if self.held:
             self.release_held()  # before the loop below, which would post released cars one by one
         for oid in list(self.orders):

@@ -139,6 +139,8 @@ class Config:
     flu_drops: int = 0                 # this many of our gigs dropped 00:00-01:00 = a flu night (0 = off): on tuning weeks, nights with
                                        # >= 8 such drops (125 of 752) make that day's cars 8.9% late vs 4.7% (research/re/flu.py; Halal idea 14)
     flu_mult: float = 1.9              # P(late) multiplier for cars due on a flu day, at quote time and in the projection (8.9 / 4.7)
+    repost_past_last: int = 0          # minutes after an open gig's last pickup to withdraw and post it again without the order's windows
+                                       # (0 = off): till then no driver can book it (research/re/external/RIVAL_FEES.md #5)
     crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar
     view_raise_n: int = 0              # this many viewers and no booking: raise to view_raise_mult at once
     view_raise_after: int = 45
