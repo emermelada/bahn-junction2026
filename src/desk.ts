@@ -48,6 +48,8 @@ export class V2Desk implements Desk {
   readonly pricing: Pricing
   readonly offers: Offers
   readonly offerQueue = new Map<string, string>() // gigId -> reason, fired at the next tick
+  readonly bundleGigs = new Map<string, string[]>() // gigId -> the orders a multi-car gig carries (bundles)
+  readonly bundlePosts = new Map<PostAction, string[]>() // bundle posts in flight -> their orders (fallback on refusal)
   readonly dropRaised = new Set<string>() // orders whose gig got the one +15% after a drop
   readonly doomedGigs = new Set<string>() // gigs repriced to the doomed schedule
   readonly cliffSeen = new Set<string>() // gigs counted as reaching the cliff (fee learner)
@@ -119,7 +121,10 @@ export class V2Desk implements Desk {
     if (event.kind === "price_request") this.quote(event.request)
     else if (event.kind === "order_won") await this.win(event.order)
     else if (event.kind === "order_changed") await this.change(event.order)
-    else if (event.kind === "order_cancelled") for (const books of [this.orders, this.legGigs]) books.delete(event.orderId)
+    else if (event.kind === "order_cancelled") {
+      for (const books of [this.orders, this.legGigs]) books.delete(event.orderId)
+      for (const g of event.gigs) if (g.outcome === "withdrawn") this.unmapGig(g.gigId) // its other cars get posted again by the sweep
+    }
     else if (event.kind === "visit_failed") await this.retry(event.orderId, event.leg, event.reason)
     else if (event.kind === "gig_expired") this.repost(event.gigId)
     else if (event.kind === "deadline_close") await this.raise(event.orderId)
@@ -212,6 +217,7 @@ export class V2Desk implements Desk {
           this.cliffSeen.add(gigId)
           this.fees.cliff(order.legs[0]!.pickup.placeId)
         }
+        if (this.bundleGigs.has(gigId) && this.now > order.lastPickupAt - this.cfg.fees.rescue.warnMinBefore) { this.splitBundle(gigId, "late"); continue }
         if (this.now > order.lastPickupAt && !this.doomedGigs.has(gigId) && this.posts.has(gigId)) {
           this.doomedGigs.add(gigId)
           this.ctx.log?.({ at: this.now, kind: "doomed", order: order.id, gig: gigId })
@@ -312,6 +318,10 @@ export class V2Desk implements Desk {
     const action = this.posts.get(gigId)
     if (!action || !action.stops.some(({ orderId, leg }) => this.legGigs.get(orderId)?.get(leg) === gigId)) return
     for (const { orderId, leg } of action.stops) this.legGigs.get(orderId)?.delete(leg)
+    if (this.bundleGigs.has(gigId)) {
+      for (const id of this.bundleGigs.get(gigId)!) { const o = this.orders.get(id); if (o) this.postSingle(o, Infinity) }
+      return
+    }
     const order = this.orders.get(action.stops[0]!.orderId)
     if (!order) return
     this.outbox.push({ ...action, stops: withoutWindows(action.stops, Infinity), schedule: this.feesFor(order, pickups(action)) })
@@ -324,6 +334,7 @@ export class V2Desk implements Desk {
     this.urgent.add(orderId)
     await this.sendPostOf(orderId)
     for (const gigId of this.gigsOf(orderId)) {
+      if (!this.booked.has(gigId) && this.bundleGigs.has(gigId)) { this.splitBundle(gigId, "warning"); continue }
       if (!this.booked.has(gigId)) {
         this.pushReprice(gigId, this.feesFor(order, pickups(this.posts.get(gigId)!)))
         if (this.cfg.flags.offers) this.offerQueue.set(gigId, "rescue")
@@ -364,6 +375,7 @@ export class V2Desk implements Desk {
   }
 
   async post(order: Order, legs: number[], retry = FIRST_TRY): Promise<void> {
+    if (this.cfg.flags.bundles && retry === FIRST_TRY && legs.length === 1 && order.legs.length === 1 && this.tryBundle(order)) return
     const audience = { experienced: order.legs.some((leg) => leg.car.premium), manualLicence: retry.manualLicence }
     const stops = withoutWindows(stopsFor(order, legs, this.requests.get(order.id)!.note, retry), this.now)
     this.outbox.push({ type: "post", stops, audience, schedule: this.feesFor(order, legs.length) })
@@ -371,6 +383,98 @@ export class V2Desk implements Desk {
     // A trade-in over the 12-hour limit for a gig with two cars goes as one gig per car.
     await this.send()
     if (this.gigsOf(order.id).length === 0) for (const leg of legs) await this.post(order, [leg], retry)
+  }
+
+  /** One car alone, at its own fees (no bundle attempt). */
+  postSingle(order: Order, windowsBefore: number): void {
+    const audience = { experienced: order.legs.some((leg) => leg.car.premium), manualLicence: false }
+    const stops = withoutWindows(stopsFor(order, [0], this.requests.get(order.id)!.note, FIRST_TRY), windowsBefore)
+    this.outbox.push({ type: "post", stops, audience, schedule: this.feesFor(order, 1) })
+  }
+
+  unmapGig(gigId: string): void {
+    for (const legs of this.legGigs.values()) for (const [leg, g] of legs) if (g === gigId) legs.delete(leg)
+  }
+
+  remapGig(gigId: string): void {
+    const action = this.posts.get(gigId)
+    if (action) for (const { orderId, leg } of action.stops) if (this.orders.has(orderId)) this.legGigs.set(orderId, (this.legGigs.get(orderId) ?? new Map()).set(leg, gigId))
+  }
+
+  /** A bundle about to miss: take it off the app and post each car alone (the urgent one gets rescue fees). */
+  splitBundle(gigId: string, why: string): void {
+    const ids = this.bundleGigs.get(gigId) ?? []
+    this.bundleGigs.delete(gigId)
+    this.unmapGig(gigId)
+    this.outbox.push({ type: "withdraw", gigId })
+    this.ctx.log?.({ at: this.now, kind: "bundle_split", gig: gigId, orders: ids, why })
+    for (const id of ids) {
+      const o = this.orders.get(id)
+      if (o) this.postSingle(o, this.now)
+    }
+  }
+
+  /** 6.8 out-and-back bundle: the new car A->B with an open single car B'->A' already posted (B' near B, A' near A),
+   * or the other way round, when one driver can do both on time within maxDriveMin. Fee = (both opening fees) x feeMult. */
+  tryBundle(order: Order): boolean {
+    if (this.urgent.has(order.id) || this.now >= order.lastPickupAt) return false
+    const B = this.cfg.bundles
+    const note = this.requests.get(order.id)?.note ?? null
+    const mine = withoutWindows(stopsFor(order, [0], note, FIRST_TRY), this.now)
+    if (mine.some((st) => st.window)) return false
+    const a = order.legs[0]!
+    let best: { gigId: string; partner: Order; first: Order; second: Order; drive: number } | null = null
+    for (const [gigId, action] of this.posts) {
+      if (this.booked.has(gigId) || this.bundleGigs.has(gigId) || this.doomedGigs.has(gigId)) continue
+      if (action.stops.length !== 2 || action.stops.some((st) => st.window || st.withPlates)) continue
+      const pid = action.stops[0]!.orderId
+      if (pid === order.id || this.legGigs.get(pid)?.get(0) !== gigId) continue
+      const partner = this.orders.get(pid)
+      if (!partner || partner.legs.length !== 1 || this.urgent.has(pid) || this.now >= partner.lastPickupAt) continue
+      const b = partner.legs[0]!
+      if (this.geo.road(a.delivery.placeId, b.pickup.placeId) > B.pairRoadMin || this.geo.road(b.delivery.placeId, a.pickup.placeId) > B.pairRoadMin) continue
+      for (const [first, second] of [[order, partner], [partner, order]] as const) {
+        const drive = this.pairDrive(first, second)
+        if (drive === null) continue
+        if (!best || drive < best.drive) best = { gigId, partner, first, second, drive }
+      }
+    }
+    if (!best) return false
+    const { gigId, partner, first, second } = best
+    this.legGigs.get(partner.id)?.delete(0)
+    this.outbox.push({ type: "withdraw", gigId })
+    const stopsOf = (o: Order) => withoutWindows(stopsFor(o, [0], this.requests.get(o.id)!.note, FIRST_TRY), this.now)
+    const base = (this.fees.open(first, this.requests.get(first.id)!, 1) + this.fees.open(second, this.requests.get(second.id)!, 1)) * B.feeMult
+    const f = first.legs[0]!
+    const cliffAt = Math.min(first.lastPickupAt, second.lastPickupAt - this.geo.road(f.pickup.placeId, f.delivery.placeId) - this.geo.road(f.delivery.placeId, second.legs[0]!.pickup.placeId) - 30)
+    const schedule = this.fees.schedule(this.now, base, cliffAt)
+    const action: PostAction = {
+      type: "post",
+      stops: [...stopsOf(first), ...stopsOf(second)],
+      audience: { experienced: [first, second].some((o) => o.legs.some((l) => l.car.premium)), manualLicence: false },
+      schedule,
+    }
+    this.bundlePosts.set(action, [first.id, second.id])
+    this.outbox.push(action)
+    this.ctx.log?.({ at: this.now, kind: "bundle", orders: [first.id, second.id], drive: best.drive, base: Math.round(base), cliffAt })
+    return true
+  }
+
+  /** Driving minutes of first then second, or null when one driver cannot collect both on time or it is too long. */
+  pairDrive(first: Order, second: Order): number | null {
+    const f = first.legs[0]!
+    const s = second.legs[0]!
+    const leg1 = this.geo.road(f.pickup.placeId, f.delivery.placeId)
+    const hop = this.geo.road(f.delivery.placeId, s.pickup.placeId)
+    const leg2 = this.geo.road(s.pickup.placeId, s.delivery.placeId)
+    const drive = leg1 + hop + leg2
+    if (drive > this.cfg.bundles.maxDriveMin) return null
+    const t1 = Math.max(this.now + this.cfg.gate.reachMarginMin, f.pickup.window.from)
+    if (t1 > first.lastPickupAt - 60) return null
+    const t2 = Math.max(t1 + leg1 + hop + 15, s.pickup.window.from)
+    if (t2 > second.lastPickupAt - 60) return null
+    if (t2 - t1 > 10 * 60) return null
+    return drive
   }
 
   gigsOf(orderId: string): string[] {
@@ -387,7 +491,15 @@ export class V2Desk implements Desk {
     const gigs = this.gigsOf(orderId)
     if (gigs.some((gigId) => this.booked.has(gigId))) return false
     this.legGigs.delete(orderId)
-    for (const gigId of gigs) this.outbox.push({ type: "withdraw", gigId })
+    for (const gigId of gigs) {
+      this.outbox.push({ type: "withdraw", gigId })
+      for (const id of this.bundleGigs.get(gigId) ?? []) {
+        if (id === orderId) continue
+        this.legGigs.get(id)?.delete(0)
+        const o = this.orders.get(id)
+        if (o) this.postSingle(o, this.now)
+      }
+    }
     return true
   }
 
@@ -403,6 +515,17 @@ export class V2Desk implements Desk {
 
   readResults(actions: Action[], results: ActionResult[]): void {
     actions.forEach((action, i) => {
+      if (action.type === "withdraw" && results[i] && !results[i]!.ok) this.remapGig(action.gigId) // a driver booked it meanwhile: it still carries its cars
+      if (action.type === "post" && this.bundlePosts.has(action)) {
+        const ids = this.bundlePosts.get(action)!
+        this.bundlePosts.delete(action)
+        if (results[i]?.ok) this.bundleGigs.set((results[i] as { ok: true; id: string }).id, ids)
+        else {
+          this.ctx.log?.({ at: this.now, kind: "bundle_refused", orders: ids, reason: (results[i] as { reason?: string } | undefined)?.reason })
+          for (const id of ids) { const o = this.orders.get(id); if (o && !this.legGigs.get(id)?.has(0)) this.postSingle(o, this.now) }
+          return
+        }
+      }
       if (action.type === "post" && results[i]?.ok) {
         const id = (results[i] as { ok: true; id: string }).id
         this.carry(action, id)

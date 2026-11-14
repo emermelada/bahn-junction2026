@@ -49,7 +49,7 @@ export type Cfg = {
   trust: { perOrder: number; cap: number; anchorDealers: number; anchorReach30: number; anchorTierBonus: number }
   guards: { war: { minQuotes: number; minDealers: number; minPools: number; ratio: number; windows: number }; outage: { minQuotes: number; lift: number; add: number; capRatio: number }; until: number }
   offers: { reach30Trigger: number; openMinTrigger: number; warnMinBefore: number; relayRoadMin: number; activeKm: number; homeboundKm: number; feeMult: number; perDriverPerDay: number; reserveAfter: number; quietFrom: number; quietTo: number; costPt: number; ticketOut: number; ticketHome: number }
-  bundles: { maxDriveMin: number; pairRoadMin: number; minSaving: number }
+  bundles: { maxDriveMin: number; pairRoadMin: number; minSaving: number; feeMult: number } // bundle opening fee = (sum of the two single opening fees) x feeMult
   triage: { sweepEveryMin: number; warmMinBefore: number }
 }
 
@@ -87,7 +87,7 @@ export const DEFAULT_CFG: Cfg = {
   trust: { perOrder: 0.01, cap: 25, anchorDealers: 5, anchorReach30: 10, anchorTierBonus: 0.3 },
   guards: { war: { minQuotes: 12, minDealers: 4, minPools: 2, ratio: 0.45, windows: 2 }, outage: { minQuotes: 5, lift: 0.3, add: 0.2, capRatio: 1.6 }, until: 18 * 60 },
   offers: { reach30Trigger: 3, openMinTrigger: 150, warnMinBefore: 240, relayRoadMin: 90, activeKm: 80, homeboundKm: 30, feeMult: 1.05, perDriverPerDay: 3, reserveAfter: 12 * 60, quietFrom: 22 * 60 + 50, quietTo: 7 * 60, costPt: 0.3, ticketOut: 0.08, ticketHome: 0.16 },
-  bundles: { maxDriveMin: 480, pairRoadMin: 30, minSaving: 0.15 },
+  bundles: { maxDriveMin: 480, pairRoadMin: 30, minSaving: 0.15, feeMult: 0.8 },
   triage: { sweepEveryMin: 30, warmMinBefore: 360 },
 }
 

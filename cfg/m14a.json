@@ -1,0 +1,61 @@
+{
+ "name": "m14a",
+ "flags": {
+  "gate": true,
+  "capacity": true,
+  "ladder": true,
+  "governor": true,
+  "fees": true,
+  "triage": true,
+  "pricing": true,
+  "trust": true
+ },
+ "pricing": {
+  "clamp": {
+   "lo": 1.05,
+   "hi": 1.75
+  }
+ },
+ "governor": {
+  "fridayTierAOnlyFrom": 100000
+ },
+ "gate": {
+  "nextDay": {
+   "maxDriveMin": 240
+  },
+  "poolBrake": {
+   "warnings": 2,
+   "windowMin": 1440
+  },
+  "sameDay": {
+   "maxDriveMin": 240,
+   "slackHours": 3,
+   "reach30Pickup": 3
+  },
+  "downgrades": [
+   "private_pickup",
+   "trade_in",
+   "unparsed_note"
+  ]
+ },
+ "fees": {
+  "kBands": [
+   {
+    "upTo": 2,
+    "k": 1.45
+   },
+   {
+    "upTo": 9,
+    "k": 1.25
+   },
+   {
+    "upTo": 39,
+    "k": 1.1
+   },
+   {
+    "upTo": 1000000000.0,
+    "k": 1.0
+   }
+  ]
+ }
+}
