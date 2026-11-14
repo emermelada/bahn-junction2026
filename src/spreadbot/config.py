@@ -147,6 +147,10 @@ class Config:
     flu_mult: float = 1.9              # P(late) multiplier for cars due on a flu day, at quote time and in the projection (8.9 / 4.7)
     repost_past_last: int = 0          # minutes after an open gig's last pickup to withdraw and post it again without the order's windows
                                        # (0 = off): till then no driver can book it (research/re/external/RIVAL_FEES.md #5)
+    late_barrier: tuple = ()           # (target, eur, grip, calm): Halal's late price (fleet.py:287-295@1ece2d5). Each quote's cost gets
+                                       # P(late) x eur x min(2, used)^grip, used = expected late / (calm + orders) / (1 - target): a week
+                                       # running short of on-time sells fewer, safer cars from Monday instead of buying on-time back at 2-4x
+                                       # (our 5 weeks < EUR 7k spent 5.9-12k on escalation; research/re/archive/R1_BADWEEKS.md). () = off
     long_warn: tuple = ()              # (drive min, n, window min): decline cars with drive >= this while >= n of our long cars got a
                                        # deadline warning in the last window min (() = off). Both unranked fresh weeks: 2-3x the usual long
                                        # cars, 36-39% late, warned 5x as often, P(on time) at quote ~0.94 as usual (research/re/H2_AUTOPSY.md)

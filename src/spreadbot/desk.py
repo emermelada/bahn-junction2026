@@ -14,7 +14,7 @@ from typing import Any, Optional
 from .config import Config
 from .geo import DAY, HOUR, Geo, open_intervals
 from .notes_safe import LegNote, read_note_safe
-from .policy import Governor, Market, OnTime
+from .policy import Governor, Market, OnTime, barrier_cents
 
 OPTION_ORDER = ("same_day", "next_day", "within_3_days")
 
@@ -507,6 +507,7 @@ class Desk:
         if cfg.gate_bonus_cents and self.won_count >= 30:
             gate = cfg.gate_bonus_cents * min(1.0, max(0.0, (cfg.gate_target - self.gov.projection()) / cfg.gate_span))
         cal = self.gov.calibration() if cfg.calibrate else 1.0
+        barrier = barrier_cents(self.gov.projection(), len(self.orders), cfg.late_barrier) if cfg.late_barrier else 0.0
         drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
         if cfg.long_warn and drive >= cfg.long_warn[0]:
             recent = sum(1 for t in self.long_warns if t >= self.now - cfg.long_warn[2])
@@ -565,6 +566,7 @@ class Desk:
                     short = cost * (cfg.short_fee[2] - 1)  # a long car won at short notice pays well over the usual fee
                     info.append(f"sfee={kind}/{lead_h:.1f}h")
             load_cost += short
+            load_cost += (1 - p_ok) * barrier  # late_barrier: what this car's lateness risk costs the week's on-time share
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain) + cfg.trust_loss_w * (1 - p_ok) * t_loss
             # Under the on-time target, a safe car is worth more than its margin: it dilutes the late ones.
@@ -620,6 +622,8 @@ class Desk:
             info.append(f"steer {s}/{n}->{prices['same_day']}/{prices['next_day']}")
         self.quote_meta[r["id"]] = meta
         head = f"bar={bar:.2f} bl={backlog} tg={t_gain/100:.0f} tf={tf:.2f} mu={self.market.mu_for(dealer, day, r["legs"][0]["pickup"]["placeId"]):.3f} cost={cost/100:.0f}"
+        if cfg.late_barrier:
+            head += f" lb={barrier/100:.0f}"  # late_barrier: euros per expected late car right now
         if not prices:
             return decline_prices(r), f"DECLINE {head} {' '.join(info)}"
         return prices, f"{head} {' '.join(info)}"
