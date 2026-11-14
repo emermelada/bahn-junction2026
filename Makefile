@@ -6,7 +6,7 @@ PY := PYTHONPATH=src .venv/bin/python
 LEVEL ?= 8
 SEED ?= dev-01
 
-.PHONY: setup test check play board final-frank sweep compare emulate chaos final
+.PHONY: setup test check play board board-frank final-frank sweep compare emulate chaos final
 SET ?= dev
 TAG ?= adhoc
 N ?= 20
@@ -39,6 +39,10 @@ emulate:
 
 chaos:
 	$(PY) harness/chaos.py --seed $(SEED) --from-minute 4320 --speed 4 --kills 2
+
+# The team's next ranking run with Franko's v1 bot, preset chains. Counts on the leaderboard. Humans only.
+board-frank:
+	harness/board_frank.sh
 
 # The final (or a test final) with Franko's v1 bot, preset chains (k18): the team's bot from 14 Nov.
 final-frank:
