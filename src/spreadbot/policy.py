@@ -209,16 +209,18 @@ class Market:
             if self.in_outage(day, place, at):
                 self.n_obs += 1
                 return  # the outage region's dealers pay the backup's price today: nothing to learn for the rest of the world
-            p = (1.0 if won else 0.0) - g
+            # Evidence for "this region pays the backup's price": log-likelihood of the result at level x (1 + outage_up) vs as is.
+            p0 = min(1 - 1e-6, max(1e-6, (1.0 if won else 0.0) - g))
+            p1 = min(1 - 1e-6, max(1e-6, sigmoid(k * (self.mu_base(dealer, day, place, lane) * (1 + self.cfg.outage_up) - ratio_eff))))
+            llr = math.log(p1 / p0) if won else math.log((1 - p1) / (1 - p0))
             for c, _ in self.desk.nearby(place):
                 a = self.out_acc.setdefault((day, c), [0.0, 0.0, 0])
-                a[0] += g
-                a[1] += p * (1 - p)
+                a[0] += llr
                 a[2] += 1
                 if (day not in self.outage and a[2] >= self.cfg.outage_min and self.day_shift[day] > -self.cfg.war_shift
-                        and a[0] >= self.cfg.outage_z * math.sqrt(a[1])):
+                        and a[0] >= self.cfg.outage_z):
                     self.outage[day] = c
-                    self.desk.say("OUTAGE", f"day {day} region {c} z={a[0] / math.sqrt(a[1]):.1f} n={a[2]}")
+                    self.desk.say("OUTAGE", f"day {day} region {c} llr={a[0]:.1f} n={a[2]}")
         if self.cfg.dist_lr:
             self.beta = min(0.4, max(-0.4, self.beta + self.cfg.dist_lr * k * g * self.dist_x(lane)))
         war = self.cfg.war_guard and self.day_shift[day] < -self.cfg.war_shift
