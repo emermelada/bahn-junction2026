@@ -158,3 +158,6 @@ PRESETS["m13mc"] = PRESETS["k-safe"] + ["quote_move_cost=true"]
 PRESETS["k-safe-dc"] = PRESETS["k-safe"] + ["drop_calm_hours=16"]
 # k-safe-dc + repost an unbooked gig 1 min after its last pickup, so a driver can book the late car at once (Burger Han).
 PRESETS["k-safe-dcr"] = PRESETS["k-safe-dc"] + ["repost_past_last=1"]
+# + decline long (>= 4 h) cars while >= 3 of our long cars were warned in the last 24 h (H2 autopsy rule 1).
+PRESETS["k-safe-dcl"] = PRESETS["k-safe-dc"] + ["long_warn=(240,3,1440)"]
+PRESETS["k-safe-dcrl"] = PRESETS["k-safe-dcr"] + ["long_warn=(240,3,1440)"]
