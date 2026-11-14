@@ -23,6 +23,11 @@ OPTION_ORDER = ("same_day", "next_day", "within_3_days")
 DRIVE_COST = ((30, 1.65), (45, 1.38), (60, 1.34), (90, 1.26), (120, 1.16), (180, 1.14), (240, 1.10), (360, 1.14), (10**6, 1.28))
 
 
+EXPENSIVE_COEF = {"log_drive": 1.5401, "log_ref": -2.0677, "log_sup_p30": -0.0331, "log_sup_p80": -0.036, "log_sup_d30": -0.0347,
+                  "slack12": -0.1486, "overnight": 0.5602, "same_day": 0.0908, "hour": 0.0092, "late_hour": -0.1168, "friday": 0.023,
+                  "premium": 0.663, "private": 0.7154, "note": -0.0284, "load": 13.862, "tradein": -0.5628, "intercept": 10.0344}
+
+
 def business_hours(a: int, b: int) -> float:
     """Request hours (Mon-Fri 08:00-18:00) between world minutes a and b."""
     total = 0
@@ -66,6 +71,7 @@ class OrderBook:
     manual: bool = False
     plates: set = field(default_factory=set)
     p_ok: float = 0.85
+    p_exp: float = 0.0
 
 
 class Desk:
@@ -164,6 +170,8 @@ class Desk:
         if o["id"] in self.orders:
             return
         ob = OrderBook(o, e["at"])
+        if self.cfg.hot_open and o["id"] in self.requests:
+            ob.p_exp = self.p_expensive(self.requests[o["id"]], o)
         self.due_count[min(self.deadline(o, l) for l in range(len(o["legs"]))) // DAY] += 1 if o["id"] in self.requests else 0
         ob.p_ok = self.quote_meta.get(o["id"], {}).get(o["option"], 0.85)
         self.orders[o["id"]] = ob
@@ -483,6 +491,22 @@ class Desk:
         n = self.due_count.get(day, 0)
         return n / max(1, len(self.roster))
 
+    def p_expensive(self, r: dict, o: dict) -> float:
+        """Chance that a won car ends late or above 1.3x the typical fee (lab/frank/expensive.py: 14,181 orders,
+        held-out-seed AUC 0.67). Features as at the win; load counts our cars already due that day."""
+        opt = next(x for x in r["options"] if x["kind"] == o["option"])
+        f = self.ontime.features(r, opt["deadline"], o["option"])
+        L0 = r["legs"][0]
+        drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
+        hour = (r["respondBy"] % DAY) / 60
+        x = {"log_drive": math.log(drive + 10), "log_ref": math.log(max(1, r["referenceFeeCents"])),
+             "log_sup_p30": math.log1p(self.supply_near(L0["pickup"]["placeId"], 30)), "log_sup_p80": f["log_sup_p80"],
+             "log_sup_d30": f["log_sup_d30"], "slack12": f["slack12"], "overnight": f["overnight"], "same_day": f["same_day"],
+             "hour": hour, "late_hour": float(hour >= 15), "friday": f["friday"], "premium": f["premium"], "private": f["private"],
+             "note": f["note"], "load": self.due_load(o["deadline"] // DAY), "tradein": float(len(r["legs"]) == 2)}
+        z = EXPENSIVE_COEF["intercept"] + sum(c * x[k] for k, c in EXPENSIVE_COEF.items() if k != "intercept")
+        return 1 / (1 + math.exp(-max(-40.0, min(40.0, z))))
+
     def investing(self, dealer: str, p_ok: float) -> bool:
         """A dealer worth building trust with: a big share of the requests, count under 25, a safe car."""
         total = sum(self.dealer_requests.values())
@@ -760,7 +784,8 @@ class Desk:
         if cfg.fee_mode == "relative":
             # Steps anchored to lastPickupAt: hold the opening fee while there is time, raise as the pickup nears.
             # The opening fee always shows for at least fee_hold minutes: most views come in the first minutes.
-            out, prev = [{"at": now, "feeCents": int(round(base * cfg.fee_open))}], int(round(base * cfg.fee_open))
+            opening = cfg.fee_open_hot if ob.p_exp >= cfg.hot_p else cfg.fee_open
+            out, prev = [{"at": now, "feeCents": int(round(base * opening))}], int(round(base * opening))
             for hours_before, mult in cfg.fee_rel:
                 at = max(now + cfg.fee_hold, last - int(hours_before * HOUR))
                 fee = max(prev, int(round(base * mult)))
