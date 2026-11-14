@@ -261,3 +261,9 @@ PRESETS["v5L"] = PRESETS["k-f1h5fD"] + ["load_bundle_w=0.6", "load_free=0.12", "
 PRESETS["v5La"] = PRESETS["v5aV2"] + LB  # the first test (v5-run3 tag v5V2lb): with v5a's long cars down to 0.90
 PRESETS["v5L45"] = PRESETS["v5L"] + ["late_barrier=(0.945,300,4,20)"]  # looser target: keep more of V2's volume in normal weeks
 PRESETS["v5L14"] = PRESETS["v5L"] + ["load_free=0.14"]                   # bolder volume under the same barrier
+# ARCHIVE: RoutePulse's climbing pair fee on v5La. Our pairs book at once at the 0.84 opening (59% within 10 min, 95% at the opening);
+# a low first step catches the instant bookers cheaper and is back at 0.84 within ~75-110 min (research/re/archive/c_pairbook.py).
+PRESETS["v5La-pc1"] = PRESETS["v5La"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0.80))"]
+PRESETS["v5La-pc2"] = PRESETS["v5La"] + ["bundle_climb=((0,0.60),(27,0.67),(54,0.74),(81,0.80))"]
+# The barrier's other direction: v5La96 (target 0.96) lost -202 with 14 fewer orders; 0.95 lets more volume through it.
+PRESETS["v5La95"] = PRESETS["v5aV2"] + ["late_barrier=(0.95,300,4,20)"]

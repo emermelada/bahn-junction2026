@@ -1266,7 +1266,12 @@ class Desk:
         if cfg.bundle_open_dense and last - self.now >= cfg.bundle_open_dense[0] * HOUR and                 self.home_near_delivery(second.order["legs"][0]["delivery"]["placeId"]) >= cfg.bundle_open_dense[1]:
             opening = min(opening, cfg.bundle_open_dense[2])  # the chain ends where many drivers live: their ride home is free
         out = [{"at": self.now, "feeCents": int(round(typical * opening))}]
-        prev = out[0]["feeCents"]
+        if cfg.bundle_climb and why != "repair" and last - self.now >= cfg.bundle_climb_slack * HOUR:
+            # Open low, climb to the usual opening: the first drivers who look take it cheaper, the rest see the usual fee soon.
+            climb = [{"at": self.now + m, "feeCents": int(round(typical * min(share, opening)))} for m, share in cfg.bundle_climb]
+            end = cfg.bundle_climb[-1][0] + (cfg.bundle_climb[-1][0] - cfg.bundle_climb[-2][0] if len(cfg.bundle_climb) > 1 else 25)
+            out = climb + [{"at": self.now + end, "feeCents": out[0]["feeCents"]}]
+        prev = out[-1]["feeCents"]
         # Raises: fee_rel scaled by the bundle discount, or bundle_rel as shares of the two typical fees.
         steps = list(cfg.bundle_rel) if cfg.bundle_rel else [(h, m * mult) for h, m in cfg.fee_rel]
         for hours_before, share in steps:
