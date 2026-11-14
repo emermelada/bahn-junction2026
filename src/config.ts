@@ -29,7 +29,7 @@ export type Cfg = {
     downgrades: string[]                           // flags that each cost one tier
     snowFactor: number
   }
-  capacity: { safety: number; active: number; active80: number; pWin: number; dealerShareMax: number; dealerShareMinRequests: number; dealerSharePenalty: number; globalDayCap: number }
+  capacity: { batchMax: number; safety: number; active: number; active80: number; pWin: number; dealerShareMax: number; dealerShareMinRequests: number; dealerSharePenalty: number; globalDayCap: number }
   governor: { admitC: boolean; cMinHeadroom: number; cMinSlack: number; lateBudget: number; atRiskWeight: number; atRiskMin: number; minDenominator: number; pOnTime: { A: number; B: number; C: number }; amberHeadroom: number; greenHeadroom: number; fridayTierAOnlyFrom: number }
   fees: {
     kBands: { upTo: number; k: number }[]          // by reach30(pickup): 0-2 -> 1.35, 3-9 -> 1.15, 10-39 -> 1.00, 40+ -> 0.90
@@ -37,6 +37,7 @@ export type Cfg = {
     steps: { atMin: number; mult: number }[]      // atMin >= 0: minutes after now; atMin < 0: minutes before lastPickup
     nightFrom: number; nightTo: number             // steps in [nightFrom, nightTo) (minutes of day) move to nightTo
     dropRaise: number
+    planCliff: boolean                            // open schedules cliff by 18:00 of the planned pickup day (not the last legal day)
     eveningBefore: { at: number; mult: number }  // a step at this minute of the day before the last-pickup day (drivers plan tomorrow 18-20h); mult 0 = off
     learn: { step1Target: number; cliffMax: number; delta: number; kMin: number; kMax: number; minSamples: number }
     rescue: { warnMinBefore: number; capPriceShare: number; capRefMult: number; capPriceAdd: number; amberPriceAdd: number; doomedPriceCap: number; finalPriceCap: number }
@@ -67,7 +68,7 @@ export const DEFAULT_CFG: Cfg = {
     downgrades: ["private_pickup", "trade_in", "unparsed_note", "weekend_crossing"],
     snowFactor: 1.3,
   },
-  capacity: { safety: 0.8, active: 0.3, active80: 0.1, pWin: 0.9, dealerShareMax: 0.6, dealerShareMinRequests: 5, dealerSharePenalty: 0.08, globalDayCap: 0.8 },
+  capacity: { batchMax: 0, safety: 0.8, active: 0.3, active80: 0.1, pWin: 0.9, dealerShareMax: 0.6, dealerShareMinRequests: 5, dealerSharePenalty: 0.08, globalDayCap: 0.8 },
   governor: { admitC: false, cMinHeadroom: 0.03, cMinSlack: 2, lateBudget: 0.07, atRiskWeight: 0.5, atRiskMin: 240, minDenominator: 30, pOnTime: { A: 0.97, B: 0.92, C: 0.8 }, amberHeadroom: 0.03, greenHeadroom: 0.045, fridayTierAOnlyFrom: 4 * 24 * 60 + 12 * 60 },
   fees: {
     kBands: [{ upTo: 2, k: 1.35 }, { upTo: 9, k: 1.15 }, { upTo: 39, k: 1.0 }, { upTo: 1e9, k: 0.9 }],
@@ -75,6 +76,7 @@ export const DEFAULT_CFG: Cfg = {
     steps: [{ atMin: 0, mult: 1.0 }, { atMin: 60, mult: 1.15 }, { atMin: -300, mult: 1.4 }, { atMin: -180, mult: 1.7 }],
     nightFrom: 23 * 60, nightTo: 7 * 60,
     dropRaise: 1.15,
+    planCliff: false,
     eveningBefore: { at: 17 * 60 + 30, mult: 1.3 },
     learn: { step1Target: 0.7, cliffMax: 0.3, delta: 0.05, kMin: 0.8, kMax: 1.8, minSamples: 10 },
     rescue: { warnMinBefore: 240, capPriceShare: 1.5, capRefMult: 1.5, capPriceAdd: 0.25, amberPriceAdd: 0.25, doomedPriceCap: 1.0, finalPriceCap: 2.0 },

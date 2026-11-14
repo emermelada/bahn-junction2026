@@ -33,6 +33,8 @@ export class Quoter {
   readonly planned = new Map<string, Partial<Record<Kind, number>>>()
   /** requestId -> expected late share of the quote (1 - p of the worst admitted tier), while the outcome is unknown. */
   readonly pendingRisk = new Map<string, number>()
+  /** batchId -> requests of the batch quoted with at least one admitted option (bulk-order cap). */
+  readonly batchAdmitted = new Map<string, number>()
 
   constructor(cfg: Cfg, geo: Geo, books: Books, capacity: Capacity, governor: Governor) {
     this.cfg = cfg
@@ -70,6 +72,7 @@ export class Quoter {
         let why = ""
         const cViaGovernor = flags.gate && tier === "C" && flags.governor && this.cfg.governor.admitC && f.slackHours >= this.cfg.governor.cMinSlack
         if (flags.gate && tier === "C" && !cViaGovernor) why = "tier C"
+        if (!why && this.cfg.capacity.batchMax > 0 && request.batchId && (this.batchAdmitted.get(request.batchId) ?? 0) >= this.cfg.capacity.batchMax) (tier = "C"), (why = "batch cap")
         if (!why && flags.gate && option.kind === "next_day" && f.drive > this.cfg.gate.nextDay.maxDriveMin) (tier = "C"), (why = "long next_day")
         if (!why && flags.gate && tier !== "A" && this.braked(pickup, now)) (tier = "C"), (why = "pool brake")
         if (!why && flags.governor && maxTier === "A" && tier === "B") (tier = "C"), (why = "calendar")
@@ -113,6 +116,7 @@ export class Quoter {
         const day = planned[slowest]
         if (flags.capacity && day !== undefined) this.capacity.reserve(request.id, pickup, day)
         this.planned.set(request.id, planned)
+        if (request.batchId) this.batchAdmitted.set(request.batchId, (this.batchAdmitted.get(request.batchId) ?? 0) + 1)
         this.pendingRisk.set(request.id, 1 - worstP)
       }
       out.push({ type: "quote", requestId: request.id, prices })

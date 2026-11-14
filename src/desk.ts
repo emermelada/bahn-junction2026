@@ -362,9 +362,19 @@ export class V2Desk implements Desk {
     let stage: string
     if (this.now > order.lastPickupAt) (schedule = this.fees.doomed(this.now, base, price, this.ctx.endsAt)), (stage = "doomed")
     else if (this.urgent.has(order.id)) (schedule = this.fees.rescue(this.now, base, price, ref, amber)), (stage = "rescue")
-    else (schedule = this.fees.schedule(this.now, base, order.lastPickupAt)), (stage = "open")
+    else (schedule = this.fees.schedule(this.now, base, this.cliffFor(order))), (stage = "open")
     this.ctx.log?.({ at: this.now, kind: "fee", order: order.id, stage, cars, ref: Math.round(ref), price: Math.round(price), base: Math.round(base), lastPickup: order.lastPickupAt, schedule })
     return schedule
+  }
+
+  /** The minute the open schedule plans its cliff against: the last pickup, or with planCliff 18:00 of the planned
+   * pickup day when that is earlier and still 3 hours ahead (so within_3_days cars do not all wait for the last day). */
+  cliffFor(order: Order): number {
+    if (!this.cfg.fees.planCliff) return order.lastPickupAt
+    const day = this.quoter.planned.get(order.id)?.[order.option]
+    if (day === undefined) return order.lastPickupAt
+    const planned = day * DAY + 18 * 60
+    return planned < order.lastPickupAt && planned > this.now + 180 ? planned : order.lastPickupAt
   }
 
   async retry(orderId: string, leg: number, reason: string): Promise<void> {
