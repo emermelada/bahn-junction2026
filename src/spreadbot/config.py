@@ -128,6 +128,11 @@ class Config:
     hold_price: bool = False           # quote a car that pairs with a held car (same pickup day, near) at the bundle cost
     bundle_keep: float = 0.0          # a dropped bundle with this many hours to spare stays a bundle, raised to this x its base (0 = split)
     hold_km: float = 0.0               # air km from A's delivery to B's pickup for a release pair (0 = bundle_km)
+    hold_weekend: bool = False         # a held car whose last pickup is on the last Monday is released Sunday at hold_hour (not before Friday):
+                                       # bookings made 2+ days ahead are a third dropped and a fifth late (RESEARCH_2 round 2), Mon2 drivers are idle
+    repair_pairs: bool = False         # a car won during the day may pair with any open unbooked single of ours, not only one posted in the last bundle_window
+    repair_drive: int = 300            # such a pair drives at most this many minutes (k18: chains under 5 h book 85%)
+    repair_lead: int = 360             # and starts at least this long from now (k18: pairs formed under 2 h ahead book 46%)
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
     backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little
     backhaul_mult: float = 1.0         # offer fee over typical fee (never under the app fee unless backhaul_below)

@@ -132,6 +132,7 @@ class Desk:
         self.ontime = OnTime(self)
         self.gov = Governor(self)
         self.book_ratios: list[float] = []
+        self.gov_logged = -1
 
     # ------------------------------------------------------------------ helpers
     def say(self, code: str, detail: str = "") -> None:
@@ -845,13 +846,16 @@ class Desk:
                 if last is not None and (best is None or self.chain_key(last, first, second) > self.chain_key(best[0], best[1], best[2])):
                     best = (last, first, second, None)
         for rec in self.gigs.values():
-            if rec.status != "open" or rec.escalated or len(rec.legs) != 1 or self.now - rec.posted_at > self.cfg.bundle_window:
+            old = self.now - rec.posted_at > self.cfg.bundle_window
+            if rec.status != "open" or rec.escalated or len(rec.legs) != 1 or (old and not self.cfg.repair_pairs):
                 continue
             other = self.orders.get(rec.legs[0][0])
             if not other or other is ob or not self.simple(other):
                 continue
             for first, second in ((ob, other), (other, ob)):
                 last = self.chain(first, second)
+                if last is not None and old and not self.repair_ok(first, second):
+                    continue  # repair: an older single still unbooked; take it into a pair only if the pair books well
                 if last is not None and (best is None or self.chain_key(last, first, second) > self.chain_key(best[0], best[1], best[2])):
                     best = (last, first, second, rec)
         if not best:
@@ -864,6 +868,14 @@ class Desk:
         self.post_bundle(first, second, last)
         return True
 
+    def repair_ok(self, first: OrderBook, second: OrderBook) -> bool:
+        """A pair built from an older open single: short enough and far enough ahead to book (k18 chain log)."""
+        A, B, g = first.order["legs"][0], second.order["legs"][0], self.geo
+        drive = (g.drive(A["pickup"]["placeId"], A["delivery"]["placeId"]) + g.drive(A["delivery"]["placeId"], B["pickup"]["placeId"])
+                 + g.drive(B["pickup"]["placeId"], B["delivery"]["placeId"]))
+        start = max(self.now + self.cfg.bundle_lead, A["pickup"]["window"]["from"])
+        return drive <= self.cfg.repair_drive and start - self.now >= self.cfg.repair_lead
+
     # ------------------------------------------------------------------ evening release
     def release_at(self, ob: OrderBook) -> Optional[int]:
         """When to post a car picked up on a later day: hold_hour on the day before its first pickup day.
@@ -874,6 +886,8 @@ class Desk:
             return None
         frm = max(max(self.leg_note(o["id"], l).ready_at or 0, L["pickup"]["window"]["from"]) for l, L in enumerate(o["legs"]))
         rel = (frm // DAY - 1) * DAY + self.cfg.hold_hour * 60
+        if self.cfg.hold_weekend and self.last_pickup(ob, list(range(len(o["legs"])))) // DAY == 7:
+            rel = max(rel, 6 * DAY + self.cfg.hold_hour * 60)  # due on the last Monday: book it on Sunday for Monday
         return rel if rel > self.now else None
 
     def release_held(self) -> None:
@@ -1385,6 +1399,11 @@ class Desk:
                     self.escalate_gig(rec, "alarm")
         if self.cfg.viewer_offers:
             self.offer_viewers()
+        if self.now // (2 * HOUR) != self.gov_logged:
+            # Every 2 world hours: the governor's view, to check its projection against the end of the week.
+            self.gov_logged = self.now // (2 * HOUR)
+            self.say("GOV", f"proj={self.gov.projection():.3f} cal={self.gov.calibration():.3f} won={self.won_count} "
+                            f"ontime={len(self.ontime_orders)} late={len(self.late_orders)} bar={self.gov.bar():.2f}")
 
     def offer_viewers(self) -> None:
         """A driver who viewed our gig and did not book is active today and close by; in the app they may be
