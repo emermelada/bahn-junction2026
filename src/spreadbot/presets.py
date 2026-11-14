@@ -328,3 +328,8 @@ SWZ = ["scarcity=(9.0,9.0)", "scarcity_z=(1.002,0.044,0.037,0.029,2.5)"]
 PRESETS["k-f1h5fV2z"] = PRESETS["k-f1h5fV2"] + SWZ + ["scarce_set=(('load_free',0.07),('load_slope',1.0),('load_bundle_w',1.0))"]
 # bold arm lw5 (k-f1h5f + long_warn (240,5,1440): +540 H1 / +552 H3, nf-04 0.884) behind the switch: long_warn back to (240,3,1440)
 PRESETS["k-f1h5f-lw5z"] = PRESETS["k-f1h5f"] + ["long_warn=(240,5,1440)"] + SWZ + ["scarce_set=(('long_warn',(240,3,1440)),)"]
+# Switch v2: nf-04 jitter showed the Tue-24:00 flip comes too late (z 16.6 at the first check; V2z 0.887-0.895, lw5z 2/3 unranked) and the
+# release's knobs are no safe mode (release 2/9 unranked on nf-04, v5La 0/9). Early tier z >= 8 from Mon 12:00, normal tier z >= 2.5
+# from Tue 24:00; the bold arm sits on v5La and falls back to v5La's knobs.
+SWZ2 = ["scarcity=(9.0,9.0)", "scarcity_z=(1.002,0.044,0.037,0.029,2.5,8.0,720)"]
+PRESETS["v5La-lw5z2"] = PRESETS["v5La"] + ["long_warn=(240,5,1440)"] + SWZ2 + ["scarce_set=(('long_warn',(240,3,1440)),)"]

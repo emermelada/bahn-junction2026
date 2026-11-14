@@ -721,7 +721,8 @@ class Desk:
         cars / won cars >= warned_share. Sticky: once scarce, scarce for the week."""
         cfg = self.cfg
         hi = min(t, cfg.scarcity_until) // 60
-        h = max(self.scarce_hour + 1, -(-cfg.scarcity_from // 60))
+        start = min(cfg.scarcity_from, cfg.scarcity_z[6]) if len(cfg.scarcity_z) > 6 else cfg.scarcity_from
+        h = max(self.scarce_hour + 1, -(-start // 60))
         while h <= hi and not self.scarce:
             self.scarce_hour = h
             H = h * 60
@@ -734,7 +735,11 @@ class Desk:
             if cfg.scarcity_z:
                 # Standardized sum of both Tuesday signals against normal weeks (PROBE's 228 labelled weeks: z >= 2.5 flags 35% of
                 # bad weeks at 4% false alarms; fee AND warned at best 28% / 4%, fee OR warned 37% / 11%; research/re/fleet/scar_rules.out).
-                mf, sf, mw, sw, thr = cfg.scarcity_z
+                mf, sf, mw, sw, thr = cfg.scarcity_z[:5]
+                if H < cfg.scarcity_from:
+                    # Early tier (scarcity_z[5] from minute scarcity_z[6]): only an extreme week flips before Tuesday midnight. nf-04's z was
+                    # 8.4 at Tue 12:00 and 16.6 at Tue 18:00; no normal tuning week passed 5.6 by Tue 18:00 (research/re/fleet/zcurve.py).
+                    thr = cfg.scarcity_z[5]
                 hit = fee > 0 and won >= cfg.scarcity_min_n and (fee - mf) / sf + (share - mw) / sw >= thr
             else:
                 hit = fee >= f_lim or share >= w_lim
