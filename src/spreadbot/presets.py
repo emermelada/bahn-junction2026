@@ -32,4 +32,8 @@ PRESETS = {
         "bundle_max_drive=300", "bundle_min_lead=360",    # chains under 5 h of driving, formed 6 h ahead: 85% booked
     ],
 }
+# chains_plus (Javier, origin/a/frank-plus 629708e): k18 + decline once we hold 6 orders from one batch (bulk-yard bursts).
+# rc10-01..12: mean 11,041 vs 10,791 for k18, 12/12 ranked, min on-time 0.918 vs 0.901.
+PRESETS["chains_plus"] = PRESETS["chains"] + ["max_per_batch=6"]
+PRESETS["c1_plus"] = PRESETS["c1"] + ["max_per_batch=6"]
 PRESETS["best"] = PRESETS["c1"]  # the current best version (team objective: raw mean margin); replaced when a combination beats it
