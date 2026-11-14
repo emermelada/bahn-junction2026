@@ -112,6 +112,8 @@ class Market:
         # day_kalman: per day, hypotheses [weight, mean shift, variance] for (normal day, war day), in ratio units.
         self.kal: dict[int, list[list[float]]] = {}
         self.war_seen = False
+        self.out_acc: dict[tuple[int, str], list[float]] = {}  # (day, region centre) -> [sum(won - p), sum p(1-p), n], 08-18
+        self.outage: dict[int, str] = {}                        # day -> centre of the flagged outage region
 
     def kal_day(self, day: int) -> list[list[float]]:
         """Today's two hypotheses, made at the first quote or result of the day. The war comes once a week on a
@@ -129,7 +131,16 @@ class Market:
     def base_for(self, dealer: str, day: int, place: str = "", lane: str = "") -> float:
         return self.mu + self.dealer_shift[dealer] + self.place_shift.get((place, day), 0.0) + self.cfg.lane_w * lane_shift(lane)
 
+    def in_outage(self, day: int, place: str, t: int) -> bool:
+        c = self.outage.get(day)
+        return bool(c and place) and 8 * HOUR <= t % DAY < 18 * HOUR and self.desk.geo.air(c, place) <= 80.0
+
     def mu_for(self, dealer: str, day: int, place: str = "", lane: str = "") -> float:
+        if self.cfg.outage_z and self.in_outage(day, place, self.desk.now):
+            return self.mu_base(dealer, day, place, lane) * (1 + self.cfg.outage_up)
+        return self.mu_base(dealer, day, place, lane)
+
+    def mu_base(self, dealer: str, day: int, place: str = "", lane: str = "") -> float:
         if self.cfg.day_kalman:
             return self.base_for(dealer, day, place, lane) + sum(w * d for w, d, v in self.kal_day(day))
         return (self.mu + self.day_shift[day] + self.dealer_shift[dealer] + self.place_shift.get((place, day), 0.0)
@@ -182,6 +193,20 @@ class Market:
             self.n_obs += 1
             self.day_obs[day].append(won)
             return
+        if self.cfg.outage_z and place and 8 * HOUR <= at % DAY < 18 * HOUR:
+            if self.in_outage(day, place, at):
+                self.n_obs += 1
+                return  # the outage region's dealers pay the backup's price today: nothing to learn for the rest of the world
+            p = (1.0 if won else 0.0) - g
+            for c, _ in self.desk.nearby(place):
+                a = self.out_acc.setdefault((day, c), [0.0, 0.0, 0])
+                a[0] += g
+                a[1] += p * (1 - p)
+                a[2] += 1
+                if (day not in self.outage and a[2] >= self.cfg.outage_min and self.day_shift[day] > -self.cfg.war_shift
+                        and a[0] >= self.cfg.outage_z * math.sqrt(a[1])):
+                    self.outage[day] = c
+                    self.desk.say("OUTAGE", f"day {day} region {c} z={a[0] / math.sqrt(a[1]):.1f} n={a[2]}")
         war = self.cfg.war_guard and self.day_shift[day] < -self.cfg.war_shift
         if not war:
             # On a price-war day (the competitor 20% under everywhere) only today's shift learns: tomorrow it is back.

@@ -128,3 +128,5 @@ PRESETS["k-s5c15"] = PRESETS["k-s5"] + ["load_cap=0.15"]
 # re-market m8mon2s (Mon2 room for drives < 4 h: +594/+834/+519, 34/34, worst 0.944-0.948) + re-drivers d-feerd (worst 0.938-0.941).
 PRESETS["k-safe"] = PRESETS["c3g"] + MON2S + ["fee_open_rule=((24,0,0.92),(12,80,0.95))", "relook_minutes=90", "relook_mult=1.05",
                                               "desert_n=11", "desert_alarm=720"]
+# re-market: the outage detector (pickup region, 08-18, flagged at z 4, priced +25%), on the k-safe bar.
+PRESETS["m11out"] = PRESETS["k-safe"] + ["outage_z=4.0"]
