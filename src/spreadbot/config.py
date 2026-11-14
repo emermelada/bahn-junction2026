@@ -245,9 +245,11 @@ class Config:
     # + ln(drive min) + posted Fri..Mon2 + private end + premium; sigma. PROBE's counterfactual forks (57 cars, 227 probes,
     # research/re/probe/out/clear_fit.json): median clearing fee ~0.98 (few drivers near the delivery, < 8 h) to 0.64 (many, > 40 h).
     fee1_clear: tuple = (0.1892, -0.0561, -0.0130, -0.1032, 0.0275, -0.0573, 0.0076, 0.0241, 0.2250)
+    fee1_sigma: float = 0.0            # override sigma (0 = fee1_clear's). f1h5: 0.80 picks booked 57% vs 74% predicted, 1.00 78% vs 84%: too
+                                       # steep; PROBE's population curve and Halal's flat fees imply 0.29-0.31
     fee1_delta: tuple = (0.10, 0.30, 1440)  # this week's offset of ln(clearing fee): prior sd, clamp, half-life of a post's weight (min)
                                        # (Halal learns its intercept: -EUR 505/wk without; drivers booking us: 48 Mon, 61-62 Tue-Thu, 38 Fri)
-    fee1_obs_minutes: int = 240        # a first post unbooked for this many daytime minutes counts as "did not clear" for the offset
+    fee1_obs_minutes: int = 30         # a first post unbooked after this many daytime minutes on show counts (by its exposure) for the offset
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
     backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little
     backhaul_mult: float = 1.0         # offer fee over typical fee (never under the app fee unless backhaul_below)

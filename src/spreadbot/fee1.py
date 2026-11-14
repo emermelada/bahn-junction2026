@@ -145,7 +145,7 @@ class Fee1:
         if t_alarm - d.now < cfg.fee1_min_minutes:
             return None
         self.calibrate()
-        sig = cfg.fee1_clear[-1]
+        sig = (cfg.fee1_sigma or cfg.fee1_clear[-1])
         oid = ob.order["id"]
         price = ob.order.get("priceCents") or 2 * base
         r_fee, r_late = cfg.fee1_rescue
@@ -241,7 +241,7 @@ class Fee1:
             legs = [l for _, l in rec.legs]
             base = d.base_fee(ob, legs)
             m = current_fee(rec.schedule, d.now) / max(1.0, base)
-            sig = cfg.fee1_clear[-1]
+            sig = (cfg.fee1_sigma or cfg.fee1_clear[-1])
             z = (math.log(max(0.05, m)) - self.mu(ob, legs, rec.posted_at) - self.delta) / sig
             price = ob.order.get("priceCents") or 2 * base
             r_fee, r_late = cfg.fee1_rescue
@@ -269,7 +269,7 @@ class Fee1:
             return None
         legs = [l for _, l in rec.legs]
         m = rec.schedule[0]["feeCents"] / max(1.0, d.base_fee(ob, legs))
-        return (math.log(max(0.05, m)) - self.mu(ob, legs, rec.posted_at)) / d.cfg.fee1_clear[-1]
+        return (math.log(max(0.05, m)) - self.mu(ob, legs, rec.posted_at)) / (d.cfg.fee1_sigma or d.cfg.fee1_clear[-1])
 
     def close(self, rec: "GigRec", booked: bool, at: int) -> None:
         """A fee1 gig's flat exposure ended (booked, withdrawn for a re-pick, or escalated at the alarm). First posts are this
@@ -297,46 +297,44 @@ class Fee1:
             self.desk.say("ERR", f"fee1 booked_after_all {type(exc).__name__}: {exc}")
 
     def calibrate(self) -> None:
-        """delta: the week's offset of ln(clearing fee), by Newton steps on the probit likelihood of "booked within the first
-        fee1_obs_minutes daytime minutes" of our first posts, P = window(W) Phi(z - delta / sigma), with a normal prior; only
-        posts whose W has passed (or that booked inside it), so fast bookings do not count before the slow misses can;
-        older posts weigh less (half-life fee1_delta[2] min), so the offset follows the week's days. Once per world hour."""
+        """delta: the week's offset of ln(clearing fee), by Newton steps on a censored probit likelihood over our first posts:
+        booked: P = Phi(z - delta / sigma); not booked after E daytime minutes on show (closed or still open):
+        P = 1 - window(E) Phi(z - delta / sigma), so a post closed at night or by the alarm counts only for what it was shown.
+        Normal prior; older posts weigh less (half-life fee1_delta[2] min), so the offset follows the week's days. Once per world hour."""
         d, cfg = self.desk, self.desk.cfg
         if d.now // 60 == self.d_at:
             return
         self.d_at = d.now // 60
-        sig = cfg.fee1_clear[-1]
-        W = cfg.fee1_obs_minutes
+        sig = (cfg.fee1_sigma or cfg.fee1_clear[-1])
         prior_sd, lim, half = cfg.fee1_delta
-        xs = []
+        xs = []  # (z, booked, window share of the exposure, weight)
         for gid in sorted(self.obs):
             z, posted, booked_at, closed = self.obs[gid]
-            if booked_at is not None and day_minutes(posted, booked_at) <= W:
-                b = 1
-            elif day_minutes(posted, closed) >= W:
-                b = 0
+            wt = 0.5 ** ((d.now - posted) / half)
+            if booked_at is not None:
+                xs.append((z, 1, 1.0, wt))
             else:
-                continue  # closed unbooked before its window was over: no verdict
-            xs.append((z, b, 0.5 ** ((d.now - posted) / half)))
-        for gid in sorted(d.gigs):  # open first posts that already sat a full window count as misses
+                e = day_minutes(posted, closed)
+                if e >= cfg.fee1_obs_minutes:
+                    xs.append((z, 0, self.window(e), wt))
+        for gid in sorted(d.gigs):  # open first posts: not booked so far
             rec = d.gigs[gid]
-            if (rec.status == "open" and gid not in self.done and d.fee1_gig(rec)
-                    and day_minutes(rec.posted_at, d.now) >= W):
+            if rec.status == "open" and gid not in self.done and d.fee1_gig(rec):
+                e = day_minutes(rec.posted_at, d.now)
                 ob = d.orders.get(rec.legs[0][0])
-                if ob and self.prior_miss(ob.order["id"], [l for _, l in rec.legs], rec.posted_at) is None:
+                if e >= cfg.fee1_obs_minutes and ob and self.prior_miss(ob.order["id"], [l for _, l in rec.legs], rec.posted_at) is None:
                     z = self.z0(rec)
                     if z is not None:
-                        xs.append((z, 0, 0.5 ** ((d.now - rec.posted_at) / half)))
-        w = self.window(W)
-        u = self.delta / sig  # offset in z units: P(booked within W) = w Phi(z - u)
+                        xs.append((z, 0, self.window(e), 0.5 ** ((d.now - rec.posted_at) / half)))
+        u = self.delta / sig  # offset in z units
         k = (sig / prior_sd) ** 2
         for _ in range(8):
             g, h = -u * k, -k
-            for z, b, wt in xs:
+            for z, b, w, wt in xs:
                 t = z - u
                 f = phi(t)
                 if b:
-                    r = f / max(1e-9, Phi(t))              # d/du ln(w Phi(t)) = -r
+                    r = f / max(1e-9, Phi(t))              # d/du ln Phi(t) = -r
                     g -= wt * r
                     h -= wt * r * (r + t)
                 else:
