@@ -70,6 +70,7 @@ class Config:
     cong_horizon: int = 18 * 60        # only gigs whose last pickup is within this many minutes
     # --- load: our cars due per day over the world's drivers
     load_free: float = 0.07            # rc3: with late 2.0 the long and thin-town cars get dear, so the safe ones can take more load (y4)
+    load_free_mon2: float = 0.0        # load_free for cars due on the last Monday: few of our gigs start then, drivers are free (0 = load_free)
     adaptive_load: bool = False        # scale load_free by how easily our first posts book this week
     cap_min: float = 0.7
     cap_max: float = 1.4

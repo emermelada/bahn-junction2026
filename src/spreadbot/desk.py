@@ -475,9 +475,11 @@ class Desk:
                 continue
             # Load: our cars already due that day against the world's drivers. Lateness grows with it
             # (lab: 2.7% late under 6% of drivers, 8.7% at 9-12%, 12% above 15%), so a busy day's next car costs more.
-            load = self.due_load(self.deadline_day(r, opt))
+            dday = self.deadline_day(r, opt)
+            load = self.due_load(dday)
             per_car = cfg.load_flat_cents if cfg.load_flat_cents else r["referenceFeeCents"]
-            load_cost = cfg.load_slope * per_car * max(0.0, load - cfg.load_free * self.capacity_factor()) / 0.05
+            free = cfg.load_free_mon2 if (cfg.load_free_mon2 and dday >= 7) else cfg.load_free
+            load_cost = cfg.load_slope * per_car * max(0.0, load - free * self.capacity_factor()) / 0.05
             risk_frac = (1 - p_ok) * cfg.late_cost_frac * self.pl_factor(drive)
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain) + cfg.trust_loss_w * (1 - p_ok) * t_loss
