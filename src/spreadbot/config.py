@@ -114,6 +114,8 @@ class Config:
     bundle_soon_slack: int = 180       # such a chain needs this long before its last start, and splits this long before it
     load_bundle_w: float = 1.0         # a car in one of our live chains counts this much in the day's load (one driver moves two)
     bundle_rel: tuple = ()             # ((hours before the chain's last start, fee as a share of the two typical fees), ...); () = fee_rel on the bundle fee
+    hold_last: int = 0                 # if set: post a held car by this long before its last pickup (not before its window opens), so next-day cars ready now can wait for a partner
+    bundle_late_start: bool = False    # a chain may start later than its first window opens (next-day cars), at least bundle_min_lead from now
     hold_minutes: int = 0              # hold a won car up to this long, unposted, to find a chain partner (0 = post at once)
     hold_lead: int = 12 * 60           # post a held car at the latest this long before its pickup window opens
     hold_slack: int = 8 * 60           # and this long before its last pickup

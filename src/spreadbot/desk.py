@@ -672,7 +672,7 @@ class Desk:
         dB = geo.drive(LB["pickup"]["placeId"], LB["delivery"]["placeId"])
         if dA + tr + dB > min(12 * HOUR - 30, cfg.bundle_max_drive):
             return None
-        start = max(self.now + cfg.bundle_lead, LA["pickup"]["window"]["from"])
+        start = max(self.now + (max(cfg.bundle_lead, cfg.bundle_min_lead) if cfg.bundle_late_start else cfg.bundle_lead), LA["pickup"]["window"]["from"])
         soon = start - self.now < cfg.bundle_soon_lead
         if start - self.now < cfg.bundle_min_lead and not soon:
             return None
@@ -690,6 +690,8 @@ class Desk:
     def hold_until(self, ob: OrderBook) -> int:
         cfg = self.cfg
         L = ob.order["legs"][0]
+        if cfg.hold_last:
+            return min(self.now + cfg.hold_minutes, self.last_pickup(ob, [0]) - cfg.hold_last)
         return min(self.now + cfg.hold_minutes, L["pickup"]["window"]["from"] - cfg.hold_lead, self.last_pickup(ob, [0]) - cfg.hold_slack)
 
     def chain_key(self, last: int, first: OrderBook, second: OrderBook) -> float:
