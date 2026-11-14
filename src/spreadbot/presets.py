@@ -183,3 +183,7 @@ PRESETS["k-safe-dcls"] = PRESETS["k-safe-dc"] + ["long_split=(360,180)"]
 # FLEET v4: one fee per single gig chosen by a booking model (fee1.py + book_gbm.py) instead of the opening + raises + relook;
 # re-pick as a new post after 6 h; the alarm's steep rescue kept. Target: lone cars 1.08x -> <= 0.97x typical at the same on-time.
 PRESETS["k-f1"] = PRESETS["k-safe-dcl"] + ["fee1=true"]
+# MARKET: the quote cost level held at k-safe-dcl's mean cost_mult (1.05), so fee1's savings stay margin instead of lowering our
+# prices on the same cars (the load charge binds: quoting at a 5% lower cost was -396/wk at equal orders, m25-fma).
+PRESETS["kdcl-hold"] = PRESETS["k-safe-dcl"] + ["quote_cost_hold=1.05"]
+PRESETS["k-f1h"] = PRESETS["k-f1"] + ["quote_cost_hold=1.05"]
