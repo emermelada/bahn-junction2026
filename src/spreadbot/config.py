@@ -129,6 +129,9 @@ class Config:
     steep_relaxed: tuple = (1.4, 1.6, 1.8)  # v1aa: p10 margin 6,773 vs 5,594, same mean
     steep_rescue: tuple = (2.0, 2.5, 3.0, 3.5, 4.0)
     late_plan: tuple = ((0, 1.2), (4, 1.5), (12, 2.0))  # (hours from now, fee): a car that is late anyway, no steep fees
+    flu_drops: int = 0                 # this many of our gigs dropped 00:00-01:00 = a flu night (0 = off): on tuning weeks, nights with
+                                       # >= 8 such drops (125 of 752) make that day's cars 8.9% late vs 4.7% (research/re/flu.py; Halal idea 14)
+    flu_mult: float = 1.9              # P(late) multiplier for cars due on a flu day, at quote time and in the projection (8.9 / 4.7)
     crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar
     view_raise_n: int = 0              # this many viewers and no booking: raise to view_raise_mult at once
     view_raise_after: int = 45

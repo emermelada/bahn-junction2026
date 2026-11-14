@@ -128,3 +128,8 @@ PRESETS["k-s5c15"] = PRESETS["k-s5"] + ["load_cap=0.15"]
 # re-market m8mon2s (Mon2 room for drives < 4 h: +594/+834/+519, 34/34, worst 0.944-0.948) + re-drivers d-feerd (worst 0.938-0.941).
 PRESETS["k-safe"] = PRESETS["c3g"] + MON2S + ["fee_open_rule=((24,0,0.92),(12,80,0.95))", "relook_minutes=90", "relook_mult=1.05",
                                               "desert_n=11", "desert_alarm=720"]
+# Flu nights (>= 8 drops 00-01h): cars due that day priced and projected at 1.9x P(late).
+FLU = ["flu_drops=8", "flu_mult=1.9"]
+PRESETS["k-safef"] = PRESETS["k-safe"] + FLU
+PRESETS["k-s5f"] = PRESETS["k-s5"] + FLU
+PRESETS["c3gf8"] = PRESETS["c3g"] + FLU

@@ -106,6 +106,8 @@ class Desk:
         self.chain_held: dict[str, int] = {}  # order -> minute to stop holding it for a chain partner and post it alone (chain planner)
         self.bundle_soon: set[str] = set()  # orders in a chain posted at short notice (split later, at bundle_soon_slack)
         self.morning_drops: dict[int, int] = defaultdict(int)
+        self.night_drops: dict[int, int] = defaultdict(int)  # drops 00:00-01:00 per day (flu nights)
+        self.flu_days: set = set()
         self.due_count: dict[int, int] = defaultdict(int)
         self.batch_won: dict[str, int] = defaultdict(int)
         self.need_resync = False
@@ -288,6 +290,19 @@ class Desk:
     def on_gig_dropped(self, e: dict) -> None:
         self._reopen(e["gigId"], "dropped")
         day, h = e["at"] // DAY, (e["at"] % DAY) // 60
+        if h == 0 and self.cfg.flu_drops:
+            self.night_drops[day] += 1
+            if self.night_drops[day] == self.cfg.flu_drops:
+                # A flu night: drivers give back that day's bookings at once; cars due that day end late ~1.9x as often.
+                self.flu_days.add(day)
+                n = 0
+                for oid in sorted(self.orders):
+                    ob = self.orders[oid]
+                    if oid in self.ontime_orders or oid in self.late_orders:
+                        continue
+                    if max(self.deadline(ob.order, l) for l in range(len(ob.order["legs"]))) // DAY == day:
+                        ob.p_ok = max(0.0, 1 - (1 - ob.p_ok) * self.cfg.flu_mult); n += 1
+                self.say("FLU", f"day {day}: {self.night_drops[day]} drops 00-01h; {n} open orders due today reweighted")
         if 5 <= h < 13:
             self.morning_drops[day] += 1
             if self.cfg.crunch_drops and self.morning_drops[day] == self.cfg.crunch_drops:
@@ -480,6 +495,8 @@ class Desk:
                 continue
             p_ok, slack = self.ontime.p_ok(r, opt["deadline"], kind)
             p_ok = min(0.99, p_ok * cal)
+            if self.flu_days and self.deadline_day(r, opt) in self.flu_days:
+                p_ok = max(0.0, 1 - (1 - p_ok) * cfg.flu_mult)  # due on a flu day (see on_gig_dropped)
             if p_ok < bar or slack < cfg.min_slack_h:
                 info.append(f"{kind}:skip(p={p_ok:.2f},s={slack:.1f})")
                 continue
