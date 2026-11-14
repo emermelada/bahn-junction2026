@@ -97,3 +97,9 @@ b1 per seed: spread-1 9,503 · v2-g1 9,189 · v2-g2 13,396 · v2-g3 7,033 · v2-
 p3 held-out (5 of 10 seeds before the slots went to b-arms): +€1,119/seed vs m19, 4/5 better (v2-h1 −€406 at 92.2%).
 
 Rejected this session: anchor bonus (cheap quotes to build trust; trust counts on delivery, ~1 day after the win, so it pulls full trust forward by half a day only: −€950 and −€1,350), sigma 0.18 (−€1k), same_day priced 1.3 x (−€1.1k on spread-1), opening the gate without chains (v3, v5: unranked 86.9–89.6% on v2-g1; Friday same_day and long next_day go late), Friday capacity x0.35 (= x0.5).
+
+**b1 held-out (10 seeds never tuned on):** 6,615 · 4,805 · 10,587 · 6,212 · 7,959 · 10,286 · 8,037 · 9,032 · 7,665 · 9,358 = **mean €8,056 vs m19 €5,805, better on 10/10**, worst on time 93.4%. Over all 15 seeds b1 averages **€8,501/week (≈ €42.5k / 5 weeks)**.
+
+**Final loop rehearsal with b1** (`run-final.ts` on a practice world ticked at 4x the final's pace, seed v2-rehearsal-2): END €8,238, 342 won, 97.4% on time, ranked, exit 0. 15 refused actions, all the live race "gig is not open" (a driver booked a chain partner between decision and withdraw; the car falls back to its own gig; such gigs are no longer partners).
+
+Rejected around b1 (each worse on its first 1–5 seeds): long next_day reopened (b6: −€211/−€565, 91.3% on v2-g1) and reopened with a 1.3x cost and late premium (b13: +€1,258 / −€1,649, 91.7%), fee estimate 0.9 (b8: −€1,031), fee bands −10% (b9: −€828, 93.8%), outage region offset (b10: −€413 / +€367, neutral), 3-car chains (b11: −€63 / −€1,500), sweep pairing of stale singles (b7: −€622), direct offers (b12: −€772), chain hop 45 min (b14: −€541 / −€850), shadow cost €10 per car (b15: mean €7,824 — same margin with ~80 fewer orders: b1's marginal cheap orders earn ~€0), Friday same_day cutoff with chains (b2: −€140 to −€330).
