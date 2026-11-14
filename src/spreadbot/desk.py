@@ -100,6 +100,7 @@ class Desk:
         self.offered: set[tuple[str, str]] = set()  # (gig, driver)
         self.gig_viewers: dict[str, list[str]] = {}  # gig -> drivers who viewed it, in order
         self.bundle_last: dict[str, int] = {}  # order -> last minute to start its bundle
+        self.held: dict[str, int] = {}  # order -> minute to stop holding it for a chain partner and post it alone
         self.morning_drops: dict[int, int] = defaultdict(int)
         self.due_count: dict[int, int] = defaultdict(int)
         self.batch_won: dict[str, int] = defaultdict(int)
@@ -587,7 +588,16 @@ class Desk:
         legs = [l for l in self.undelivered(oid) if (oid, l) not in self.leg_gig and not self._pending(oid, l)]
         if not legs:
             return
-        if self.cfg.bundle and why == "won" and len(ob.order["legs"]) == 1 and self.try_bundle(ob):
+        if self.cfg.bundle and self.cfg.hold_minutes and (why == "won" or oid in self.held) and legs == [0] and len(ob.order["legs"]) == 1 and self.simple(ob):
+            # Hold the car a while: most cars are won hours before they are ready, and a partner whose
+            # pickup is near this car's delivery lets one driver take both for less than two gigs.
+            until = self.held.setdefault(oid, self.hold_until(ob))
+            if self.try_bundle(ob):
+                return
+            if self.now < until:
+                return
+            self.held.pop(oid, None)
+        elif self.cfg.bundle and why == "won" and len(ob.order["legs"]) == 1 and self.try_bundle(ob):
             return
         groups = [legs]
         if len(legs) == 2 and self.trade_minutes(ob.order) > 12 * HOUR - 10:
@@ -605,6 +615,15 @@ class Desk:
             return False
         p, d = L["pickup"]["placeId"], L["delivery"]["placeId"]
         km = self.cfg.bundle_km
+        for oid2 in self.held:
+            ob = self.orders.get(oid2)
+            if not ob or not self.simple(ob):
+                continue
+            O = ob.order["legs"][0]
+            if ob.order["deadline"] // DAY != r["options"][0]["deadline"] // DAY:
+                continue
+            if self.geo.air(O["delivery"]["placeId"], p) <= km or self.geo.air(d, O["pickup"]["placeId"]) <= km:
+                return True
         for rec in self.gigs.values():
             if rec.status != "open" or rec.escalated or len(rec.legs) != 1 or self.now - rec.posted_at > self.cfg.bundle_window:
                 continue
@@ -640,9 +659,11 @@ class Desk:
         dA = geo.drive(LA["pickup"]["placeId"], LA["delivery"]["placeId"])
         tr = geo.drive(LA["delivery"]["placeId"], LB["pickup"]["placeId"])
         dB = geo.drive(LB["pickup"]["placeId"], LB["delivery"]["placeId"])
-        if dA + tr + dB > 12 * HOUR - 30:
+        if dA + tr + dB > min(12 * HOUR - 30, cfg.bundle_max_drive):
             return None
         start = max(self.now + cfg.bundle_lead, LA["pickup"]["window"]["from"])
+        if start - self.now < cfg.bundle_min_lead:
+            return None
         a_del = start + dA
         if a_del > self.deadline(A.order, 0) - cfg.bundle_margin:
             return None
@@ -654,10 +675,25 @@ class Desk:
             return None
         return last
 
+    def hold_until(self, ob: OrderBook) -> int:
+        cfg = self.cfg
+        L = ob.order["legs"][0]
+        return min(self.now + cfg.hold_minutes, L["pickup"]["window"]["from"] - cfg.hold_lead, self.last_pickup(ob, [0]) - cfg.hold_slack)
+
     def try_bundle(self, ob: OrderBook) -> bool:
         if not self.simple(ob):
             return False
         best = None
+        for oid2 in list(self.held):
+            other = self.orders.get(oid2)
+            if not other or other is ob or other.order["status"] == "cancelled" or not self.simple(other):
+                continue
+            if self.undelivered(oid2) != [0] or (oid2, 0) in self.leg_gig or self._pending(oid2, 0):
+                continue
+            for first, second in ((ob, other), (other, ob)):
+                last = self.chain(first, second)
+                if last is not None and (best is None or last > best[0]):
+                    best = (last, first, second, None)
         for rec in self.gigs.values():
             if rec.status != "open" or rec.escalated or len(rec.legs) != 1 or self.now - rec.posted_at > self.cfg.bundle_window:
                 continue
@@ -671,14 +707,20 @@ class Desk:
         if not best:
             return False
         last, first, second, rec = best
-        self.withdraw(rec.id)
+        if rec is not None:
+            self.withdraw(rec.id)
+        self.held.pop(first.order["id"], None)
+        self.held.pop(second.order["id"], None)
         stops = self.stops_for(first, 0) + self.stops_for(second, 0)
         audience = {"experienced": any(x.order["legs"][0]["car"]["premium"] for x in (first, second)), "manualLicence": False}
         base = (self.base_fee(first, [0]) + self.base_fee(second, [0])) * self.cfg.bundle_mult
         out = [{"at": self.now, "feeCents": int(round(base * self.cfg.fee_open))}]
         prev = out[0]["feeCents"]
-        for hours_before, mult in self.cfg.fee_rel:
-            fee = max(prev, int(round(base * mult)))
+        # Unbooked bundles used to sit at the opening fee until they were split, and split cars run late and dear:
+        # a bundle raises toward the price of two gigs before it gives up.
+        steps = [(h, m * self.cfg.bundle_mult) for h, m in self.cfg.fee_rel] if not self.cfg.bundle_rel else             [(h, m) for h, m in self.cfg.bundle_rel]
+        for hours_before, mult in steps:
+            fee = max(prev, int(round(base / self.cfg.bundle_mult * mult)))
             out.append({"at": max(self.now + self.cfg.fee_hold, last - int(hours_before * HOUR)), "feeCents": fee})
             prev = fee
         sched = dedupe(sorted(out, key=lambda x: (x["at"], x["feeCents"])))

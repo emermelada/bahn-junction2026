@@ -103,6 +103,12 @@ class Config:
     bundle_window: int = 120           # pair with gigs posted at most this many minutes ago
     bundle_mult: float = 0.8           # one driver, no trip home in between: the pair costs less than two gigs
     unbundle_minutes: int = 5 * 60     # unbooked this close to its last start: post the cars alone
+    bundle_max_drive: int = 12 * 60 - 30  # road minutes of a chain; k5: 74% booked under 4 h, 17% at 10-12 h
+    bundle_min_lead: int = 0           # minutes from now to the chain's start; k5: 46% booked under 2 h, 70% at 18-30 h
+    bundle_rel: tuple = ()             # ((hours before the chain's last start, fee as a share of the two typical fees), ...); () = fee_rel on the bundle fee
+    hold_minutes: int = 0              # hold a won car up to this long, unposted, to find a chain partner (0 = post at once)
+    hold_lead: int = 12 * 60           # post a held car at the latest this long before its pickup window opens
+    hold_slack: int = 8 * 60           # and this long before its last pickup
     # --- experiments (research runs only)
     experiment_quote: bool = False
     exp_quote_lo: float = 1.0
