@@ -218,3 +218,13 @@ PRESETS["k-f1h5fV1"] = PRESETS["k-f1h5f"] + ["load_bundle_w=0.6"]  # as on claud
 PRESETS["k-f1h5fV2"] = PRESETS["k-f1h5fV1"] + ["load_free=0.12", "load_slope=2"]
 PRESETS["v5q2V"] = PRESETS["k-f1h5fV2"] + ["long_warn_distinct=true"] + SCARCITY + [
     "scarce_set=(('load_free',0.07),('load_slope',1.0),('load_bundle_w',1.0))"]
+# V5 FLEET (research/re/v5/FLEET_BUILD.md). v5f1: fee1 cars with >= 8 h lead open at a flat 0.90 (floors kept), the one re-pick
+# posts at 1.03 (a 0.90 opening ends at 0.945x over all attempts vs 0.80 picks' 0.91x after 1.6-1.7 gigs/car; openings2.py).
+PRESETS["v5f1"] = PRESETS["v5a"] + ["v5_open=(8,0.9)", "v5_repost=1.03"]
+# v5f2: + at the re-pick, pair the sitting car with another open unbooked single of ours (one driver, two cars, bundle_mult).
+PRESETS["v5f2"] = PRESETS["v5f1"] + ["v5_pair2=true"]
+# v5f3: + ladder singles under 8 h to the last pickup (fee1 cannot choose) open at 0.95 instead of 1.05; raises unchanged.
+PRESETS["v5f3"] = PRESETS["v5f2"] + ["v5_short_open=0.95"]
+# V5 stacks (fleet + quote): the fee-first fleet's saving spent on safe volume, with the Tuesday scarcity switch turning both off.
+PRESETS["v5s1"] = PRESETS["v5f1"] + ["safe_admit=(0.97,0.95,0.12)"]
+PRESETS["v5s3"] = PRESETS["v5f3"] + ["safe_admit=(0.97,0.95,0.12)"] + SCARCITY

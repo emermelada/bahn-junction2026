@@ -250,6 +250,12 @@ class Config:
     fee1_delta: tuple = (0.10, 0.30, 1440)  # this week's offset of ln(clearing fee): prior sd, clamp, half-life of a post's weight (min)
                                        # (Halal learns its intercept: -EUR 505/wk without; drivers booking us: 48 Mon, 61-62 Tue-Thu, 38 Fri)
     fee1_obs_minutes: int = 240        # a first post unbooked for this many daytime minutes counts as "did not clear" for the offset
+    # --- V5 FLEET: fee-first single cars (research/re/v5/FLEET_BUILD.md). All off by default; Desk.scarce=True turns them all off.
+    v5_open: tuple = ()                # (min lead h, mult): a fee1 first post with >= this lead opens at this flat fee, never under the floors,
+                                       # instead of the model's pick (0.80 picks ended 0.91x after 1.6-1.7 gigs/car; a 0.90 opening 0.945x, openings2.py)
+    v5_repost: float = 0.0             # fee1's re-pick posts once at max(this, floors); no further model re-picks (last call and alarm unchanged; 0 = off)
+    v5_pair2: bool = False             # at the re-pick, first try to pair the car with another open unbooked single of ours (pairs pay 0.84x)
+    v5_short_open: float = 0.0         # ladder singles with < 8 h to the last pickup (fee1 cannot choose) open at this, not fee_open (0 = off)
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
     backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little
     backhaul_mult: float = 1.0         # offer fee over typical fee (never under the app fee unless backhaul_below)

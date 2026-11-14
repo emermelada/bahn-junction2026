@@ -80,6 +80,9 @@ class OrderBook:
     p_exp: float = 0.0
 
 
+V5_SHORT_H = 8  # v5_short_open: ladder singles under this many hours to the last pickup (6-8 h cars paid 1.13x, 0-6 h 1.27x)
+
+
 class Desk:
     def __init__(self, geo: Geo, cfg: Config, level: int, now: int, roster: list[dict]):
         self.geo, self.cfg, self.level, self.now = geo, cfg, level, now
@@ -1372,6 +1375,10 @@ class Desk:
                 opening = cfg.fee_open_dense  # many drivers live near the pickup: it books in minutes at less
             if (cfg.fee_open_rule or cfg.fee_open_day) and not ob.p_exp >= cfg.hot_p:
                 opening = self.open_rule(ob, legs, last, opening)
+            if (cfg.v5_short_open and cfg.fee1 and not getattr(self, "scarce", False) and last - now < V5_SHORT_H * HOUR
+                    and not ob.p_exp >= cfg.hot_p and not (cfg.desert_n and self.desert(ob.order["legs"][legs[-1]]["delivery"]["placeId"]))):
+                opening = cfg.v5_short_open  # short lead, fee1 could not choose: open lower, the fee_rel raises stay
+                self.say("V5_SHORT", f"{ob.order['id']} left={last - now} open={opening:.2f}")
             out, prev = [{"at": now, "feeCents": int(round(base * opening))}], int(round(base * opening))
             for hours_before, mult in cfg.fee_rel:
                 at = max(now + cfg.fee_hold, last - int(hours_before * HOUR))
@@ -1868,13 +1875,48 @@ class Desk:
             last_call = (cfg.fee1_last_call and cfg.fee1_min_minutes <= left <= cfg.fee1_last_call
                          and self.now - rec.posted_at >= 60 and posts <= cfg.fee1_max_posts)
             if not last_call:
-                if self.now < repick_at(rec.posted_at, cfg.fee1_repick) or posts >= cfg.fee1_max_posts:
+                # v5_repost: one re-pick at a flat fee, then the car keeps it to the last call (no second model re-pick)
+                max_posts = min(cfg.fee1_max_posts, 2) if cfg.v5_repost and not getattr(self, "scarce", False) else cfg.fee1_max_posts
+                if self.now < repick_at(rec.posted_at, cfg.fee1_repick) or posts >= max_posts:
                     continue  # (a re-pick that would fall at night waits for the morning: nobody plans a trip then)
                 if left < cfg.fee1_min_minutes + (cfg.fee1_last_call or 0):
                     continue  # too close to the alarm for another choice: the last call (or the alarm) takes it
+            if not last_call and cfg.v5_pair2 and not getattr(self, "scarce", False) and self.v5_pair2(rec):
+                continue  # paired with another sitting single of ours: one driver, two cars, at the pair's fee
             self.fee1.close(rec, False, self.now)
             self.say("FEE1_REPICK", f"{gid} {oid} sat {self.now - rec.posted_at} min at {rec.schedule[0]['feeCents']}{' last-call' if last_call else ''}")
             self.withdraw(gid)
+
+    def v5_pair2(self, rec: GigRec) -> bool:
+        """v5_pair2: at its re-pick, pair a sitting single with another open unbooked single of ours that one driver can take
+        before or after it (chain()'s fit checks); withdraw both and post the pair at bundle_mult (pairs pay 0.84x vs 1.03x for
+        a re-post alone). Stateless: the pair is a two-order gig, rebuilt after a restart like any other (run.settle)."""
+        ob = self.orders.get(rec.legs[0][0])
+        if not ob or len(rec.legs) != 1 or not self.simple(ob):
+            return False
+        best = None
+        for gid in sorted(self.gigs):
+            r2 = self.gigs[gid]
+            if gid == rec.id or r2.status != "open" or r2.escalated or len(r2.legs) != 1:
+                continue
+            other = self.orders.get(r2.legs[0][0])
+            if not other or other is ob or not self.simple(other):
+                continue
+            for first, second in ((ob, other), (other, ob)):
+                last = self.chain(first, second)
+                if last is not None and (best is None or self.chain_key(last, first, second) > self.chain_key(best[0], best[1], best[2])):
+                    best = (last, first, second, r2)
+        if best is None:
+            return False
+        last, first, second, r2 = best
+        self.say("V5_PAIR2", f"{rec.id}+{r2.id} {first.order['id']}+{second.order['id']} last={last} sat {self.now - rec.posted_at}"
+                             f"+{self.now - r2.posted_at} min")
+        for r in (rec, r2):
+            if self.fee1_gig(r):
+                self.fee1.close(r, False, self.now)  # both sat unbooked until now: the week's offset keeps the evidence
+            self.withdraw(r.id)
+        self.post_bundle(first, second, last, why="pair2")
+        return True
 
     def offer_home(self) -> None:
         """Direct offers to drivers who live near a gig's delivery but too far from its pickup to be notified: the trip home
