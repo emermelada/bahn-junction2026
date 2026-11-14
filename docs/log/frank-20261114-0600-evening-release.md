@@ -54,3 +54,6 @@ By seed: +1655, +699, +211, -868, +1957, -1932, +4941, +3476, -655, +459, +1892,
 Fresh dev-19..30, money + hold 16: mean 13,234 but 10/12 ranked (gated 11,245) vs money alone 12,063, 9/12.
 
 y4 beats the base on all 12 seeds (+1,918/week, +20%); its worst week is 8,066 vs 5,608. Pricing lateness harder (P(late) x 2.0 x price) moves the gate risk into the quote: long and thin-town cars get dear, and the freed on-time budget buys more safe cars (load_free 0.07). Next: push further (late 3-4, load 0.08-0.10), then a fresh check.
+
+Money line with stricter guards (all + hold 16): y5 guard 0.93: 11/12, mean 10,865. y6 guard 0.94: cut at 4 seeds by a memory reap, 4/4 ranked, 13,057 vs 14,198 for y4 on the same seeds. y7 guard 0.93 + load 0.06: 12/12, min on-time 0.919, mean 10,894.
+**Kill the money line**: every ranked variant is below y4 (late 2.0, load 0.07: 11,579, 12/12). Candidate for rc3: `hold=true hold_hour=16 late_cost_frac=2.0 load_free=0.07`, pending a fresh check on dev-19..30.
