@@ -389,3 +389,4 @@ PRESETS["v5S-RCg"] = PRESETS["v5S"] + ["fee1_repost_cap=24", "fee1_repost_gate=(
 # P1 (Franco post-01:20): pre-warning fresh re-post. 7 h before the last pickup an unbooked single is withdrawn and posted again at the
 # same fee (timing only: a new post notifies drivers again before the 6 h alarm and the 3 h warning; no cut, no escalation).
 PRESETS["v5S-P1"] = PRESETS["v5S"] + ["prewarn_repost=7"]
+PRESETS["v5S-P1b"] = PRESETS["v5S-P1"] + ["prewarn_now=true"]  # P1, re-posted in the same flush (no 1-2 h night gap)

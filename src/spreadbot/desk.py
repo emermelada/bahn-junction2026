@@ -2161,6 +2161,11 @@ class Desk:
                 self.fee1.close(rec, False, self.now)
             self.say("PREWARN_REPOST", f"{gid} {ob.order['id']} left {(last - self.now) // 60} h at {current_fee(rec.schedule, self.now)}")
             self.withdraw(gid)
+            if cfg.prewarn_now:
+                # Post again in the same flush (as drop_calm's re-post does): at night the next tick can be 1-2 h away (P1 on fresh-20:
+                # 72-108 min off the market right before the alarm). A withdraw refused because a driver booked first drops this post
+                # in read_results, so no car is posted twice.
+                self.dispatch_order(ob.order["id"], "prewarn")
 
     def prewarn_prev(self, ob: OrderBook, legs: list[int], last: int) -> Optional[GigRec]:
         """The gig prewarn_withdraw took down: the latest gig of these legs, a single never booked, withdrawn, posted before the
