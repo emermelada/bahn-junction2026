@@ -95,3 +95,6 @@ PRESETS["k-s3e"] = PRESETS["k-s3"] + ["gate_bonus_cents=4000", "gate_target=0.95
 # k-s3 + full load charge for cars delivering where <= 10 drivers live within 60 road min (re-drivers' DEV46.md: the stacks starve
 # the cars c3g also won by adding long drives into such towns).
 PRESETS["k-s3x"] = PRESETS["k-s3"] + ["load_desert_n=10"]
+# k-s3d with the bonus only on deadline days under load 0.12 (the knee), so dilution does not overload a day.
+PRESETS["k-s3dl"] = PRESETS["k-s3d"] + ["gate_load_max=0.12"]
+PRESETS["k-s3xdl"] = PRESETS["k-s3x"] + GATE + ["gate_load_max=0.12"]

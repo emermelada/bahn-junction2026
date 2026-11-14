@@ -498,8 +498,8 @@ class Desk:
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain) + cfg.trust_loss_w * (1 - p_ok) * t_loss
             # Under the on-time target, a safe car is worth more than its margin: it dilutes the late ones.
-            if gate and p_ok >= cfg.gate_safe_p:
-                trust_adj -= gate
+            if gate and p_ok >= cfg.gate_safe_p and not (cfg.gate_load_max and load >= cfg.gate_load_max):
+                trust_adj -= gate  # (gate_load_max: only on days with room, or the bonus overloads them; dev-17 Mon2 0.17 -> 0.23)
             if cfg.menu:
                 cands.append((kind, opt["listPriceCents"], self.market.speed_offset(kind), risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost))
                 meta[kind] = p_ok
