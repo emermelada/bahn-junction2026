@@ -101,6 +101,8 @@ class Config:
     fee_open_rule: tuple = ()          # ((min hours to last pickup, min drivers living <= 30 road min from the delivery, opening), ...),
                                        # first match wins, else fee_open. 1.05 openings book in a median 1-5 min and are 63% of c3g's fees;
                                        # 0.95 openings pay 0.96-0.98 vs 1.05-1.06 with slack > 24 h (988k gigs, research/re/drivers/gigs.py)
+    fee_open_day: tuple = ()           # ((first day 0=Mon, last day, min drivers <= 30 road min from delivery, min hours to last pickup, opening), ...) first match, before fee_open_rule
+                                       # nd30 > 40 + 90-min relook kept warned 2.0/2.7% vs c3g 1.6/2.4%, waits to 1.25 0.7/1.2% vs 1.0/0.5%; nd30 <= 40 warned 3.0 -> 4.3% (SAFE_OPEN.md)
     stop_windows: bool = False         # pickup window ends at the car's last pickup, delivery window at deadline - stop_margin
     stop_margin: int = 60              # (Halal / jaffa: failed visits 10.6 -> 0, deliveries >24 h late fixed)
     desert_n: int = 0                  # a delivery town with fewer drivers living <= 60 road min is a desert: no fee_open_rule cut and the own

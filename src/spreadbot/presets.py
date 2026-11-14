@@ -79,3 +79,6 @@ PRESETS["d-fee2r"] = PRESETS["d-fee2"] + ["relook_minutes=90", "relook_mult=1.05
 # Desert delivery towns (DEV46.md): no fee cut and an alarm 12 h before the last pickup for cars to towns with <= 10 drivers within 60 min.
 PRESETS["d-feerd"] = PRESETS["d-feer"] + ["desert_n=11", "desert_alarm=720"]
 PRESETS["d-fee2d"] = PRESETS["d-fee2"] + ["desert_n=11", "desert_alarm=720"]
+# Safe low openings (SAFE_OPEN.md): cut only where warned and waited-to-1.25 stayed at c3g; 1.05 where <= 40 drivers live near the delivery.
+PRESETS["d-safe"] = PRESETS["c3g"] + ["fee_open_day=((0,3,81,24,0.85),(0,6,41,24,0.92),(0,1,81,12,0.95))",
+                                      "relook_minutes=90", "relook_mult=1.05"]
