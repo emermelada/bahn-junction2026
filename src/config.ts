@@ -37,6 +37,8 @@ export type Cfg = {
     steps: { atMin: number; mult: number }[]      // atMin >= 0: minutes after now; atMin < 0: minutes before lastPickup
     nightFrom: number; nightTo: number             // steps in [nightFrom, nightTo) (minutes of day) move to nightTo
     dropRaise: number
+    holdMin?: number                              // post a won car only this many minutes before its last pickup (0 = at once)
+    openMult?: number                             // the first fee of an open schedule, x base (steps may only rise from it)
     planCliff: boolean                            // open schedules cliff by 18:00 of the planned pickup day (not the last legal day)
     eveningBefore: { at: number; mult: number }  // a step at this minute of the day before the last-pickup day (drivers plan tomorrow 18-20h); mult 0 = off
     learn: { step1Target: number; cliffMax: number; delta: number; kMin: number; kMax: number; minSamples: number }
@@ -47,12 +49,16 @@ export type Cfg = {
     optionMult: { within_3_days: number; next_day: number; same_day: number }
     minBucketSamples: number
     deflateTrust: boolean                        // the interval learns trust-free ratios (fix: trusted wins lifted every dealer's price)
-    model: { on: boolean; median: number; sigma: number; hi: number; minValue: number; etaWorld: number; etaDay: number; etaLane: number; etaDealer: number; etaKind: number; shrink: number; maxOffset: number; anchorBonus: number; anchorMinRequests: number; anchorPerRequest: number; anchorWeekRequests: number; anchorAvgList: number; costMult: number; lateLoss: number; etaRegion: number; longFrom: number; longMult: number; carCost: number }
+    // P(late) of a won order, logistic fitted on 59,696 won orders of our level-8 runs (held-out AUC 0.69, calibrated):
+    // z = b0 + sp ln(1+S_pickup) + sd ln(1+S_delivery) + km x km/100 + slack band + sameDay + fri (+ friKm x km/100),
+    // S = Geo.supply. The quote pays for it: x (1 - pl lateCost) - cost - pl shadow / list.
+    risk: { on: boolean; b0: number; sp: number; sd: number; km: number; s4: number; s8: number; s16: number; sameDay: number; fri: number; friKm: number; scale: number; lateCost: number; shadow: number }
+    model: { on: boolean; median: number; sigma: number; hi: number; minValue: number; etaWorld: number; etaDay: number; etaLane: number; etaDealer: number; etaKind: number; shrink: number; maxOffset: number; anchorBonus: number; anchorMinRequests: number; anchorPerRequest: number; anchorWeekRequests: number; anchorAvgList: number; costMult: number; lateLoss: number; etaRegion: number; etaPlace?: number; longFrom: number; longMult: number; carCost: number }
   }
   trust: { perOrder: number; cap: number; anchorDealers: number; anchorReach30: number; anchorTierBonus: number }
   guards: { war: { minQuotes: number; minDealers: number; minPools: number; ratio: number; windows: number }; outage: { minQuotes: number; lift: number; add: number; capRatio: number }; until: number }
   offers: { reach30Trigger: number; openMinTrigger: number; warnMinBefore: number; relayRoadMin: number; activeKm: number; homeboundKm: number; feeMult: number; perDriverPerDay: number; reserveAfter: number; quietFrom: number; quietTo: number; costPt: number; ticketOut: number; ticketHome: number }
-  bundles: { chain?: boolean; maxCars?: number; sweepMinAge?: number; maxDriveMin: number; pairRoadMin: number; minSaving: number; feeMult: number } // bundle opening fee = (sum of the two single opening fees) x feeMult
+  bundles: { chain?: boolean; maxCars?: number; sweepMinAge?: number; withHeld?: boolean; returnMult?: number; returnRoadMin?: number; returnScore?: boolean; maxDriveMin: number; pairRoadMin: number; minSaving: number; feeMult: number } // bundle opening fee = (sum of the two single opening fees) x feeMult
   triage: { sweepEveryMin: number; warmMinBefore: number }
 }
 
@@ -88,6 +94,7 @@ export const DEFAULT_CFG: Cfg = {
     optionMult: { within_3_days: 1.0, next_day: 1.05, same_day: 1.15 },
     minBucketSamples: 3,
     deflateTrust: false,
+    risk: { on: false, b0: -1.751, sp: -0.539, sd: -0.066, km: 0.203, s4: 3.648, s8: 2.884, s16: 1.911, sameDay: -1.043, fri: 0.832, friKm: -0.186, scale: 1, lateCost: 0.3, shadow: 8000 },
     model: { on: false, median: 1.36, sigma: 0.23, hi: 2.2, minValue: 0.02, etaWorld: 0.02, etaDay: 0.04, etaLane: 0.03, etaDealer: 0.03, etaKind: 0.01, shrink: 0.002, maxOffset: 0.4, anchorBonus: 0, anchorMinRequests: 6, anchorPerRequest: 0.0076, anchorWeekRequests: 1000, anchorAvgList: 7500, costMult: 1.0, lateLoss: 0, etaRegion: 0, longFrom: 240, longMult: 1, carCost: 0 },
   },
   trust: { perOrder: 0.01, cap: 25, anchorDealers: 5, anchorReach30: 10, anchorTierBonus: 0.3 },

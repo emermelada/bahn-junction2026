@@ -15,6 +15,7 @@ export class Geo {
   readonly #reach80 = new Map<string, Reach>()
   readonly #pool = new Map<string, string[]>()
   readonly #poolId = new Map<string, string>()
+  readonly #supply = new Map<string, number>()
   readonly homes = new Map<string, number>() // place -> roster drivers living there
   readonly driverHome = new Map<string, string>()
   readonly drivers = new Map<string, DriverProfile>()
@@ -76,6 +77,17 @@ export class Geo {
 
   poolId(place: string): string {
     return this.#poolId.get(place) ?? place
+  }
+
+  /** Driver supply index of a place: roster drivers weighted by exp(-road minutes from their home / 60) (own town = 1). */
+  supply(place: string): number {
+    let s = this.#supply.get(place)
+    if (s === undefined) {
+      s = 0
+      for (const [home, n] of this.homes) s += n * Math.exp(-(home === place ? 0 : this.road(home, place)) / 60)
+      this.#supply.set(place, s)
+    }
+    return s
   }
 
   /** Places within `km` straight-line of a place. */

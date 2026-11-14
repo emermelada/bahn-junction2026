@@ -53,8 +53,8 @@ export class Pricing {
   /** The quoted ratio for the slowest admitted option: interval midpoint (or probe) x trust + dealer-share penalty.
    * With pricing.model: the margin-optimal ratio under the fitted threshold model (see modelRatio).
    * The interval learns in trust-free units (the base ratio), so trusted dealers' wins do not lift everyone's price. */
-  quoteRatio(request: PriceRequest, option: DeliveryOption, now: number, penalty: number, cost = 1): number {
-    if (this.cfg.pricing.model.on) return this.modelRatio(request, option, now, cost)
+  quoteRatio(request: PriceRequest, option: DeliveryOption, now: number, penalty: number, cost = 1, keep = 1): number {
+    if (this.cfg.pricing.model.on) return this.modelRatio(request, option, now, cost, keep)
     const r0 = this.ratio(request, option, now)
     const t = this.trustMult(request.dealerId)
     const r = Math.min(this.cfg.pricing.clamp.hi + penalty, r0 * t + penalty)
@@ -82,6 +82,8 @@ export class Pricing {
     // A fast pickup-pool offset for today only: the competitor's outage (one region, one working day) shows as a run of
     // wins at high ratios there, and lifts that pool's prices within hours instead of days.
     if (this.cfg.pricing.model.etaRegion > 0 && day >= 0) keys.push(`r|${p}|${day}`)
+    // Per-town offsets (pickup and delivery places): 60 numbers learn a world's lane prices faster than ~900 pool pairs.
+    if ((this.cfg.pricing.model.etaPlace ?? 0) > 0) keys.push(`p|${leg.pickup.placeId}`, `q|${leg.delivery.placeId}`)
     return keys
   }
 
@@ -103,7 +105,8 @@ export class Pricing {
     return (this.books.trust.get(dealer) ?? 0) + open
   }
 
-  modelRatio(request: PriceRequest, option: DeliveryOption, now: number, cost: number): number {
+  /** keep: the share of the price kept in expectation (1 - P(late) x late cost share). */
+  modelRatio(request: PriceRequest, option: DeliveryOption, now: number, cost: number, keep = 1): number {
     const M = this.cfg.pricing.model
     const C = this.cfg.pricing.clamp
     const day = dayOf(now)
@@ -122,7 +125,7 @@ export class Pricing {
     let best = C.hi
     let bestV = -Infinity
     for (let x = C.lo; x <= M.hi + 1e-9; x += 0.01) {
-      const v = this.pWin(x / t, mu) * (x - cost + bonus)
+      const v = this.pWin(x / t, mu) * (x * keep - cost + bonus)
       if (v > bestV) (bestV = v), (best = x)
     }
     // Nothing to earn: decline (a losing quote costs nothing).
@@ -147,7 +150,7 @@ export class Pricing {
     this.worldMu += step(M.etaWorld)
     this.dayMu.set(s.day, (this.dayMu.get(s.day) ?? 0) + step(M.etaDay))
     for (const k of s.keys) {
-      const eta = k.startsWith("l|") ? M.etaLane : k.startsWith("d|") ? M.etaDealer : k.startsWith("r|") ? M.etaRegion : M.etaKind
+      const eta = k.startsWith("l|") ? M.etaLane : k.startsWith("d|") ? M.etaDealer : k.startsWith("r|") ? M.etaRegion : k.startsWith("p|") || k.startsWith("q|") ? (M.etaPlace ?? 0) : M.etaKind
       const o = (this.offsets.get(k) ?? 0) * (k.startsWith("r|") ? 1 : 1 - M.shrink) + step(eta)
       // The region-day offset only rises (an outage); a bad day is the day term's job, and noise must not cut prices.
       const lo = k.startsWith("r|") ? 0 : -M.maxOffset

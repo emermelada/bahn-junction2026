@@ -56,6 +56,7 @@ export class V2Desk implements Desk {
   readonly dropRaised = new Set<string>() // orders whose gig got the one +15% after a drop
   readonly doomedGigs = new Set<string>() // gigs repriced to the doomed schedule
   readonly cliffSeen = new Set<string>() // gigs counted as reaching the cliff (fee learner)
+  readonly held = new Map<string, number>() // won orders not posted yet (fees.holdMin) -> the minute to post them
   nextSweep = 0
 
   constructor(cfg: Cfg, ctx: DeskContext) {
@@ -79,9 +80,30 @@ export class V2Desk implements Desk {
       // Long drives (a driver's whole day, far from home, the trip home bought on the day) cost more than the band estimate.
       const long = feas && feas.drive >= M.longFrom ? M.longMult : 1
       // carCost: a shadow price per car (cents) for the scarce driver it uses: cheap short lanes must earn it too.
-      const cost = (this.fees.estimate(request) * long + M.carCost * request.legs.length) / option.listPriceCents + pLate * M.lateLoss
-      return this.pricing.quoteRatio(request, option, this.now, f.capacity ? this.capacity.dealerPenalty(request.dealerId, this.now) : 0, cost)
+      let cost = (this.fees.estimate(request) * long + M.carCost * request.legs.length) / option.listPriceCents + pLate * M.lateLoss
+      let keep = 1
+      if (cfg.pricing.risk.on && feas) {
+        const pl = this.pLate(request, option, feas.slackHours)
+        keep = 1 - pl * cfg.pricing.risk.lateCost
+        cost += (pl * cfg.pricing.risk.shadow) / option.listPriceCents
+      }
+      return this.pricing.quoteRatio(request, option, this.now, f.capacity ? this.capacity.dealerPenalty(request.dealerId, this.now) : 0, cost, keep)
     }
+  }
+
+  /** P(late) of an option if won (pricing.risk): the fitted logistic, worst leg by km. */
+  pLate(request: PriceRequest, option: { kind: string; deadline: number }, slack: number): number {
+    const K = this.cfg.pricing.risk
+    let z = -Infinity
+    const dDay = Math.floor(option.deadline / DAY)
+    const fri = dDay % 7 === 4 || dDay === 7 ? 1 : 0
+    for (const leg of request.legs) {
+      const a = leg.pickup.placeId, b = leg.delivery.placeId
+      const km = this.geo.km(a, b) / 100
+      const s = slack < 4 ? K.s4 : slack < 8 ? K.s8 : slack < 16 ? K.s16 : 0
+      z = Math.max(z, K.b0 + K.sp * Math.log1p(this.geo.supply(a)) + K.sd * Math.log1p(this.geo.supply(b)) + K.km * km + s + (option.kind === "same_day" ? K.sameDay : 0) + fri * (K.fri + K.friKm * km))
+    }
+    return Math.min(0.95, K.scale / (1 + Math.exp(-z)))
   }
 
   // ------------------------------------------------------------------ lifecycle
@@ -106,7 +128,7 @@ export class V2Desk implements Desk {
     for (const event of history) if (event.kind === "price_request") this.requests.set(event.request.id, event.request)
     for (const event of history) if (event.kind === "deadline_close") this.urgent.add(event.orderId)
     for (const order of snapshot.orders) if (this.requests.has(order.id) && order.status !== "cancelled") this.orders.set(order.id, order)
-    for (const order of this.orders.values()) if (order.status === "waiting" && this.gigsOf(order.id).length === 0) await this.post(order, undelivered(order))
+    for (const order of this.orders.values()) if (order.status === "waiting" && this.gigsOf(order.id).length === 0) await this.postOrHold(order)
     for (const event of history) {
       const order = "orderId" in event ? this.orders.get(event.orderId) : undefined
       if (!order) continue
@@ -134,7 +156,7 @@ export class V2Desk implements Desk {
     else if (event.kind === "order_won") await this.win(event.order)
     else if (event.kind === "order_changed") await this.change(event.order)
     else if (event.kind === "order_cancelled") {
-      for (const books of [this.orders, this.legGigs]) books.delete(event.orderId)
+      for (const books of [this.orders, this.legGigs, this.held]) books.delete(event.orderId)
       for (const g of event.gigs) if (g.outcome === "withdrawn") this.unmapGig(g.gigId) // its other cars get posted again by the sweep
     }
     else if (event.kind === "visit_failed") await this.retry(event.orderId, event.leg, event.reason)
@@ -152,6 +174,7 @@ export class V2Desk implements Desk {
   async tick(now: number): Promise<void> {
     this.now = Math.max(this.now, now)
     if (this.v2Quote) this.markMissed()
+    if (this.held.size > 0) await this.releaseHeld()
     if (this.cfg.flags.triage && this.now >= this.nextSweep) {
       this.nextSweep = this.now - (this.now % this.cfg.triage.sweepEveryMin) + this.cfg.triage.sweepEveryMin
       await this.sweep()
@@ -215,7 +238,7 @@ export class V2Desk implements Desk {
    * gigs past their cliff feed the fee learner. */
   async sweep(): Promise<void> {
     for (const order of this.orders.values()) {
-      if (order.status === "cancelled") continue
+      if (order.status === "cancelled" || this.held.has(order.id)) continue
       const missing = undelivered(order).filter((leg) => !this.legGigs.get(order.id)?.has(leg))
       const pendingPost = this.outbox.some((a) => a.type === "post" && a.stops.some((s) => s.orderId === order.id))
       if (missing.length > 0 && !pendingPost && this.requests.has(order.id)) {
@@ -341,12 +364,38 @@ export class V2Desk implements Desk {
   async win(order: Order): Promise<void> {
     if (!this.requests.has(order.id) || this.orders.has(order.id)) return
     this.orders.set(order.id, order)
+    await this.postOrHold(order)
+  }
+
+  /** fees.holdMin: a won car goes to the app only holdMin minutes before its last pickup. Drivers who see a gig days
+   * ahead learn to wait for raises, and a held car can still pair with cars won later (one driver, two cars). */
+  async postOrHold(order: Order): Promise<void> {
+    const hold = this.cfg.fees.holdMin ?? 0
+    const at = order.lastPickupAt - hold
+    if (hold > 0 && at > this.now + 30) {
+      this.held.set(order.id, at)
+      return
+    }
     await this.post(order, undelivered(order))
+  }
+
+  /** Posts every held order whose minute has come. */
+  async releaseHeld(): Promise<void> {
+    for (const [id, at] of [...this.held]) {
+      if (at > this.now || !this.held.has(id)) continue
+      this.held.delete(id)
+      const order = this.orders.get(id)
+      if (order && this.gigsOf(id).length === 0) await this.post(order, undelivered(order))
+    }
   }
 
   async change(order: Order): Promise<void> {
     if (!this.orders.has(order.id)) return
     this.orders.set(order.id, order)
+    if (this.held.has(order.id)) {
+      this.held.set(order.id, order.lastPickupAt - (this.cfg.fees.holdMin ?? 0))
+      return
+    }
     if (await this.withdraw(order.id)) await this.post(order, undelivered(order))
   }
 
@@ -422,6 +471,7 @@ export class V2Desk implements Desk {
   }
 
   async post(order: Order, legs: number[], retry = FIRST_TRY): Promise<void> {
+    if (legs.length === 0) return
     if (this.cfg.flags.bundles && retry === FIRST_TRY && legs.length === 1 && order.legs.length === 1 && this.tryBundle(order)) return
     const facts = this.factsOf(order)
     const audience = { experienced: order.legs.some((leg) => leg.car.premium), manualLicence: retry.manualLicence || !!facts?.manual }
@@ -479,12 +529,22 @@ export class V2Desk implements Desk {
     const mine = withoutWindows(stopsFor(order, [0], note, FIRST_TRY, this.factsOf(order)), this.now)
     if (mine.some((st) => st.window)) return false
     const a = order.legs[0]!
-    let best: { gigId: string; partner: Order; first: Order; second: Order; drive: number } | null = null
+    let best: { gigId: string; partner: Order; first: Order; second: Order; drive: number; score: number } | null = null
+    const candidates: [string, string][] = [] // [gig id ("" = a held order), partner order id]
     for (const [gigId, action] of this.posts) {
       if (gigId === exclude || this.booked.has(gigId) || this.notOpen.has(gigId) || this.bundleGigs.has(gigId) || this.doomedGigs.has(gigId)) continue
       if (action.stops.length !== 2 || action.stops.some((st) => st.window || st.withPlates)) continue
       const pid = action.stops[0]!.orderId
       if (pid === order.id || this.legGigs.get(pid)?.get(0) !== gigId) continue
+      candidates.push([gigId, pid])
+    }
+    if (B.withHeld) for (const pid of this.held.keys()) {
+      if (pid === order.id || this.gigsOf(pid).length > 0) continue
+      const held = this.orders.get(pid)
+      if (!held || withoutWindows(stopsFor(held, [0], this.requests.get(pid)?.note ?? null, FIRST_TRY, this.factsOf(held)), this.now).some((st) => st.window || st.withPlates)) continue
+      candidates.push(["", pid])
+    }
+    for (const [gigId, pid] of candidates) {
       const partner = this.orders.get(pid)
       if (!partner || partner.legs.length !== 1 || this.urgent.has(pid) || this.now >= partner.lastPickupAt) continue
       const b = partner.legs[0]!
@@ -497,15 +557,22 @@ export class V2Desk implements Desk {
         if (B.chain && this.geo.road(first.legs[0]!.delivery.placeId, second.legs[0]!.pickup.placeId) > B.pairRoadMin) continue
         const drive = this.pairDrive(first, second)
         if (drive === null) continue
-        if (!best || drive < best.drive) best = { gigId, partner, first, second, drive }
+        // Score: the empty driving of the pair (hop out, and with returnScore the way back to the first pickup).
+        const back = this.geo.road(second.legs[0]!.delivery.placeId, first.legs[0]!.pickup.placeId)
+        const score = B.returnScore ? this.geo.road(first.legs[0]!.delivery.placeId, second.legs[0]!.pickup.placeId) + back : drive
+        if (!best || score < best.score) best = { gigId, partner, first, second, drive, score }
       }
     }
     if (!best) return (this.cfg.bundles.maxCars ?? 2) >= 3 && this.tryExtend(order, exclude)
     const { gigId, partner, first, second } = best
-    this.legGigs.get(partner.id)?.delete(0)
-    this.outbox.push({ type: "withdraw", gigId })
+    if (gigId) {
+      this.legGigs.get(partner.id)?.delete(0)
+      this.outbox.push({ type: "withdraw", gigId })
+    } else this.held.delete(partner.id)
     const stopsOf = (o: Order) => withoutWindows(stopsFor(o, [0], this.requests.get(o.id)!.note, FIRST_TRY, this.factsOf(o)), this.now)
-    const base = (this.fees.open(first, this.requests.get(first.id)!, 1) + this.fees.open(second, this.requests.get(second.id)!, 1)) * B.feeMult
+    // A return pair (the second car ends near the first car's pickup) brings the driver home: cheaper than a chain.
+    const isReturn = B.returnMult !== undefined && this.geo.road(second.legs[0]!.delivery.placeId, first.legs[0]!.pickup.placeId) <= (B.returnRoadMin ?? B.pairRoadMin)
+    const base = (this.fees.open(first, this.requests.get(first.id)!, 1) + this.fees.open(second, this.requests.get(second.id)!, 1)) * (isReturn ? B.returnMult! : B.feeMult)
     const f = first.legs[0]!
     const cliffAt = Math.min(first.lastPickupAt, second.lastPickupAt - this.geo.road(f.pickup.placeId, f.delivery.placeId) - this.geo.road(f.delivery.placeId, second.legs[0]!.pickup.placeId) - 30)
     const schedule = this.fees.schedule(this.now, base, cliffAt)
@@ -517,7 +584,7 @@ export class V2Desk implements Desk {
     }
     this.bundlePosts.set(action, [first.id, second.id])
     this.outbox.push(action)
-    this.ctx.log?.({ at: this.now, kind: "bundle", orders: [first.id, second.id], drive: best.drive, base: Math.round(base), cliffAt })
+    this.ctx.log?.({ at: this.now, kind: "bundle", orders: [first.id, second.id], drive: best.drive, base: Math.round(base), cliffAt, held: !gigId, ret: isReturn })
     return true
   }
 

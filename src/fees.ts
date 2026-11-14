@@ -70,7 +70,7 @@ export class Fees {
     const eb = this.cfg.fees.eveningBefore
     const evening = dayOf(lastPickup) * DAY - DAY + eb.at
     if (eb.mult > 0 && evening > now && weekday(evening) !== 6) steps.push({ at: evening, feeCents: Math.round(base * mult * eb.mult) })
-    return normalize(now, steps, Math.round(base * mult))
+    return normalize(now, steps, Math.round(base * mult * (this.cfg.fees.openMult ?? 1)))
   }
 
   /** Rescue at the deadline warning: one fee at the on-time cap at once. */

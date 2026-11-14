@@ -1,0 +1,95 @@
+{
+ "name": "c4-hold36-ladder-held-ret75",
+ "flags": {
+  "gate": true,
+  "capacity": true,
+  "ladder": true,
+  "governor": true,
+  "fees": true,
+  "triage": true,
+  "pricing": true,
+  "trust": true,
+  "notes": true,
+  "bundles": true
+ },
+ "pricing": {
+  "clamp": {
+   "lo": 1.05,
+   "hi": 1.75
+  },
+  "model": {
+   "on": true
+  }
+ },
+ "governor": {
+  "fridayTierAOnlyFrom": 100000
+ },
+ "gate": {
+  "nextDay": {
+   "maxDriveMin": 240
+  },
+  "poolBrake": {
+   "warnings": 2,
+   "windowMin": 1440
+  },
+  "sameDay": {
+   "maxDriveMin": 240,
+   "slackHours": 3,
+   "reach30Pickup": 3
+  },
+  "downgrades": [
+   "private_pickup",
+   "trade_in",
+   "unparsed_note"
+  ]
+ },
+ "capacity": {
+  "batchMax": 4,
+  "batchPerReach": 0.1,
+  "dayMult": [
+   1,
+   1,
+   1,
+   1,
+   0.5,
+   1,
+   1
+  ]
+ },
+ "bundles": {
+  "chain": true,
+  "pairRoadMin": 30,
+  "feeMult": 0.85,
+  "maxDriveMin": 480,
+  "minSaving": 0.15,
+  "withHeld": true,
+  "returnMult": 0.75,
+  "returnRoadMin": 45
+ },
+ "fees": {
+  "holdMin": 2160,
+  "openMult": 0.9,
+  "steps": [
+   {
+    "atMin": -1440,
+    "mult": 1.05
+   },
+   {
+    "atMin": -960,
+    "mult": 1.25
+   },
+   {
+    "atMin": -600,
+    "mult": 1.55
+   },
+   {
+    "atMin": -360,
+    "mult": 2.0
+   }
+  ],
+  "eveningBefore": {
+   "at": 1050,
+   "mult": 0
+  }
+ }
+}
