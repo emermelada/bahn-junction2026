@@ -145,6 +145,7 @@ class Config:
     hold_all: bool = False             # hold every car (default: only cars that could be paired, see simple())
     hold_open: bool = True             # at a release, also pair with our open unbooked single gigs
     hold_price: bool = False           # quote a car that pairs with a held car (same pickup day, near) at the bundle cost
+    hold_price_war: bool = False      # hold_price only on a price-war day: the competitor sits near 1.0-1.2x list, so only cars a release can pair (~0.85x fee) still pay
     bundle_keep: float = 0.0          # a dropped bundle with this many hours to spare stays a bundle, raised to this x its base (0 = split)
     hold_km: float = 0.0               # air km from A's delivery to B's pickup for a release pair (0 = bundle_km)
     hold_weekend: bool = False         # a held car whose last pickup is on the last Monday is released Sunday at hold_hour (not before Friday):

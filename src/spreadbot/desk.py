@@ -451,7 +451,7 @@ class Desk:
         cal = self.gov.calibration() if cfg.calibrate else 1.0
         drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
         cost = r["referenceFeeCents"] * (self.drive_cost_mult(drive) if cfg.drive_cost else self.cost_mult())
-        if cfg.hold_price and self.pairs_with_held(r):
+        if (cfg.hold_price or (cfg.hold_price_war and self.market.war_day(self.now // DAY))) and self.pairs_with_held(r):
             cost *= cfg.bundle_mult  # a held car for the same day starts or ends near this one: the evening release pairs them
         elif cfg.bundle_price and self.chainable(r):
             cost *= cfg.bundle_mult  # one of our open gigs ends where this car starts (or the reverse): a driver can take both
