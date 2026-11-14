@@ -76,7 +76,11 @@ async function runJobs(jobs: { cfg: Cfg; seed: string; tag: string }[], policy: 
     tasks.push(
       runPractice(client, { ...job, level, policy, onWorld: registered, quiet: args.quiet })
         .then((r) => void out.push(r))
-        .catch((error) => console.error(`[${job.seed}] FAILED: ${(error as Error).message}`))
+        .catch((error) => {
+          // Lost the race for the last slot (409 at create): put the job back.
+          if (String((error as Error).message).includes("8 practice worlds")) (jobs.push(job), console.error(`[${job.seed}] no slot at create; requeued`))
+          else console.error(`[${job.seed}] FAILED: ${(error as Error).message}`)
+        })
         .finally(() => running--),
     )
     await new Promise((done) => setTimeout(done, 3000)) // let the world register before counting free slots again

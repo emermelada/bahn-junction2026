@@ -71,6 +71,7 @@ export async function runPractice(client: Client, opts: RunOptions): Promise<Run
   const runId = `${tag}-${seed}-${hash.slice(0, 6)}-${stamp}`
   const dir = `${RUNS_DIR}/${runId}`
   mkdirSync(dir, { recursive: true })
+  writeFileSync(`${dir}/world.txt`, world.id)
   const say = (line: string) => opts.quiet || console.log(`[${seed}] ${line}`)
   say(`world ${world.id} run ${runId}`)
 

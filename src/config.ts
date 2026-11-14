@@ -34,6 +34,7 @@ export type Cfg = {
     steps: { atMin: number; mult: number }[]      // atMin >= 0: minutes after now; atMin < 0: minutes before lastPickup
     nightFrom: number; nightTo: number             // steps in [nightFrom, nightTo) (minutes of day) move to nightTo
     dropRaise: number
+    eveningBefore: { at: number; mult: number }  // a step at this minute of the day before the last-pickup day (drivers plan tomorrow 18-20h); mult 0 = off
     learn: { step1Target: number; cliffMax: number; delta: number; kMin: number; kMax: number; minSamples: number }
     rescue: { warnMinBefore: number; capPriceShare: number; capRefMult: number; capPriceAdd: number; amberPriceAdd: number; doomedPriceCap: number; finalPriceCap: number }
   }
@@ -68,8 +69,9 @@ export const DEFAULT_CFG: Cfg = {
     steps: [{ atMin: 0, mult: 1.0 }, { atMin: 60, mult: 1.15 }, { atMin: -300, mult: 1.4 }, { atMin: -180, mult: 1.7 }],
     nightFrom: 23 * 60, nightTo: 7 * 60,
     dropRaise: 1.15,
+    eveningBefore: { at: 17 * 60 + 30, mult: 1.3 },
     learn: { step1Target: 0.7, cliffMax: 0.3, delta: 0.05, kMin: 0.8, kMax: 1.8, minSamples: 10 },
-    rescue: { warnMinBefore: 240, capPriceShare: 0.9, capRefMult: 1.5, capPriceAdd: 0.25, amberPriceAdd: 0.25, doomedPriceCap: 1.0, finalPriceCap: 2.0 },
+    rescue: { warnMinBefore: 240, capPriceShare: 1.5, capRefMult: 1.5, capPriceAdd: 0.25, amberPriceAdd: 0.25, doomedPriceCap: 1.0, finalPriceCap: 2.0 },
   },
   pricing: {
     prior: { lo: 1.15, hi: 1.4 }, morningWiden: 0.05, invertWiden: 0.03, probeEvery: 10, probeMult: 1.1, clamp: { lo: 1.05, hi: 1.6 },

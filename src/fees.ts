@@ -54,6 +54,9 @@ export class Fees {
       if (at < now) continue
       steps.push({ at, feeCents: Math.round(base * mult * s.mult) })
     }
+    const eb = this.cfg.fees.eveningBefore
+    const evening = dayOf(lastPickup) * DAY - DAY + eb.at
+    if (eb.mult > 0 && evening > now && weekday(evening) !== 6) steps.push({ at: evening, feeCents: Math.round(base * mult * eb.mult) })
     return normalize(now, steps, Math.round(base * mult))
   }
 
@@ -62,11 +65,14 @@ export class Fees {
     return [{ at: now, feeCents: Math.round(this.capOnTime(base, price, ref, amber)) }]
   }
 
+  /** The rescue fee at the warning: at least the cliff (1.7 x base, never lower than the schedule it replaces),
+   * up to capRefMult x ref + capPriceAdd x price (+ amberPriceAdd x price in AMBER/RED), limited to capPriceShare x price. */
   capOnTime(base: number, price: number, ref: number, amber: boolean): number {
     const r = this.cfg.fees.rescue
-    let cap = Math.max(1.7 * base, r.capRefMult * ref + r.capPriceAdd * price)
+    const cliff = 1.7 * base
+    let cap = r.capRefMult * ref + r.capPriceAdd * price
     if (amber) cap += r.amberPriceAdd * price
-    return Math.max(base, Math.min(r.capPriceShare * price + (amber ? r.amberPriceAdd * price : 0), cap))
+    return Math.max(cliff, Math.min(r.capPriceShare * price, cap))
   }
 
   /** A doomed car (its last on-time pickup has passed): a calm schedule capped at doomedPriceCap x price, rising
