@@ -234,3 +234,6 @@ PRESETS["k-f1h5fG"] = PRESETS["k-f1h5f"] + ["fee1_grid=(0.85,1.0,1.15,1.3,1.5)"]
 # V1 with a spiral switch: the pair weight stops for the week once 6% of our orders were warned or our last 60 bookings averaged
 # 1.10x typical (V1 tipped H3 nf-04, warned 21%, fee 1.30x, to 0.875; normal weeks <= 5.7% / 1.06x through Thursday noon).
 PRESETS["k-f1h5fV1g"] = PRESETS["k-f1h5fV1"] + ["vol_guard=(60,0.06,1.10)"]
+# V1g fired too early (5/11 WAR weeks on Mon/Tue at 6% of 60 orders = 4 cars; +38 vs V1 +154). Thresholds from ARCHIVE's Tuesday
+# signals (c_spiral_sig.csv): harsh weeks warn 0.092-0.099, fee60 1.17-1.20; normal warn 0.02-0.06, fee60 0.88-0.99.
+PRESETS["k-f1h5fV1g2"] = PRESETS["k-f1h5fV1"] + ["vol_guard=(100,0.09,1.15)"]
