@@ -75,7 +75,9 @@ export class V2Desk implements Desk {
       // Model pricing cost: the expected fee, plus the expected late loss of the option's tier (refund + rescue fees).
       const M = cfg.pricing.model
       const pLate = feas && f.gate ? 1 - cfg.governor.pOnTime[feas.tier] : 0
-      const cost = this.fees.estimate(request) / option.listPriceCents + pLate * M.lateLoss
+      // Long drives (a driver's whole day, far from home, the trip home bought on the day) cost more than the band estimate.
+      const long = feas && feas.drive >= M.longFrom ? M.longMult : 1
+      const cost = (this.fees.estimate(request) * long) / option.listPriceCents + pLate * M.lateLoss
       return this.pricing.quoteRatio(request, option, this.now, f.capacity ? this.capacity.dealerPenalty(request.dealerId, this.now) : 0, cost)
     }
   }

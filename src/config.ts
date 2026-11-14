@@ -47,7 +47,7 @@ export type Cfg = {
     optionMult: { within_3_days: number; next_day: number; same_day: number }
     minBucketSamples: number
     deflateTrust: boolean                        // the interval learns trust-free ratios (fix: trusted wins lifted every dealer's price)
-    model: { on: boolean; median: number; sigma: number; hi: number; minValue: number; etaWorld: number; etaDay: number; etaLane: number; etaDealer: number; etaKind: number; shrink: number; maxOffset: number; anchorBonus: number; anchorMinRequests: number; anchorPerRequest: number; anchorWeekRequests: number; anchorAvgList: number; costMult: number; lateLoss: number; etaRegion: number }
+    model: { on: boolean; median: number; sigma: number; hi: number; minValue: number; etaWorld: number; etaDay: number; etaLane: number; etaDealer: number; etaKind: number; shrink: number; maxOffset: number; anchorBonus: number; anchorMinRequests: number; anchorPerRequest: number; anchorWeekRequests: number; anchorAvgList: number; costMult: number; lateLoss: number; etaRegion: number; longFrom: number; longMult: number }
   }
   trust: { perOrder: number; cap: number; anchorDealers: number; anchorReach30: number; anchorTierBonus: number }
   guards: { war: { minQuotes: number; minDealers: number; minPools: number; ratio: number; windows: number }; outage: { minQuotes: number; lift: number; add: number; capRatio: number }; until: number }
@@ -88,7 +88,7 @@ export const DEFAULT_CFG: Cfg = {
     optionMult: { within_3_days: 1.0, next_day: 1.05, same_day: 1.15 },
     minBucketSamples: 3,
     deflateTrust: false,
-    model: { on: false, median: 1.36, sigma: 0.23, hi: 2.2, minValue: 0.02, etaWorld: 0.02, etaDay: 0.04, etaLane: 0.03, etaDealer: 0.03, etaKind: 0.01, shrink: 0.002, maxOffset: 0.4, anchorBonus: 0, anchorMinRequests: 6, anchorPerRequest: 0.0076, anchorWeekRequests: 1000, anchorAvgList: 7500, costMult: 1.0, lateLoss: 0, etaRegion: 0 },
+    model: { on: false, median: 1.36, sigma: 0.23, hi: 2.2, minValue: 0.02, etaWorld: 0.02, etaDay: 0.04, etaLane: 0.03, etaDealer: 0.03, etaKind: 0.01, shrink: 0.002, maxOffset: 0.4, anchorBonus: 0, anchorMinRequests: 6, anchorPerRequest: 0.0076, anchorWeekRequests: 1000, anchorAvgList: 7500, costMult: 1.0, lateLoss: 0, etaRegion: 0, longFrom: 240, longMult: 1 },
   },
   trust: { perOrder: 0.01, cap: 25, anchorDealers: 5, anchorReach30: 10, anchorTierBonus: 0.3 },
   guards: { war: { minQuotes: 12, minDealers: 4, minPools: 2, ratio: 0.45, windows: 2 }, outage: { minQuotes: 5, lift: 0.3, add: 0.2, capRatio: 1.6 }, until: 18 * 60 },
