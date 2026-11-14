@@ -1,0 +1,1 @@
+{ "name": "m2", "flags": { "gate": true, "capacity": true, "ladder": true, "governor": true, "fees": true, "triage": true } }

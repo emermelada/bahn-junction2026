@@ -9,6 +9,8 @@ import { Books } from "./books.ts"
 import { Capacity } from "./capacity.ts"
 import { Governor } from "./governor.ts"
 import { Quoter } from "./quote.ts"
+import { Fees } from "./fees.ts"
+import { Pricing } from "./pricing.ts"
 
 /** How to post a leg again after a failed visit. */
 export type Retry = { pickupFrom: number; manualLicence: boolean; plates: boolean }
@@ -40,6 +42,12 @@ export class V2Desk implements Desk {
   readonly quoter: Quoter
   readonly toQuote: PriceRequest[] = [] // requests waiting for the one-pass quote decision (v2 quote path)
   readonly v2Quote: boolean
+  readonly fees: Fees
+  readonly pricing: Pricing
+  readonly dropRaised = new Set<string>() // orders whose gig got the one +15% after a drop
+  readonly doomedGigs = new Set<string>() // gigs repriced to the doomed schedule
+  readonly cliffSeen = new Set<string>() // gigs counted as reaching the cliff (fee learner)
+  nextSweep = 0
 
   constructor(cfg: Cfg, ctx: DeskContext) {
     this.cfg = cfg
@@ -52,12 +60,27 @@ export class V2Desk implements Desk {
     this.quoter = new Quoter(cfg, this.geo, this.books, this.capacity, this.governor)
     const f = cfg.flags
     this.v2Quote = f.gate || f.capacity || f.governor || f.ladder || f.pricing
+    this.fees = new Fees(cfg, this.geo, ctx.log)
+    this.pricing = new Pricing(cfg, this.geo, this.books)
+    if (f.pricing) this.quoter.ratio = (request, option) => this.pricing.quoteRatio(request, option, this.now, f.capacity ? this.capacity.dealerPenalty(request.dealerId, this.now) : 0)
   }
 
   // ------------------------------------------------------------------ lifecycle
 
   async rejoin(snapshot: DeskSnapshot, history: DeskEvent[]): Promise<void> {
     this.now = snapshot.now
+    // v2 books: replay the whole history (pure bookkeeping), then the snapshot's gigs and positions.
+    for (const event of history) {
+      this.books.track(event)
+      if (event.kind === "order_won") (this.quoter.onWon(event.order), this.pricing.outcome(event.order.id, true, event.at))
+      else if (event.kind === "order_lost") (this.quoter.onLost(event.requestId), this.pricing.outcome(event.requestId, false, event.at))
+      else if (event.kind === "order_cancelled") this.quoter.onCancelled(event.orderId)
+      else if (event.kind === "gig_dropped" || event.kind === "no_show") {
+        const orderId = snapshot.gigs.find((g) => g.id === event.gigId)?.stops[0]?.orderId
+        if (orderId) this.dropRaised.add(orderId)
+      }
+    }
+    this.books.seed(snapshot)
     const posted = Map.groupBy(snapshot.gigs, (gig) => gig.stops[0]!.orderId)
     for (const gig of snapshot.gigs) if (["booked", "working", "done"].includes(gig.status)) this.booked.add(gig.id)
     for (const gig of snapshot.gigs) if (["open", "booked", "working"].includes(gig.status)) this.carry({ type: "post", stops: gig.stops, audience: gig.audience, schedule: gig.schedule }, gig.id)
@@ -79,9 +102,10 @@ export class V2Desk implements Desk {
   async handle(event: DeskEvent): Promise<void> {
     this.now = Math.max(this.now, event.at)
     this.books.track(event)
-    if (event.kind === "order_won") this.quoter.onWon(event.order)
-    else if (event.kind === "order_lost") this.quoter.onLost(event.requestId)
+    if (event.kind === "order_won") (this.quoter.onWon(event.order), this.pricing.outcome(event.order.id, true, event.at))
+    else if (event.kind === "order_lost") (this.quoter.onLost(event.requestId), this.pricing.outcome(event.requestId, false, event.at))
     else if (event.kind === "order_cancelled") this.quoter.onCancelled(event.orderId)
+    if (this.cfg.flags.fees) this.feeEvent(event)
     if (event.kind === "price_request") this.quote(event.request)
     else if (event.kind === "order_won") await this.win(event.order)
     else if (event.kind === "order_changed") await this.change(event.order)
@@ -101,6 +125,55 @@ export class V2Desk implements Desk {
   async tick(now: number): Promise<void> {
     this.now = Math.max(this.now, now)
     if (this.v2Quote) this.markMissed()
+    if (this.cfg.flags.triage && this.now >= this.nextSweep) {
+      this.nextSweep = this.now - (this.now % this.cfg.triage.sweepEveryMin) + this.cfg.triage.sweepEveryMin
+      await this.sweep()
+    }
+  }
+
+  /** Fee learner inputs and the one raise after a drop. */
+  feeEvent(event: DeskEvent): void {
+    if (event.kind === "gig_booked") {
+      const gig = this.books.gigs.get(event.gigId)
+      const pickup = gig ? this.books.placeOf(gig.orderIds[0]!, 0, "pickup") : ""
+      if (gig && pickup && !this.cliffSeen.has(gig.id)) this.fees.booked(pickup, event.feeCents <= gig.firstFee && event.at - gig.postedAt <= 60)
+    } else if (event.kind === "gig_dropped" || event.kind === "no_show") {
+      const action = this.posts.get(event.gigId)
+      const orderId = action?.stops[0]?.orderId
+      const order = orderId ? this.orders.get(orderId) : undefined
+      if (!order || !action) return
+      this.fees.dropped(order.legs[0]!.pickup.placeId)
+      if (this.dropRaised.has(order.id) || this.urgent.has(order.id)) return
+      this.dropRaised.add(order.id)
+      this.outbox.push({ type: "reprice", gigId: event.gigId, schedule: this.feesFor(order, pickups(action)) })
+    }
+  }
+
+  /** The 30-minute sweep: a car without any live gig gets one; an unbooked car past its last pickup goes doomed;
+   * gigs past their cliff feed the fee learner. */
+  async sweep(): Promise<void> {
+    for (const order of this.orders.values()) {
+      if (order.status === "cancelled") continue
+      const missing = undelivered(order).filter((leg) => !this.legGigs.get(order.id)?.has(leg))
+      const pendingPost = this.outbox.some((a) => a.type === "post" && a.stops.some((s) => s.orderId === order.id))
+      if (missing.length > 0 && !pendingPost && this.requests.has(order.id)) {
+        this.ctx.log?.({ at: this.now, kind: "sweep_post", order: order.id, legs: missing })
+        await this.post(order, missing)
+        continue
+      }
+      for (const gigId of this.gigsOf(order.id)) {
+        if (this.booked.has(gigId)) continue
+        if (!this.cliffSeen.has(gigId) && this.now >= order.lastPickupAt - 300) {
+          this.cliffSeen.add(gigId)
+          this.fees.cliff(order.legs[0]!.pickup.placeId)
+        }
+        if (this.now > order.lastPickupAt && !this.doomedGigs.has(gigId) && this.posts.has(gigId)) {
+          this.doomedGigs.add(gigId)
+          this.ctx.log?.({ at: this.now, kind: "doomed", order: order.id, gig: gigId })
+          this.outbox.push({ type: "reprice", gigId, schedule: this.feesFor(order, pickups(this.posts.get(gigId)!)) })
+        }
+      }
+    }
   }
 
   drain(): Action[] {
@@ -141,7 +214,12 @@ export class V2Desk implements Desk {
   }
 
   nextWake(): number | null {
-    return null
+    if (!this.cfg.flags.triage) return null
+    // No sweep wakes at night: drivers do not read then, and fee steps there move to 07:00.
+    const mod = this.nextSweep % DAY
+    if (mod >= 23 * 60) return Math.floor(this.nextSweep / DAY) * DAY + DAY + 7 * 60
+    if (mod < 7 * 60) return Math.floor(this.nextSweep / DAY) * DAY + 7 * 60
+    return this.nextSweep
   }
 
   // ------------------------------------------------------------------ the starter's decisions
@@ -199,8 +277,26 @@ export class V2Desk implements Desk {
   }
 
   feesFor(order: Order, cars: number): FeeStep[] {
+    if (this.cfg.flags.fees) return this.v2Fees(order, cars)
     const fee = (this.requests.get(order.id)!.referenceFeeCents * cars) / order.legs.length
     return this.urgent.has(order.id) ? steep(this.now, fee, this.level) : rising(this.now, fee, this.level)
+  }
+
+  /** 6.4: flat-then-cliff before the warning; the on-time cap after it; the doomed schedule once the last pickup passed. */
+  v2Fees(order: Order, cars: number): FeeStep[] {
+    const request = this.requests.get(order.id)!
+    let base = this.fees.open(order, request, cars)
+    if (this.dropRaised.has(order.id)) base *= this.cfg.fees.dropRaise
+    const ref = (request.referenceFeeCents * cars) / order.legs.length
+    const price = (order.priceCents * cars) / order.legs.length
+    const amber = this.cfg.flags.governor && this.governor.mode !== "GREEN"
+    let schedule: FeeStep[]
+    let stage: string
+    if (this.now > order.lastPickupAt) (schedule = this.fees.doomed(this.now, base, price, this.ctx.endsAt)), (stage = "doomed")
+    else if (this.urgent.has(order.id)) (schedule = this.fees.rescue(this.now, base, price, ref, amber)), (stage = "rescue")
+    else (schedule = this.fees.schedule(this.now, base, order.lastPickupAt)), (stage = "open")
+    this.ctx.log?.({ at: this.now, kind: "fee", order: order.id, stage, cars, ref: Math.round(ref), price: Math.round(price), base: Math.round(base), lastPickup: order.lastPickupAt, schedule })
+    return schedule
   }
 
   async retry(orderId: string, leg: number, reason: string): Promise<void> {
