@@ -50,12 +50,102 @@ export class Pricing {
     return iv
   }
 
-  /** The quoted ratio for the slowest admitted option: interval midpoint (or probe) x trust + dealer-share penalty. */
-  quoteRatio(request: PriceRequest, option: DeliveryOption, now: number, penalty: number): number {
+  /** The quoted ratio for the slowest admitted option: interval midpoint (or probe) x trust + dealer-share penalty.
+   * With pricing.model: the margin-optimal ratio under the fitted threshold model (see modelRatio).
+   * The interval learns in trust-free units (the base ratio), so trusted dealers' wins do not lift everyone's price. */
+  quoteRatio(request: PriceRequest, option: DeliveryOption, now: number, penalty: number, cost = 1): number {
+    if (this.cfg.pricing.model.on) return this.modelRatio(request, option, now, cost)
     const r0 = this.ratio(request, option, now)
-    const r = Math.min(this.cfg.pricing.clamp.hi + penalty, r0 * this.trustMult(request.dealerId) + penalty)
-    this.sent.get(request.id)!.r = r
+    const t = this.trustMult(request.dealerId)
+    const r = Math.min(this.cfg.pricing.clamp.hi + penalty, r0 * t + penalty)
+    this.sent.get(request.id)!.r = this.cfg.pricing.deflateTrust ? r / t : r
     return r
+  }
+
+  // ---- Model pricing -------------------------------------------------------------------------------------------
+  // Measured on ~20 runs per gate seed (interval-censored fit): the ratio at which a request flips from won to lost
+  // is lognormal, median ~1.36 x list, sigma ~0.23 (P(win) 0.91 at 1.0, 0.58 at 1.3, 0.34 at 1.5). Dealer trust t
+  // scales the threshold by t. Per world, day, lane, option kind and dealer the median moves: learnt online by
+  // stochastic gradient on the censored log-likelihood. The quote maximises P(win) x (ratio - cost + bonus), where
+  // cost = the expected driver fee / list and bonus = the value of one more on-time order at a dealer still building trust.
+  worldMu = NaN
+  readonly dayMu = new Map<number, number>()
+  readonly offsets = new Map<string, number>()
+  readonly dealerSeen = new Map<string, number>()
+  totalSeen = 0
+  readonly modelSent = new Map<string, { y: number; keys: string[]; day: number }>()
+
+  modelKeys(request: PriceRequest, option: DeliveryOption): string[] {
+    const leg = request.legs[0]!
+    return [`k|${option.kind}`, `l|${this.geo.poolId(leg.pickup.placeId)}|${this.geo.poolId(leg.delivery.placeId)}`, `d|${request.dealerId}`]
+  }
+
+  mu(keys: string[], day: number): number {
+    const M = this.cfg.pricing.model
+    if (Number.isNaN(this.worldMu)) this.worldMu = Math.log(M.median)
+    return this.worldMu + (this.dayMu.get(day) ?? 0) + keys.reduce((s, k) => s + (this.offsets.get(k) ?? 0), 0)
+  }
+
+  /** P(win) at trust-free ratio y under median exp(mu). */
+  pWin(y: number, mu: number): number {
+    return 1 - phiCdf((Math.log(y) - mu) / this.cfg.pricing.model.sigma)
+  }
+
+  /** On-time orders the dealer is on its way to counting: counted trust + won orders not yet delivered. */
+  trustSoon(dealer: string): number {
+    let open = 0
+    for (const b of this.books.orders.values()) if (b.order.dealerId === dealer && !b.deliveredAll && !b.late) open++
+    return (this.books.trust.get(dealer) ?? 0) + open
+  }
+
+  modelRatio(request: PriceRequest, option: DeliveryOption, now: number, cost: number): number {
+    const M = this.cfg.pricing.model
+    const C = this.cfg.pricing.clamp
+    const day = dayOf(now)
+    const keys = this.modelKeys(request, option)
+    const mu = this.mu(keys, day)
+    const t = this.trustMult(request.dealerId)
+    const seen = (this.dealerSeen.get(request.dealerId) ?? 0) + 1
+    this.dealerSeen.set(request.dealerId, seen)
+    this.totalSeen++
+    // The value of one more on-time order at a dealer still building trust: +1% on the threshold of each of its
+    // remaining requests, worth ~anchorPerRequest x list each (0.37 vs 0.18 x list at full vs no trust, /25).
+    // In this request's list units; the dealer's remaining requests = its share so far x the week's remaining requests.
+    const anchor = M.anchorBonus > 0 && seen >= M.anchorMinRequests && this.trustSoon(request.dealerId) < this.cfg.trust.cap
+    const remaining = (seen / this.totalSeen) * Math.max(0, M.anchorWeekRequests - this.totalSeen)
+    const bonus = anchor ? Math.min(M.anchorBonus, (M.anchorPerRequest * remaining * M.anchorAvgList) / option.listPriceCents) : 0
+    let best = C.hi
+    let bestV = -Infinity
+    for (let x = C.lo; x <= M.hi + 1e-9; x += 0.01) {
+      const v = this.pWin(x / t, mu) * (x - cost + bonus)
+      if (v > bestV) (bestV = v), (best = x)
+    }
+    // Nothing to earn: decline (a losing quote costs nothing).
+    if (bestV - this.pWin(best / t, mu) * bonus < M.minValue) return this.cfg.decline.mult
+    this.modelSent.set(request.id, { y: best / t, keys, day })
+    return best
+  }
+
+  modelOutcome(requestId: string, won: boolean): void {
+    const s = this.modelSent.get(requestId)
+    if (!s) return
+    this.modelSent.delete(requestId)
+    if (this.frozen) return
+    const M = this.cfg.pricing.model
+    const mu = this.mu(s.keys, s.day)
+    const z = (Math.log(s.y) - mu) / M.sigma
+    const pdf = Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI)
+    const cdf = phiCdf(z)
+    // d/dmu log-likelihood x sigma: a win says the threshold is above y (mu up), a loss below (mu down).
+    const g = won ? pdf / Math.max(1e-6, 1 - cdf) : -pdf / Math.max(1e-6, cdf)
+    const step = (eta: number) => eta * M.sigma * Math.max(-3, Math.min(3, g))
+    this.worldMu += step(M.etaWorld)
+    this.dayMu.set(s.day, (this.dayMu.get(s.day) ?? 0) + step(M.etaDay))
+    for (const k of s.keys) {
+      const eta = k.startsWith("l|") ? M.etaLane : k.startsWith("d|") ? M.etaDealer : M.etaKind
+      const o = (this.offsets.get(k) ?? 0) * (1 - M.shrink) + step(eta)
+      this.offsets.set(k, Math.max(-M.maxOffset, Math.min(M.maxOffset, o)))
+    }
   }
 
   /** The base ratio for the slowest admitted option of a request at minute `now`. */
@@ -82,6 +172,7 @@ export class Pricing {
   }
 
   outcome(requestId: string, won: boolean, at: number): void {
+    if (this.cfg.pricing.model.on) return this.modelOutcome(requestId, won)
     const s = this.sent.get(requestId)
     if (!s) return
     this.sent.delete(requestId)
@@ -99,4 +190,12 @@ export class Pricing {
       }
     }
   }
+}
+
+/** Standard normal CDF (Abramowitz-Stegun 7.1.26 erf). */
+export function phiCdf(z: number): number {
+  const x = Math.abs(z) / Math.SQRT2
+  const t = 1 / (1 + 0.3275911 * x)
+  const erf = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x)
+  return z >= 0 ? 0.5 * (1 + erf) : 0.5 * (1 - erf)
 }

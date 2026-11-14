@@ -98,10 +98,18 @@ export class Quoter {
       // Prices: the ladder quotes every admitted option, slower cheaper; without it only the first admitted option.
       const prices: QuoteAction["prices"] = {}
       const admittedKinds = decisions.filter((d) => d.admitted).map((d) => d.kind)
-      const slowest = SLOW_FIRST.find((k) => admittedKinds.includes(k))
+      let slowest = SLOW_FIRST.find((k) => admittedKinds.includes(k))
+      let r = 0
       if (slowest) {
         const slowOpt = request.options.find((o) => o.kind === slowest)!
-        const r = this.ratio(request, slowOpt, fs.find((x) => x.option.kind === slowest)!.f)
+        r = this.ratio(request, slowOpt, fs.find((x) => x.option.kind === slowest)!.f)
+        // Model pricing found nothing to earn: a decline, not an admission (no reservation, no pending risk).
+        if (r >= this.cfg.decline.mult * 0.9) {
+          for (const d of decisions) if (d.admitted) (d.admitted = false), (d.why = "no value")
+          slowest = undefined
+        }
+      }
+      if (slowest) {
         const m = this.cfg.pricing.optionMult
         const chosen = flags.ladder ? admittedKinds : [decisions.find((d) => d.admitted)!.kind]
         for (const d of decisions) {

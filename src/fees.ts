@@ -29,6 +29,19 @@ export class Fees {
     return this.cfg.fees.kBands.findIndex((b) => r <= b.upTo)
   }
 
+  /** Expected driver fee (cents) for a request at quote time: the opening multiplier by reach band and extras, x costMult
+   * (bookings average ~1.0-1.1x the opening fee after raises). Used by model pricing as the cost of a win. */
+  estimate(request: PriceRequest): number {
+    const f = this.cfg.fees
+    const leg0 = request.legs[0]!
+    let m = this.k[this.band(leg0.pickup.placeId)]!
+    if (request.legs.some((l) => l.pickup.privateAddress || l.delivery.privateAddress)) m *= f.privateMult
+    if (request.legs.length > 1) m *= f.extraLegMult ** (request.legs.length - 1)
+    if (request.legs.some((l) => l.car.premium)) m *= f.premiumMult
+    if (this.geo.reach30(leg0.delivery.placeId).all >= 40) m *= f.homeboundMult
+    return request.referenceFeeCents * m * this.cfg.pricing.model.costMult
+  }
+
   /** The opening fee for `cars` of the order's legs. */
   open(order: Order, request: PriceRequest, cars: number): number {
     const f = this.cfg.fees

@@ -1,0 +1,53 @@
+{
+ "name": "v2-open-nobatch",
+ "flags": {
+  "gate": true,
+  "capacity": true,
+  "ladder": true,
+  "governor": true,
+  "fees": true,
+  "triage": true,
+  "pricing": true,
+  "trust": true,
+  "notes": true
+ },
+ "pricing": {
+  "clamp": {
+   "lo": 1.05,
+   "hi": 1.75
+  }
+ },
+ "governor": {
+  "fridayTierAOnlyFrom": 100000
+ },
+ "gate": {
+  "tierA": {
+   "slackHours": 24,
+   "reach30Pickup": 3,
+   "reach30Delivery": 10
+  },
+  "tierB": {
+   "slackHours": 2,
+   "reach30Pickup": 0,
+   "reach80Pickup": 0,
+   "reach30Delivery": 0
+  },
+  "sameDay": {
+   "maxDriveMin": 100000,
+   "slackHours": 2,
+   "reach30Pickup": 0
+  },
+  "nextDay": {
+   "maxDriveMin": 100000
+  },
+  "poolBrake": {
+   "warnings": 0,
+   "windowMin": 1440
+  },
+  "downgrades": []
+ },
+ "capacity": {
+  "batchMax": 0,
+  "batchPerReach": 0
+ }
+}

@@ -36,7 +36,8 @@ export class Capacity {
     let active = c.active
     const seen = this.books.poolSeen.get(this.key(this.geo.poolId(place), day - 1))?.size ?? 0
     if (r30 > 0 && seen > 0) active = Math.max(active, Math.min(1, seen / r30))
-    return c.safety * (active * r30 + c.active80 * Math.max(0, r80 - r30))
+    const dayMult = c.dayMult?.[day % 7] ?? 1 // Friday supply is thin (p1: same_day due Friday 20% late at volume)
+    return dayMult * c.safety * (active * r30 + c.active80 * Math.max(0, r80 - r30))
   }
 
   loadOf(place: string, day: number): number {

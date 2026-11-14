@@ -71,7 +71,7 @@ export class V2Desk implements Desk {
     this.fees = new Fees(cfg, this.geo, ctx.log)
     this.pricing = new Pricing(cfg, this.geo, this.books)
     this.offers = new Offers(cfg, this.geo, this.books)
-    if (f.pricing) this.quoter.ratio = (request, option) => this.pricing.quoteRatio(request, option, this.now, f.capacity ? this.capacity.dealerPenalty(request.dealerId, this.now) : 0)
+    if (f.pricing) this.quoter.ratio = (request, option) => this.pricing.quoteRatio(request, option, this.now, f.capacity ? this.capacity.dealerPenalty(request.dealerId, this.now) : 0, this.fees.estimate(request) / option.listPriceCents)
   }
 
   // ------------------------------------------------------------------ lifecycle
