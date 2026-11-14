@@ -92,6 +92,9 @@ class Config:
     dense_n: int = 150                 # dense towns book in a median 2 min at 1.05 (13,297 singles of the c1/c3/c4/y4 runs)
     stop_windows: bool = False         # pickup window ends at the car's last pickup, delivery window at deadline - stop_margin
     stop_margin: int = 60              # (Halal / jaffa: failed visits 10.6 -> 0, deliveries >24 h late fixed)
+    pick_cap: bool = False             # the first pickup's window ends at the order's last pickup, for every order with a private delivery
+                                       # (trade-ins included): 176 c3 weeks, a car picked up after its last pickup is late 93% (trade-ins) / 99%,
+                                       # one picked up in time 1.8% / 0.7%; 2.5 trade-ins a week were booked in time with a pickup planned too late
     fee_hold: int = 45                 # minutes the opening fee shows before any raise
     fee_rel: tuple = ((8, 1.25), (5, 1.6))   # (hours before lastPickupAt, fee over typical fee)
     fee_plan: tuple = ((0.0, 0.95), (0.15, 1.15), (0.4, 1.45), (0.7, 1.85))  # (share of slack, fee over typical fee)

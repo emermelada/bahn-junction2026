@@ -1041,6 +1041,8 @@ class Desk:
             pick["withCharging"] = True
         if self.cfg.stop_windows and len(o["legs"]) == 1 and not self.is_late(ob, [leg]):
             to = min(to, self.last_pickup(ob, [leg]))  # a pickup after this cannot be on time: let no driver plan it
+        elif self.cfg.pick_cap and leg == 0 and o["legs"][0]["delivery"]["privateAddress"] and not self.is_late(ob, [leg]):
+            to = min(to, o["lastPickupAt"])  # the customer's hour: a later pickup misses it and the dealer rebooks the next day
         if (frm > pw["from"] or to < pw["to"]) and frm < to and to > self.now:
             pick["window"] = {"from": frm, "to": to}
         dw = L["delivery"]["window"]

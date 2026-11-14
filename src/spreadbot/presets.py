@@ -48,3 +48,7 @@ PRESETS["best"] = PRESETS["c1"]  # the current best version (team objective: raw
 PRESETS["c3bp"] = PRESETS["c3"] + ["repair_pairs=true", "repair_lead=180", "repair_mult=0.85", "repair_split=60"]
 PRESETS["c3rl"] = PRESETS["c3"] + ["relook_minutes=360"]
 PRESETS["c3bprl"] = PRESETS["c3bp"] + ["relook_minutes=360"]
+# Candidates (claude/main-windows): pickup windows that stop drivers planning a pickup too late to be on time.
+PRESETS["c3pc"] = PRESETS["c3"] + ["pick_cap=true"]
+PRESETS["c3sw"] = PRESETS["c3"] + ["stop_windows=true"]
+PRESETS["c3swpc"] = PRESETS["c3"] + ["stop_windows=true", "pick_cap=true"]
