@@ -80,6 +80,9 @@ class OrderBook:
     p_exp: float = 0.0
 
 
+V5_SHORT_H = 8  # v5_short_open: ladder singles under this many hours to the last pickup (6-8 h cars paid 1.13x, 0-6 h 1.27x)
+
+
 class Desk:
     def __init__(self, geo: Geo, cfg: Config, level: int, now: int, roster: list[dict]):
         self.geo, self.cfg, self.level, self.now = geo, cfg, level, now
@@ -1282,6 +1285,10 @@ class Desk:
                 opening = cfg.fee_open_dense  # many drivers live near the pickup: it books in minutes at less
             if (cfg.fee_open_rule or cfg.fee_open_day) and not ob.p_exp >= cfg.hot_p:
                 opening = self.open_rule(ob, legs, last, opening)
+            if (cfg.v5_short_open and cfg.fee1 and not getattr(self, "scarce", False) and last - now < V5_SHORT_H * HOUR
+                    and not ob.p_exp >= cfg.hot_p and not (cfg.desert_n and self.desert(ob.order["legs"][legs[-1]]["delivery"]["placeId"]))):
+                opening = cfg.v5_short_open  # short lead, fee1 could not choose: open lower, the fee_rel raises stay
+                self.say("V5_SHORT", f"{ob.order['id']} left={last - now} open={opening:.2f}")
             out, prev = [{"at": now, "feeCents": int(round(base * opening))}], int(round(base * opening))
             for hours_before, mult in cfg.fee_rel:
                 at = max(now + cfg.fee_hold, last - int(hours_before * HOUR))

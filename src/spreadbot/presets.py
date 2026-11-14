@@ -203,3 +203,5 @@ PRESETS["v5a"] = PRESETS["k-f1h5f"] + ["long_warn_distinct=true", "fee1_long=(24
 PRESETS["v5f1"] = PRESETS["v5a"] + ["v5_open=(8,0.9)", "v5_repost=1.03"]
 # v5f2: + at the re-pick, pair the sitting car with another open unbooked single of ours (one driver, two cars, bundle_mult).
 PRESETS["v5f2"] = PRESETS["v5f1"] + ["v5_pair2=true"]
+# v5f3: + ladder singles under 8 h to the last pickup (fee1 cannot choose) open at 0.95 instead of 1.05; raises unchanged.
+PRESETS["v5f3"] = PRESETS["v5f2"] + ["v5_short_open=0.95"]
