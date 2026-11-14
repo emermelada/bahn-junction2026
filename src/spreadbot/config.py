@@ -239,6 +239,7 @@ class Config:
     fee1_long: tuple = ()              # (drive min, floor): long cars never below this fee. k-f1h WAR: cheaper long gigs got warned, long_warn
                                        # then declined long cars 38-40x/wk vs 27 (the highest-margin cars, EUR 63-77 each; -8.7 won/wk) (() = off)
     fee1_only: tuple = ()              # (min hours to the last pickup, min drivers <= 30 road min from the delivery): fee1 only for such cars (() = all)
+    fee1_window_fee: bool = False      # booking-time profile by fee (low fees book later: a 6 h miss is weak evidence; PROBE forks)
     fee1_after_ladder: bool = False    # a fee1 gig unbooked at its re-pick time joins the old ladder in place instead of a new post
     fee1_long_ladder: bool = False     # long cars (fee1_long[0]) are not fee1 cars at all: the opening + ladder as before
     fee1_last_call: int = 0            # minutes before our alarm: a fee1 car still unbooked gets one more new post at a safe fee (0 = off)

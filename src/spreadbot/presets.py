@@ -208,3 +208,6 @@ PRESETS["k-safe-dclD"] = PRESETS["k-safe-dcl"] + ["long_warn_distinct=true"]
 # fee1 on PROBE's 21:13 clearing-fee refit (148 cars / 651 probes incl. 0.62-0.80; leave-one-seed-out log-lik -1.397 vs -1.533 intercept
 # only): premium +0.32 and private +0.11 on ln(clearing fee) (were +0.02 / +0.01), lead -0.146, sigma 0.261. On the release k-f1h5f.
 PRESETS["k-f1h5fP"] = PRESETS["k-f1h5f"] + ["fee1_clear=(0.2771,-0.0694,0.0153,-0.1463,-0.0037,0.0635,0.1097,0.3214,0.2609)"]
+# + booking time by fee (PROBE: ~45% of cars unbooked at 6 h still book at the same fee; 18% of bookings come after 6 h at 0.85):
+# the re-pick no longer reads a 6 h miss as "fee below the clearing fee" (ARCHIVE: re-picked cars cost EUR 3.6-6 more).
+PRESETS["k-f1h5fPW"] = PRESETS["k-f1h5fP"] + ["fee1_window_fee=true"]

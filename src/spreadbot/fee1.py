@@ -137,6 +137,20 @@ class Fee1:
             return 0.7 * minutes / 60
         return 1.0 - 0.3 * math.exp(-(minutes - 60) / 240)
 
+    def window_m(self, minutes: float, m: float) -> float:
+        """window() by fee (fee1_window_fee): low fees book later. PROBE's flat-fee forks (probes.jsonl): within 1 h 0.67 of the
+        pre-warning bookings at 0.85, 0.81 at 1.05, 0.90 at 1.2; after 6 h still 18% at 0.85, 11% at 1.05, 6% at 1.2, 25-30% at
+        0.62-0.72 (new drivers each day, mostly next morning)."""
+        if minutes <= 0:
+            return 0.0
+        w60 = min(0.95, max(0.40, 0.81 + 0.6 * (m - 1.05)))
+        w360 = 1.0 - min(0.35, max(0.05, 0.11 + 0.35 * (1.05 - m)))
+        if minutes < 60:
+            return w60 * minutes / 60
+        if minutes <= 360:
+            return w60 + (w360 - w60) * math.log(minutes / 60) / math.log(6)
+        return 1.0 - (1.0 - w360) * math.exp(-(minutes - 360) / 1440)
+
     def plan(self, ob: "OrderBook", legs: list[int], last: int, base: float, desert: bool) -> Optional[tuple]:
         """(fee m, expected cost in cents, P1(m), the first window's end, V2(m), info), or None with too little time before the alarm."""
         d, cfg = self.desk, self.desk.cfg
@@ -180,8 +194,12 @@ class Fee1:
         A, going = self.harm(ob.order["legs"][legs[0]]["pickup"]["placeId"]) if cfg.fee1_harm else (0.0, 1.0)
         mu2 = self.mu(ob, legs, t1) + self.delta if stage2 else mu1
         w2 = self.window(day_minutes(t1, t_alarm)) if stage2 else 0.0
+        e1 = day_minutes(d.now, t1)
+        e2 = day_minutes(t1, t_alarm) if stage2 else 0
         best = None
         for m in grid:
+            if cfg.fee1_window_fee:
+                w1 = self.window_m(e1, m)
             pc = p_clear(m, mu1)
             p1 = pc * w1
             if stage2:
@@ -197,7 +215,7 @@ class Fee1:
                     miss_clear = 1 - Phi(lo)               # P(residual above m's | ...) * tail (unnormalised)
                     slow = pc * (1 - w1) * tail            # cleared at m but did not book inside the window (unnormalised)
                     tot = miss_clear + slow
-                    pb = ((max(0.0, Phi(z2) - Phi(lo)) + slow) / tot if tot > 1e-12 else 0.0) * w2
+                    pb = ((max(0.0, Phi(z2) - Phi(lo)) + slow) / tot if tot > 1e-12 else 0.0) * (self.window_m(e2, m2) if cfg.fee1_window_fee else w2)
                     v2 = min(v2, pb * m2 * base + (1 - pb) * v_res)
             else:
                 v2 = v_res
