@@ -52,6 +52,7 @@ export class V2Desk implements Desk {
   readonly offerQueue = new Map<string, string>() // gigId -> reason, fired at the next tick
   readonly bundleGigs = new Map<string, string[]>() // gigId -> the orders a multi-car gig carries (bundles)
   readonly bundlePosts = new Map<PostAction, string[]>() // bundle posts in flight -> their orders (fallback on refusal)
+  readonly notOpen = new Set<string>() // gigs whose withdraw was refused (booked in the live race): never bundle partners
   readonly dropRaised = new Set<string>() // orders whose gig got the one +15% after a drop
   readonly doomedGigs = new Set<string>() // gigs repriced to the doomed schedule
   readonly cliffSeen = new Set<string>() // gigs counted as reaching the cliff (fee learner)
@@ -479,7 +480,7 @@ export class V2Desk implements Desk {
     const a = order.legs[0]!
     let best: { gigId: string; partner: Order; first: Order; second: Order; drive: number } | null = null
     for (const [gigId, action] of this.posts) {
-      if (gigId === exclude || this.booked.has(gigId) || this.bundleGigs.has(gigId) || this.doomedGigs.has(gigId)) continue
+      if (gigId === exclude || this.booked.has(gigId) || this.notOpen.has(gigId) || this.bundleGigs.has(gigId) || this.doomedGigs.has(gigId)) continue
       if (action.stops.length !== 2 || action.stops.some((st) => st.window || st.withPlates)) continue
       const pid = action.stops[0]!.orderId
       if (pid === order.id || this.legGigs.get(pid)?.get(0) !== gigId) continue
@@ -643,7 +644,7 @@ export class V2Desk implements Desk {
 
   readResults(actions: Action[], results: ActionResult[]): void {
     actions.forEach((action, i) => {
-      if (action.type === "withdraw" && results[i] && !results[i]!.ok) this.remapGig(action.gigId) // a driver booked it meanwhile: it still carries its cars
+      if (action.type === "withdraw" && results[i] && !results[i]!.ok) (this.remapGig(action.gigId), this.notOpen.add(action.gigId)) // a driver booked it meanwhile: it still carries its cars, and is no bundle partner
       if (action.type === "post" && this.bundlePosts.has(action)) {
         const ids = this.bundlePosts.get(action)!
         this.bundlePosts.delete(action)
