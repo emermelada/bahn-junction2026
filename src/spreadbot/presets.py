@@ -265,3 +265,7 @@ PRESETS["v5L14"] = PRESETS["v5L"] + ["load_free=0.14"]                   # bolde
 # EUR 2-3.9k per late car on every car -> 0 orders Tue-Fri, EUR 1,449 @0.907 vs the release 273 orders @0.956, EUR 3,435).
 PRESETS["v5Lf45"] = PRESETS["v5La"] + ["late_barrier_free=0.045"]  # = 1 - target: cars at least as safe as the target pay nothing
 PRESETS["v5Lf02"] = PRESETS["v5La"] + ["late_barrier_free=0.02"]   # only the safest cars (p_ok >= 0.98) pay nothing
+# v5Lfl: the free share only on deadline days below the release's free load (0.07): light weeks like dev-05 keep selling safe cars,
+# a crowded day (fresh-20 Thursday) still charges every car.
+PRESETS["v5Lfl"] = PRESETS["v5Lf45"] + ["late_barrier_free_load=0.07"]
+PRESETS["v5Lfl10"] = PRESETS["v5Lf45"] + ["late_barrier_free_load=0.10"]
