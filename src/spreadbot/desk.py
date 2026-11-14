@@ -200,6 +200,7 @@ class Desk:
         ob.p_ok = self.quote_meta.get(o["id"], {}).get(o["option"], 0.85)
         if self.fee_model is not None and o["option"] in self.fee_meta.get(o["id"], {}):
             self.fee_model.won.append(self.fee_meta[o["id"]][o["option"]])
+            self.fee_model.won_by_order[o["id"]] = self.fee_meta[o["id"]][o["option"]]
         self.orders[o["id"]] = ob
         self.won_count += 1
         self.observe_outcome(o["id"], e["at"], True)
@@ -280,6 +281,8 @@ class Desk:
             ob = self.orders.get(rec.legs[0][0])
             if ob:
                 self.book_ratios.append(e["feeCents"] / max(1.0, self.gig_base(rec)))
+                if self.fee_model is not None:
+                    self.fee_model.booked(sorted({o for o, _ in rec.legs}), e["feeCents"] / max(1.0, self.gig_base(rec)))
                 if rec.id in self.gig_open:
                     self.bo_ratios.append(e["feeCents"] / max(1, self.gig_open[rec.id]))
                 if len({o for o, _ in rec.legs}) == 1:
@@ -572,7 +575,10 @@ class Desk:
                     self.fee_model = FeeModel(self)
                 fm = self.fee_model.mult(r, opt)
                 self.fee_meta.setdefault(r["id"], {})[kind] = fm
-                c_opt = c_opt * (1.0 + cfg.fee_model * (fm / self.fee_model.level() - 1.0))
+                if cfg.fee_model_abs:
+                    c_opt = r["referenceFeeCents"] * fm * self.fee_model.calib()  # the car's own expected fee, at this week's level
+                else:
+                    c_opt = c_opt * (1.0 + cfg.fee_model * (fm / self.fee_model.level() - 1.0))
             ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, c_opt, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 info.append(f"{kind}:noev")

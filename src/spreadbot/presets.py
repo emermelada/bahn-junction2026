@@ -187,3 +187,6 @@ PRESETS["kdcl-fm5"] = PRESETS["k-safe-dcl"] + ["fee_model=0.5"]
 # fee_model alone: EUR -58 (se 233) but on time 0.965 -> 0.974 at equal orders (fewer dear late cars): spend that room on volume.
 PRESETS["kdcl-fm-ls"] = PRESETS["kdcl-fm"] + ["load_slope=0.5"]
 PRESETS["kdcl-ls"] = PRESETS["k-safe-dcl"] + ["load_slope=0.5"]  # control for kdcl-fm-ls: the load change alone
+# The quote's cost level runs ~1.05x typical (Mon 1.08-1.15x: cost_prior 1.15) while cars cost 1.00x: quote the true expected fee.
+PRESETS["kdcl-fma-ls"] = PRESETS["kdcl-fm-ls"] + ["fee_model_abs=true"]
+PRESETS["kdcl-fma"] = PRESETS["kdcl-fm"] + ["fee_model_abs=true"]

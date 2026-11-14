@@ -44,10 +44,28 @@ class FeeModel:
         self.desk = desk
         self.feats = LateModel(desk)
         self.won: list[float] = []  # the trees' fee mult of each car we won, at its quote
+        self.won_by_order: dict[str, float] = {}
+        self.paid = 0.0  # this week's booked fee / typical, per car and booking (fee_model_abs calibration)
+        self.pred = 0.0  # the trees' fee mult of those cars, once per car
+        self.seen: set[str] = set()
 
     def mult(self, r: dict, opt: dict) -> float:
         f = self.feats.features(r, opt)
         return min(2.0, max(0.5, score([float(f[k]) for k in model()["features"]])))
+
+    def booked(self, oids: list[str], ratio: float) -> None:
+        """A gig of ours booked at `ratio` x the typical fee of its cars: each car paid that ratio of its own typical fee."""
+        for o in oids:
+            if o in self.won_by_order:
+                self.paid += ratio
+                if o not in self.seen:
+                    self.seen.add(o)
+                    self.pred += self.won_by_order[o]
+
+    def calib(self) -> float:
+        """This week's paid over predicted, with the trees as the prior (cost_prior_n cars at 1.0)."""
+        n = self.desk.cfg.cost_prior_n
+        return (n + self.paid) / (n + self.pred)
 
     def level(self) -> float:
         n = self.desk.cfg.cost_prior_n
