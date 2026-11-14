@@ -275,6 +275,8 @@ class Config:
     pair_end: tuple = ()               # (w, min_nd): R1, rank pair/chain partners by score = base key in hours + w x ln(1 + drivers living
                                        # <= 30 road min of the final delivery); min_nd > 0: never build a chain ending under min_nd such drivers.
                                        # Pairs at 0.84: end nd30 0-10 book 67% in 60 min, warned 9.7%; 150+ 91%, 1.6% (() = off)
+    pair_bridge: tuple = ()            # (free_min, zero_min): with pair_end, a chain whose empty drive between its cars is >= free_min
+                                       # counts the end's drivers x (1 - bridge / zero_min) (Franco 23:30: deadheads may cause drops; () = off)
     pair_long_empty: tuple = ()        # (drive_min, nd_max): R2, no chain with more than drive_min road minutes whose final delivery has
                                        # <= nd_max drivers living <= 30 road min: post singles (PAIRS.md: such pairs 18.5% warned, singles 3.7%; () = off)
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it

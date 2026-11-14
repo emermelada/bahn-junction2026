@@ -1075,15 +1075,25 @@ class Desk:
             g = self.geo
             base = -(g.drive(A["pickup"]["placeId"], A["delivery"]["placeId"]) + g.drive(A["delivery"]["placeId"], B["pickup"]["placeId"])
                      + g.drive(B["pickup"]["placeId"], B["delivery"]["placeId"]))
-        return self.end_score(base, second.order["legs"][0]["delivery"]["placeId"])
+        bridge = self.geo.drive(first.order["legs"][0]["delivery"]["placeId"], second.order["legs"][0]["pickup"]["placeId"])
+        return self.end_score(base, second.order["legs"][0]["delivery"]["placeId"], bridge)
 
-    def end_score(self, base: float, end: str) -> float:
+    def bridges(self, seq: list) -> int:
+        """Empty driving inside a chain: each car's delivery -> the next car's pickup, in road minutes (pair_bridge)."""
+        return sum(self.geo.drive(a.order["legs"][0]["delivery"]["placeId"], b.order["legs"][0]["pickup"]["placeId"])
+                   for a, b in zip(seq, seq[1:]))
+
+    def end_score(self, base: float, end: str, bridge: int = 0) -> float:
         """pair_end (R1): a candidate chain's score, in hours = base / 60 + w x ln(1 + nd30(end)), where base is the old key in
         minutes (higher better) and nd30 counts drivers living <= 30 road min of the chain's final delivery. Pairs book by their
         end (AUC .65-.68; hop .51, start .52; PAIRS.md), so the end decides and the old key breaks near-ties. Off: base unchanged."""
         if not self.cfg.pair_end:
             return base
-        return base / 60.0 + self.cfg.pair_end[0] * math.log1p(self.home_near_delivery(end, PAIR_END_RADIUS))
+        nd = self.home_near_delivery(end, PAIR_END_RADIUS)
+        if self.cfg.pair_bridge and bridge >= self.cfg.pair_bridge[0]:
+            # pair_bridge (Franco 23:30): a long empty drive between the cars discounts the end's drivers, to nothing at zero_min
+            nd *= max(0.0, 1.0 - bridge / self.cfg.pair_bridge[1])
+        return base / 60.0 + self.cfg.pair_end[0] * math.log1p(nd)
 
     def pair_blocked(self, drive: int, end: str, seq: list) -> bool:
         """The end guards on a chain that fits in time (chain(), chain_seq()): R2 pair_long_empty (long chain into an empty town)
@@ -1158,7 +1168,7 @@ class Desk:
                 last = self.chain_seq(seq)
                 if last is None:
                     continue
-                key = self.end_score(last, seq[-1].order["legs"][0]["delivery"]["placeId"])
+                key = self.end_score(last, seq[-1].order["legs"][0]["delivery"]["placeId"], self.bridges(seq))
                 if best is None or key > best[0]:
                     best = (key, last, seq, rec)
         if not best:
@@ -1289,7 +1299,7 @@ class Desk:
                             L1, L2 = first.order["legs"][0], second.order["legs"][0]
                             tr = self.geo.drive(L1["delivery"]["placeId"], L2["pickup"]["placeId"])
                             # Greedy order: shortest hop first; with pair_end the end's score first (base = -hop), hop then slack break ties.
-                            key = -self.end_score(-tr, L2["delivery"]["placeId"]) if cfg.pair_end else 0.0
+                            key = -self.end_score(-tr, L2["delivery"]["placeId"], tr) if cfg.pair_end else 0.0
                             edges.append((key, tr, -last, first.order["id"], second.order["id"], last))
         finally:
             self.cfg = cfg
