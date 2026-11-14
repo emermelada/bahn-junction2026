@@ -261,3 +261,10 @@ PRESETS["v5L"] = PRESETS["k-f1h5fD"] + ["load_bundle_w=0.6", "load_free=0.12", "
 PRESETS["v5La"] = PRESETS["v5aV2"] + LB  # the first test (v5-run3 tag v5V2lb): with v5a's long cars down to 0.90
 PRESETS["v5L45"] = PRESETS["v5L"] + ["late_barrier=(0.945,300,4,20)"]  # looser target: keep more of V2's volume in normal weeks
 PRESETS["v5L14"] = PRESETS["v5L"] + ["load_free=0.14"]                   # bolder volume under the same barrier
+# V5 HUB (research/re/v5/HUB_BUILD.md): pairs book by their END (research/re/drivers/PAIRS.md). Pair score in hours = old key / 60 + w x
+# ln(1 + nd30 of the final delivery). w = 2: nd30 5 -> 100 adds 2 x 2.8 = 5.6 h, above the usual spread of the old keys among a car's
+# feasible partners (latest start: p75 spread on the fixture week in HUB_BUILD.md; release hop: <= ~1 h, 98% of pairs hop <= 30 min);
+# that move is worth ~+18-24 pts of 60-min booking and warned 9.7% -> 1.6-3%, the strongest pair term after drive.
+PRESETS["v5h1"] = PRESETS["v5La"] + ["pair_end=(2.0,0)"]
+PRESETS["v5h2"] = PRESETS["v5h1"] + ["pair_long_empty=(240,10)"]  # + R2: no chain > 4 h of road into an end with nd30 <= 10 (18.5% warned)
+PRESETS["v5h3"] = PRESETS["v5La"] + ["pair_long_empty=(240,10)"]  # R2 alone
