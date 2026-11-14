@@ -201,6 +201,8 @@ class Config:
     drop_calm_hours: float = 0.0       # a single dropped with more than this many hours to its last pickup is posted again at the opening
                                        # fee instead of escalated (k-safe, 35 weeks: 25 of 35 drops/wk had > 16 h left, rebooked at
                                        # 1.24-1.31x typical, 2-4% late); 0 = off
+    drop_night_hold: float = 0.0       # a single dropped 23-07 h with at least this many hours from 07:00 to its last pickup keeps its fee and
+                                       # escalates from 07:00 (no driver reads the app at night; re-external, 34 c3g weeks); 0 = off
     repair_pairs: bool = False         # a car won during the day may pair with any open unbooked single of ours, not only one posted in the last bundle_window
     repair_drive: int = 300            # such a pair drives at most this many minutes (k18: chains under 5 h book 85%)
     repair_lead: int = 360             # and starts at least this long from now (k18: pairs formed under 2 h ahead book 46%)

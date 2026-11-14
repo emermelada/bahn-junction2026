@@ -156,3 +156,4 @@ PRESETS["m13mc"] = PRESETS["k-safe"] + ["quote_move_cost=true"]
 
 # Drops with time to spare: post again at the opening fee instead of escalating (claude/spec-drops).
 PRESETS["k-safe-dc"] = PRESETS["k-safe"] + ["drop_calm_hours=16"]
+PRESETS["k-safe-dcn"] = PRESETS["k-safe-dc"] + ["drop_night_hold=3"]  # + night drops wait for 07:00 to escalate

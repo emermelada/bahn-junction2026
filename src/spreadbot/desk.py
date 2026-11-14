@@ -343,6 +343,22 @@ class Desk:
                 self.dispatch_order(ob.order["id"], "drop-repost")
                 self.say("DROP_REPOST", f"{gid} {ob.order['id']} left={(self.last_pickup(ob, legs) - self.now) // 60}h")
                 return
+        if self.cfg.drop_night_hold and why == "dropped" and len({o for o, _ in rec.legs}) == 1:
+            hour = (self.now % DAY) // 60
+            ob = self.orders.get(rec.legs[0][0])
+            legs = [l for _, l in rec.legs]
+            if ob and not ob.urgent and (hour >= 23 or hour < 7):
+                morning = (self.now // DAY + (1 if hour >= 23 else 0)) * DAY + 7 * 60
+                if self.last_pickup(ob, legs) - morning >= self.cfg.drop_night_hold * HOUR:
+                    # No driver reads the app 23-07 (RULES): a raise now buys nothing until morning (night drops escalated at
+                    # once rebooked at 1.40x vs 1.21x by day). Keep the fee, start the escalation at 07:00.
+                    cur = current_fee(rec.schedule, self.now)
+                    rec.schedule = dedupe([{"at": self.now, "feeCents": cur}]
+                                          + steep(morning, self.base_fee(ob, legs), self.cfg, floor=cur, plan=self.steep_plan_now(ob)))
+                    rec.escalated = True
+                    self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": rec.schedule})
+                    self.say("DROP_NIGHT", f"{gid} {ob.order['id']} escalate from {morning}")
+                    return
         # The gig is in the app again with its old schedule: make sure it can still find a driver.
         self.escalate_gig(rec, why)
 
