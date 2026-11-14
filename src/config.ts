@@ -52,7 +52,7 @@ export type Cfg = {
   trust: { perOrder: number; cap: number; anchorDealers: number; anchorReach30: number; anchorTierBonus: number }
   guards: { war: { minQuotes: number; minDealers: number; minPools: number; ratio: number; windows: number }; outage: { minQuotes: number; lift: number; add: number; capRatio: number }; until: number }
   offers: { reach30Trigger: number; openMinTrigger: number; warnMinBefore: number; relayRoadMin: number; activeKm: number; homeboundKm: number; feeMult: number; perDriverPerDay: number; reserveAfter: number; quietFrom: number; quietTo: number; costPt: number; ticketOut: number; ticketHome: number }
-  bundles: { chain?: boolean; sweepMinAge?: number; maxDriveMin: number; pairRoadMin: number; minSaving: number; feeMult: number } // bundle opening fee = (sum of the two single opening fees) x feeMult
+  bundles: { chain?: boolean; maxCars?: number; sweepMinAge?: number; maxDriveMin: number; pairRoadMin: number; minSaving: number; feeMult: number } // bundle opening fee = (sum of the two single opening fees) x feeMult
   triage: { sweepEveryMin: number; warmMinBefore: number }
 }
 

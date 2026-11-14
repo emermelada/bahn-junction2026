@@ -496,7 +496,7 @@ export class V2Desk implements Desk {
         if (!best || drive < best.drive) best = { gigId, partner, first, second, drive }
       }
     }
-    if (!best) return false
+    if (!best) return (this.cfg.bundles.maxCars ?? 2) >= 3 && this.tryExtend(order, exclude)
     const { gigId, partner, first, second } = best
     this.legGigs.get(partner.id)?.delete(0)
     this.outbox.push({ type: "withdraw", gigId })
@@ -515,6 +515,75 @@ export class V2Desk implements Desk {
     this.outbox.push(action)
     this.ctx.log?.({ at: this.now, kind: "bundle", orders: [first.id, second.id], drive: best.drive, base: Math.round(base), cliffAt })
     return true
+  }
+
+  /** 3-car chains (bundles.maxCars >= 3): append the new car to an open 2-car chain whose last delivery is near its
+   * pickup, or put it in front when its delivery is near the chain's first pickup; one driver, every pickup on time. */
+  tryExtend(order: Order, exclude?: string): boolean {
+    const B = this.cfg.bundles
+    let best: { gigId: string; seq: Order[]; drive: number } | null = null
+    for (const [gigId, ids] of this.bundleGigs) {
+      if (gigId === exclude || this.booked.has(gigId) || this.doomedGigs.has(gigId) || ids.length !== 2 || ids.includes(order.id)) continue
+      const chain = ids.map((id) => this.orders.get(id))
+      if (chain.some((o) => !o || o.legs.length !== 1 || this.urgent.has(o.id) || this.now >= o.lastPickupAt)) continue
+      const [c1, c2] = chain as Order[]
+      const action = this.posts.get(gigId)
+      if (!action || action.stops.some((st) => st.window || st.withPlates)) continue
+      for (const seq of [[c1!, c2!, order], [order, c1!, c2!]]) {
+        const drive = this.chainDrive(seq)
+        if (drive !== null && (!best || drive < best.drive)) best = { gigId, seq, drive }
+      }
+    }
+    if (!best) return false
+    const { gigId, seq } = best
+    this.bundleGigs.delete(gigId)
+    this.unmapGig(gigId)
+    this.outbox.push({ type: "withdraw", gigId })
+    const stopsOf = (o: Order) => withoutWindows(stopsFor(o, [0], this.requests.get(o.id)!.note, FIRST_TRY, this.factsOf(o)), this.now)
+    const base = seq.reduce((sum, o) => sum + this.fees.open(o, this.requests.get(o.id)!, 1), 0) * B.feeMult
+    // The cliff: the latest minute the first car can still go so that every later car is collected on time.
+    let cliffAt = seq[0]!.lastPickupAt
+    let lead = 0
+    for (let i = 1; i < seq.length; i++) {
+      const prev = seq[i - 1]!.legs[0]!
+      lead += this.geo.road(prev.pickup.placeId, prev.delivery.placeId) + this.geo.road(prev.delivery.placeId, seq[i]!.legs[0]!.pickup.placeId) + 15
+      cliffAt = Math.min(cliffAt, seq[i]!.lastPickupAt - lead - 30)
+    }
+    const action: PostAction = {
+      type: "post",
+      stops: seq.flatMap(stopsOf),
+      audience: { experienced: seq.some((o) => o.legs.some((l) => l.car.premium)), manualLicence: false },
+      schedule: this.fees.schedule(this.now, base, cliffAt),
+    }
+    this.bundlePosts.set(action, seq.map((o) => o.id))
+    this.outbox.push(action)
+    this.ctx.log?.({ at: this.now, kind: "bundle", orders: seq.map((o) => o.id), drive: best.drive, base: Math.round(base), cliffAt })
+    return true
+  }
+
+  /** Driving minutes of a chain of single cars in this order, or null when a short hop, the timing or the length fails. */
+  chainDrive(seq: Order[]): number | null {
+    const B = this.cfg.bundles
+    let drive = 0
+    let t = Math.max(this.now + this.cfg.gate.reachMarginMin, seq[0]!.legs[0]!.pickup.window.from)
+    const start = t
+    for (let i = 0; i < seq.length; i++) {
+      const o = seq[i]!
+      const leg = o.legs[0]!
+      if (t > o.lastPickupAt - 60) return null
+      const run = this.geo.road(leg.pickup.placeId, leg.delivery.placeId)
+      drive += run
+      t += run
+      const next = seq[i + 1]
+      if (next) {
+        const hop = this.geo.road(leg.delivery.placeId, next.legs[0]!.pickup.placeId)
+        if (hop > B.pairRoadMin) return null
+        drive += hop
+        t = Math.max(t + hop + 15, next.legs[0]!.pickup.window.from)
+      }
+    }
+    if (drive > B.maxDriveMin || t - start > 11 * 60) return null
+    return drive
   }
 
   /** Driving minutes of first then second, or null when one driver cannot collect both on time or it is too long. */
