@@ -502,6 +502,13 @@ class Desk:
             else:
                 prices["same_day"] = max(s, int(round(n / cfg.steer)))
             info.append(f"steer {s}/{n}->{prices['same_day']}/{prices['next_day']}")
+        if cfg.steer_w3d and "within_3_days" in prices and "next_day" in prices:
+            # Steer to within_3_days: due on the last Monday, when few of our gigs start and drivers are idle;
+            # our best class (98.5% on time, EUR 39/order). Dealers take a slower option only when clearly cheaper.
+            w, n = prices["within_3_days"], prices["next_day"]
+            lw = next(o["listPriceCents"] for o in r["options"] if o["kind"] == "within_3_days")
+            prices["within_3_days"] = min(w, max(int(round(n * cfg.steer_w3d)), int(lw * cfg.min_ratio)))
+            info.append(f"steer3 {w}->{prices['within_3_days']}")
         if cfg.slow_only_floor and prices and r["options"][0]["kind"] not in prices:
             # Without the dealer's fastest option we win about 0.32 at any price (36 k18 weeks, flat from
             # mu-0.2 to mu+0.25): the price barely moves the win, so quote at least mu + floor.
