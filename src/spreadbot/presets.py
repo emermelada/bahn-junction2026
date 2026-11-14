@@ -211,3 +211,9 @@ PRESETS["k-f1h5fP"] = PRESETS["k-f1h5f"] + ["fee1_clear=(0.2771,-0.0694,0.0153,-
 # + booking time by fee (PROBE: ~45% of cars unbooked at 6 h still book at the same fee; 18% of bookings come after 6 h at 0.85):
 # the re-pick no longer reads a 6 h miss as "fee below the clearing fee" (ARCHIVE: re-picked cars cost EUR 3.6-6 more).
 PRESETS["k-f1h5fPW"] = PRESETS["k-f1h5fP"] + ["fee1_window_fee=true"]
+# FLEET volume arms on the release k-f1h5f (Franco 21:35: highest mean on H1+H3, every week ranked):
+# V1: a car in one of our live pairs counts 0.6 in the day's load (RoutePulse: pairs = 1.45 driver slots, most of +23 orders/wk).
+PRESETS["k-f1h5fV1"] = PRESETS["k-f1h5f"] + ["load_bundle_w=0.6"]
+# V2: + the load barrier at the measured knee (fee/typ flat to day load 0.12, late 4-5% to 0.12): c3g +944/+868/+1,057 on the three
+# tuning sets; killed then for one week at 0.914 without long_warn/desert guards, which this stack has.
+PRESETS["k-f1h5fV2"] = PRESETS["k-f1h5fV1"] + ["load_free=0.12", "load_slope=2"]
