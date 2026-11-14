@@ -381,3 +381,8 @@ PRESETS["v5S-P2s"] = PRESETS["v5S"] + ["v5_pair2=true", "v5_pair2_hub=40", "v5_p
 # ARCHIVE's autopsy of v5S (c_single_autopsy.out): re-posts with >= 24 h to the deadline cost EUR 776/wk over typical (re-pick 1.15x,
 # drop 1.22x). Cap them at max(1.0, previous fee) while >= 24 h remain; the climb (and the alarm) only inside 24 h.
 PRESETS["v5S-RC"] = PRESETS["v5S"] + ["fee1_repost_cap=24"]
+# v5S-RCg (Franco 00:00): the re-post cap only where the harsh-week holdout failures cannot come from: scarcity switch off (detect-only:
+# Franco's z (z_fee+z_warn)/sqrt2 >= 2.5 from Tue 24:00, early tier sum >= 8 from Mon 12:00; no other scarce effect in v5S), drive < 4 h,
+# not a desert delivery, P(on time) at the win >= 0.97. Gate thresholds: ARCHIVE's split of RC vs v5S (non-holdout) may move them.
+RCG_SWITCH = ["scarcity=(9.0,9.0)", "scarcity_z=(1.002,0.044,0.037,0.029,3.536,8.0,720)"]
+PRESETS["v5S-RCg"] = PRESETS["v5S"] + ["fee1_repost_cap=24", "fee1_repost_gate=(1,240,1,0.97)"] + RCG_SWITCH

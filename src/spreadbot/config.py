@@ -267,6 +267,7 @@ class Config:
     fee1_window_fee: bool = False      # booking-time profile by fee (low fees book later: a 6 h miss is weak evidence; PROBE forks)
     fee1_after_ladder: bool = False    # a fee1 gig unbooked at its re-pick time joins the old ladder in place instead of a new post
     fee1_repost_cap: int = 0           # hours: a fee1 re-post with at least this long to the last pickup pays at most max(1.0, its previous fee) (0 = off)
+    fee1_repost_gate: tuple = ()       # (scarce_off 0/1, max drive min, no_desert 0/1, min P(on time) at the win): where fee1_repost_cap applies (() = everywhere)
     fee1_long_ladder: bool = False     # long cars (fee1_long[0]) are not fee1 cars at all: the opening + ladder as before
     fee1_last_call: int = 0            # minutes before our alarm: a fee1 car still unbooked gets one more new post at a safe fee (0 = off)
     fee1_harm: float = 1.0             # weight of the harm a fee above the going fee does to our other waiting gigs (0 = off; Halal: -EUR 2,967/wk without)

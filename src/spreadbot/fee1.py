@@ -92,6 +92,25 @@ class Fee1:
                     ids.append(gid)
         return near
 
+    def repost_gate(self, ob: "OrderBook", legs: list[int], desert: bool) -> bool:
+        """fee1_repost_gate (scarce_off, max_drive, no_desert, min_p_ok): where the re-post cap may apply. v5S-RC failed the holdouts
+        on harsh weeks only (H1 dev-65 0.892, H3 nf-04 0.890, nf-04 jitter 6/9): keep the cap out of scarce weeks (the z switch's
+        flag), long cars, desert deliveries and cars whose P(on time) at the win was low. () = everywhere."""
+        g = self.desk.cfg.fee1_repost_gate
+        if not g:
+            return True
+        scarce_off, max_drive, no_desert, min_p_ok = g
+        d = self.desk
+        if scarce_off and getattr(d, "scarce", False):
+            return False
+        if max_drive:
+            o = ob.order
+            if sum(d.geo.drive(o["legs"][l]["pickup"]["placeId"], o["legs"][l]["delivery"]["placeId"]) for l in legs) >= max_drive:
+                return False
+        if no_desert and desert:
+            return False
+        return ob.p_ok >= min_p_ok
+
     def prev_fee(self, oid: str, legs: list[int], base: float) -> Optional[float]:
         """First fee (x typical) of the latest earlier single gig of these legs, or None for a first post."""
         best = None
@@ -182,7 +201,7 @@ class Fee1:
             return None  # narrow fee1: only cars with time and drivers near the delivery (where its cheap fees are); the rest keep the ladder
         floor = self.floor(ob, legs, desert)
         grid = [m for m in cfg.fee1_grid if m >= floor] or [max(cfg.fee1_grid)]
-        if cfg.fee1_repost_cap and last - d.now >= cfg.fee1_repost_cap * 60:
+        if cfg.fee1_repost_cap and last - d.now >= cfg.fee1_repost_cap * 60 and self.repost_gate(ob, legs, desert):
             prev = self.prev_fee(ob.order["id"], legs, base)
             if prev is not None:
                 # A re-post (re-pick or after a drop) with >= fee1_repost_cap hours left pays at most max(1.0, its previous fee): the
