@@ -107,3 +107,17 @@ Rejected around b1 (each worse on its first 1–5 seeds): long next_day reopened
 More rejected around b1 (Sat ~07:30): shadow cost €5 per car (b17: −€1,335 / +€9 / −€1,175), shadow cost €10 + long next_day (b16: mean €8,813 vs €9,392 — +€1.5k and +€1.0k on v2-g1 / spread-1, −€1–2k on the three tighter worlds), shadow cost €15 + long next_day (b18: −€868 / −€3,908), long next_day only while the late budget has room (b19: v2-g4 €4,721 at 91.6% — the governor sees lateness only at delivery, a day too late). Stride vs the live final loop on the same seed: €8,166 vs €8,238 — the real-time loop loses nothing.
 
 Margin per order by drive band (b1, 15 seeds, chain fees split by typical fee): <1 h €16, 1–2 h €26, 2–4 h €36, 4 h+ €54 — about 0.45 x list everywhere; fee/list 0.84–0.97, revenue/list 1.37. The long lanes we still decline would pay, but in the tight worlds they take a driver's whole day and the same-day cars go late (b6/b16/b19 late orders were mostly same_day, not the long ones).
+
+## Session 3 (Sat 09:20–10:20): ideas from public Spread repos, on b1 (gate seeds, paired)
+
+Correction to commit 55474b6: only c1, c2, c3, c6 and c11 ran on all five gate seeds; c4, c5, c7, c8, c9, c10, c12, c13 were never measured (network drop, then the team moved to the v1 bot). All five that ran lost to b1 (mean €9,391):
+
+| Arm | Change | Mean | vs b1 | Better | Worst on time |
+|---|---|---|---|---|---|
+| c2 | hold gigs to 36 h before last pickup + fee ladder (open 0.9; 1.05/1.25/1.55/2.0 at 24/16/10/6 h) | €7,157 | −2,235 | 0/5 | 94.0% |
+| c1 | hold 36 h, our own fees | €8,141 | −1,251 | 1/5 | 92.8% |
+| c3 | fee ladder alone | €8,326 | −1,066 | 1/5 | 92.3% |
+| c6 | fitted P(late) priced into quotes (shadow €80, late cost 0.3 x price) | €8,531 | −860 | 0/5 | 94.0% |
+| c11 | c6 + long next_day, batch cap and pool brake off | €9,133 | −258 | 3/5 | 87.3% (unranked) |
+
+Offline: per-town competitor price offsets do not transfer between worlds (229 runs, seed-half correlation 0.07–0.29), so no persistent lane table. P(late) logistic on 59,696 won orders: held-out AUC 0.69, 0.72 with our own unbooked backlog within 30 km of the pickup (coef +0.52 per ln(1+cars)).
