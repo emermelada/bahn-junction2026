@@ -333,3 +333,9 @@ PRESETS["k-f1h5f-lw5z"] = PRESETS["k-f1h5f"] + ["long_warn=(240,5,1440)"] + SWZ 
 # from Tue 24:00; the bold arm sits on v5La and falls back to v5La's knobs.
 SWZ2 = ["scarcity=(9.0,9.0)", "scarcity_z=(1.002,0.044,0.037,0.029,2.5,8.0,720)"]
 PRESETS["v5La-lw5z2"] = PRESETS["v5La"] + ["long_warn=(240,5,1440)"] + SWZ2 + ["scarce_set=(('long_warn',(240,3,1440)),)"]
+# ARCHIVE: RoutePulse's climbing pair fee on v5La. Our pairs book at once at the 0.84 opening (59% within 10 min, 95% at the opening);
+# a low first step catches the instant bookers cheaper and is back at 0.84 within ~75-110 min (research/re/archive/c_pairbook.py).
+PRESETS["v5La-pc1"] = PRESETS["v5La"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0.80))"]
+PRESETS["v5La-pc2"] = PRESETS["v5La"] + ["bundle_climb=((0,0.60),(27,0.67),(54,0.74),(81,0.80))"]
+# The barrier's other direction: v5La96 (target 0.96) lost -202 with 14 fewer orders; 0.95 lets more volume through it.
+PRESETS["v5La95"] = PRESETS["v5aV2"] + ["late_barrier=(0.95,300,4,20)"]
