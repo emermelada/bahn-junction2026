@@ -1175,10 +1175,18 @@ class Desk:
             self._near_q[key] = sum(c for h, c in sorted(self.home_count.items()) if self.geo.drive(place, h) <= minutes)
         return self._near_q[key]
 
+    def desert(self, place: str) -> bool:
+        """A delivery town the shortage emptied: fewer than desert_n drivers live within 60 road minutes (dev-46: 21% of won cars,
+        twice as late in every policy; research/re/drivers/DEV46.md)."""
+        return bool(place) and self.home_near_delivery(place, 60) < self.cfg.desert_n
+
     def open_rule(self, ob: OrderBook, legs: list[int], last: int, default: float) -> float:
         """Opening fee by time to the last pickup and drivers living near the delivery (cheap to move: they need no trip home)."""
         left = (last - self.now) / HOUR
-        nd = self.home_near_delivery(ob.order["legs"][legs[-1]]["delivery"]["placeId"])
+        q = ob.order["legs"][legs[-1]]["delivery"]["placeId"]
+        if self.cfg.desert_n and self.desert(q):
+            return default  # no cut where nobody lives near the delivery
+        nd = self.home_near_delivery(q)
         for hours, n, mult in self.cfg.fee_open_rule:
             if left >= hours and nd >= n:
                 return mult
@@ -1512,7 +1520,10 @@ class Desk:
                 ob = self.orders.get(rec.legs[0][0])
                 if len({o for o, _ in rec.legs}) > 1 and all(o in self.bundle_soon for o, _ in rec.legs):
                     continue  # a short-notice chain splits by its own clock (tick above)
-                if ob and self.last_pickup(ob, [l for _, l in rec.legs]) - self.now < self.cfg.alarm_minutes:
+                alarm = self.cfg.alarm_minutes
+                if self.cfg.desert_n and ob and self.desert(self.stop_place(rec.stops[-1]) or ""):
+                    alarm = max(alarm, self.cfg.desert_alarm)  # few drivers live near this delivery: escalate while there is time
+                if ob and self.last_pickup(ob, [l for _, l in rec.legs]) - self.now < alarm:
                     ob.urgent = True
                     self.escalate_gig(rec, "alarm")
         if self.cfg.viewer_offers:

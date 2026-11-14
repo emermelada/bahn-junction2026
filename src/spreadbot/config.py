@@ -103,6 +103,9 @@ class Config:
                                        # 0.95 openings pay 0.96-0.98 vs 1.05-1.06 with slack > 24 h (988k gigs, research/re/drivers/gigs.py)
     stop_windows: bool = False         # pickup window ends at the car's last pickup, delivery window at deadline - stop_margin
     stop_margin: int = 60              # (Halal / jaffa: failed visits 10.6 -> 0, deliveries >24 h late fixed)
+    desert_n: int = 0                  # a delivery town with fewer drivers living <= 60 road min is a desert: no fee_open_rule cut and the own
+                                       # alarm at desert_alarm (0 = off). dev-46: 21% of won cars, ~2x late in every policy (DEV46.md)
+    desert_alarm: int = 720            # minutes before the last pickup: escalate a desert car this early (others: alarm_minutes)
     fee_hold: int = 45                 # minutes the opening fee shows before any raise
     fee_rel: tuple = ((8, 1.25), (5, 1.6))   # (hours before lastPickupAt, fee over typical fee)
     fee_plan: tuple = ((0.0, 0.95), (0.15, 1.15), (0.4, 1.45), (0.7, 1.85))  # (share of slack, fee over typical fee)
