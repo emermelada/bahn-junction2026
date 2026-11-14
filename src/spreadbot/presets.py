@@ -75,3 +75,4 @@ PRESETS["k-s1"] = PRESETS["k-load"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))
 PRESETS["k-s2"] = PRESETS["k-s1"] + ["load_free_mon2=0.15"]
 # d-fee2's 0.85 where >= 80 drivers live near the delivery: 1 warned of ~60 such gigs; its 0.9 elsewhere drove dev-46 to 0.917.
 PRESETS["d-fee5"] = PRESETS["c3g"] + ["fee_open_rule=((24,80,0.85),(24,0,0.92),(12,80,0.95))"]
+PRESETS["d-fee2r"] = PRESETS["d-fee2"] + ["relook_minutes=90", "relook_mult=1.05"]  # deeper openings with d-feer's guard
