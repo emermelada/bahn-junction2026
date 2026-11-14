@@ -90,6 +90,10 @@ class Config:
     cap_max: float = 1.4
     load_flat_cents: int = 0           # load cost per car in cents (every car counts the same for the gate); 0 = one typical fee
     load_slope: float = 1.0            # extra cost, in typical fees, per 0.05 of load above load_free
+    load_desert_n: int = 0             # cars delivering where <= this many drivers live within 60 road min keep the full load charge
+                                       # (0 = off): the stacks' extra late cars on dev-46 are cars c3g also won, starved by extra long
+                                       # drives into such towns (21% of won cars that week vs ~35 cars in a median week; drivers/DEV46.md)
+    load_desert_slope: float = 1.0     # their load_slope (c3g's)
     # --- fees
     fee_mode: str = "relative"         # "span": fee_plan over the slack; "relative": fee_rel anchored to lastPickupAt
     fee_open: float = 1.05              # 12/12 ranked, min on-time 0.919 vs 11/12, 0.896 at 0.95 (v1v vs v1p, 12 seeds)

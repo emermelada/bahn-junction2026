@@ -489,7 +489,11 @@ class Desk:
             load = self.due_load(dday)
             free = cfg.load_free_mon2 if (cfg.load_free_mon2 and dday >= 7) else cfg.load_free
             per_car = cfg.load_flat_cents if cfg.load_flat_cents else r["referenceFeeCents"]
-            load_cost = cfg.load_slope * per_car * max(0.0, load - free * self.capacity_factor()) / 0.05
+            slope = cfg.load_slope
+            if cfg.load_desert_n and self.home_near_delivery(r["legs"][-1]["delivery"]["placeId"], 60) <= cfg.load_desert_n:
+                # Few drivers live near the delivery: an extra car there takes one of the few drivers our other cars need.
+                free, slope = cfg.load_free, cfg.load_desert_slope
+            load_cost = slope * per_car * max(0.0, load - free * self.capacity_factor()) / 0.05
             risk_frac = (1 - p_ok) * cfg.late_cost_frac * self.pl_factor(drive)
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain) + cfg.trust_loss_w * (1 - p_ok) * t_loss

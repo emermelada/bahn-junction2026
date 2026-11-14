@@ -92,3 +92,6 @@ PRESETS["k-s3d"] = PRESETS["k-s3"] + GATE
 PRESETS["c3gd"] = PRESETS["c3g"] + GATE
 # Stronger guard: the projection is up to +0.02..0.03 optimistic (projerr.py), so start diluting under 0.955, full bonus at 0.925.
 PRESETS["k-s3e"] = PRESETS["k-s3"] + ["gate_bonus_cents=4000", "gate_target=0.955", "gate_span=0.03", "gate_safe_p=0.95"]
+# k-s3 + full load charge for cars delivering where <= 10 drivers live within 60 road min (re-drivers' DEV46.md: the stacks starve
+# the cars c3g also won by adding long drives into such towns).
+PRESETS["k-s3x"] = PRESETS["k-s3"] + ["load_desert_n=10"]
