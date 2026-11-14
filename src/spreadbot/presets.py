@@ -333,3 +333,7 @@ PRESETS["k-f1h5f-lw5z"] = PRESETS["k-f1h5f"] + ["long_warn=(240,5,1440)"] + SWZ 
 # from Tue 24:00; the bold arm sits on v5La and falls back to v5La's knobs.
 SWZ2 = ["scarcity=(9.0,9.0)", "scarcity_z=(1.002,0.044,0.037,0.029,2.5,8.0,720)"]
 PRESETS["v5La-lw5z2"] = PRESETS["v5La"] + ["long_warn=(240,5,1440)"] + SWZ2 + ["scarce_set=(('long_warn',(240,3,1440)),)"]
+# Franco's fast-track spec (FLEET): combined_z = (z_fee + z_warn) / sqrt(2) >= 2.5, i.e. z_fee + z_warn >= 3.536, sticky for the week;
+# safe mode = v5La's knobs. Kept the early tier (sum >= 8 from Mon 12:00): without it the flip came at Tue 24:00, too late on nf-04.
+SWZF = ["scarcity=(9.0,9.0)", "scarcity_z=(1.002,0.044,0.037,0.029,3.536,8.0,720)"]
+PRESETS["v5La-lw5zF"] = PRESETS["v5La"] + ["long_warn=(240,5,1440)"] + SWZF + ["scarce_set=(('long_warn',(240,3,1440)),)"]
