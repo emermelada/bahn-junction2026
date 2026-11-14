@@ -180,3 +180,6 @@ PRESETS["k-safe-kmh"] = PRESETS["k-safe"] + ["bundle_km=50", "hold_minutes=120",
 # k-safe-dc + re-drivers' long_split: a pair with >= 6 h of driving still unbooked 3 h after posting goes out as singles
 # (long pairs carry 4.4 of 20.5 warned singles a week; k-safe-ls vs k-safe: +540/+220, worst 0.960/0.948 vs 0.942).
 PRESETS["k-safe-dcls"] = PRESETS["k-safe-dc"] + ["long_split=(360,180)"]
+# FLEET v4: one fee per single gig chosen by a booking model (fee1.py + book_gbm.py) instead of the opening + raises + relook;
+# re-pick as a new post after 6 h; the alarm's steep rescue kept. Target: lone cars 1.08x -> <= 0.97x typical at the same on-time.
+PRESETS["k-f1"] = PRESETS["k-safe-dcl"] + ["fee1=true"]

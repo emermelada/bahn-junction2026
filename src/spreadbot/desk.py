@@ -144,10 +144,22 @@ class Desk:
         self.gov_logged = -1
         self.warned: set[str] = set()  # orders that had a deadline warning
         self._strict_cfg: Optional[Config] = None
+        self._fee1 = None  # Fee1 engine (fee1.py), built on first use when cfg.fee1
 
     # ------------------------------------------------------------------ helpers
     def say(self, code: str, detail: str = "") -> None:
         self.log.append(f"{self.now}\t{code}\t{detail}")
+
+    @property
+    def fee1(self):
+        if self._fee1 is None:
+            from .fee1 import Fee1
+            self._fee1 = Fee1(self)
+        return self._fee1
+
+    def fee1_gig(self, rec: "GigRec") -> bool:
+        """A gig on one fee chosen by fee1: one order, a one-step schedule, not escalated (stateless, so it survives a restart)."""
+        return bool(self.cfg.fee1) and not rec.escalated and len(rec.schedule) == 1 and len({o for o, _ in rec.legs}) == 1
 
     def supply_near(self, place: str, radius: float = 30.0) -> int:
         return sum(c for p, c in self.home_count.items() if self.geo.air(p, place) <= radius)
@@ -269,6 +281,8 @@ class Desk:
     def on_gig_booked(self, e: dict) -> None:
         rec = self.gigs.get(e["gigId"])
         if rec:
+            if rec.status == "open" and self.fee1_gig(rec):
+                self.fee1.close(rec, True, e["at"])
             rec.status, rec.driver, rec.fee = "booked", e["driverId"], e["feeCents"]
             t0 = self.first_posts.pop(rec.id, None)
             if t0 is not None:
@@ -1237,6 +1251,19 @@ class Desk:
             return dedupe([{"at": now + int(h * HOUR), "feeCents": max(1, int(round(base * m)))} for h, m in cfg.late_plan])
         if ob.urgent or last - now < 2 * HOUR:
             return steep(now, base, cfg, plan=self.steep_plan_now(ob))
+        if cfg.fee1:
+            try:
+                q = ob.order["legs"][legs[-1]]["delivery"]["placeId"]
+                pick = self.fee1.choose(ob, legs, last, base, bool(cfg.desert_n and self.desert(q)))
+            except Exception as exc:  # the model must never stop a post: fall back to the ladder
+                self.say("ERR", f"fee1 {type(exc).__name__}: {exc}")
+                pick = None
+            if pick:
+                m, why = pick
+                oid = ob.order["id"]
+                self.fee1.picks[oid] = self.fee1.picks.get(oid, 0) + 1
+                self.say("FEE1", f"{oid} {why}")
+                return [{"at": now, "feeCents": max(1, int(round(base * m)))}]
         if cfg.fee_mode == "relative":
             # Steps anchored to lastPickupAt: hold the opening fee while there is time, raise as the pickup nears.
             # The opening fee always shows for at least fee_hold minutes: most views come in the first minutes.
@@ -1381,6 +1408,8 @@ class Desk:
         cur = current_fee(rec.schedule, self.now)
         if self.cfg.late_plan and self.is_late(ob, [l for _, l in legs]):
             return
+        if self.fee1_gig(rec):
+            self.fee1.close(rec, False, self.now)
         sched = steep(self.now, base, self.cfg, floor=cur, plan=self.steep_plan_now(ob))
         rec.schedule = sched
         rec.escalated = True
@@ -1642,6 +1671,8 @@ class Desk:
                         self.withdraw(rec.id)
         if self.cfg.relook_minutes:
             self.relook()
+        if self.cfg.fee1 and self.cfg.fee1_repick:
+            self.fee1_repick()
         if self.cfg.offer_home_n:
             self.offer_home()
         if self.cfg.view_raise_n:
@@ -1688,6 +1719,8 @@ class Desk:
             rec = self.gigs[gid]
             if rec.status != "open" or rec.escalated or rec.relooked or len({o for o, _ in rec.legs}) != 1:
                 continue
+            if self.fee1_gig(rec):
+                continue  # one fee: a re-pick is a new post (fee1_repick), not a raise nobody is notified of
             if self.now - rec.posted_at < cfg.relook_minutes:
                 continue
             ob = self.orders.get(rec.legs[0][0])
@@ -1704,6 +1737,28 @@ class Desk:
             rec.schedule = dedupe([{"at": self.now, "feeCents": fee}] + later)
             self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": rec.schedule})
             self.say("RELOOK", f"{rec.id} {ob.order['id']} sat {self.now - rec.posted_at} min {cur}->{fee}")
+
+    def fee1_repick(self) -> None:
+        """A fee1 gig unbooked for fee1_repick minutes: withdraw it; the next tick posts the car again at a new choice. A new post
+        notifies drivers again (~10 views in 30 min); a raise reaches ~1 (research/mechanics/MECHANICS.md). Posting in the next tick,
+        not in this flush, keeps a withdraw that loses to a booking from posting the car twice."""
+        cfg = self.cfg
+        for gid in sorted(self.gigs):
+            rec = self.gigs[gid]
+            if rec.status != "open" or not self.fee1_gig(rec) or self.now - rec.posted_at < cfg.fee1_repick:
+                continue
+            oid = rec.legs[0][0]
+            ob = self.orders.get(oid)
+            if not ob or ob.urgent or self.fee1.picks.get(oid, 0) >= cfg.fee1_max_posts:
+                continue
+            legs = [l for _, l in rec.legs]
+            q = ob.order["legs"][legs[-1]]["delivery"]["placeId"]
+            alarm = max(cfg.alarm_minutes, cfg.desert_alarm) if (cfg.desert_n and self.desert(q)) else cfg.alarm_minutes
+            if self.last_pickup(ob, legs) - alarm - self.now < cfg.fee1_min_minutes:
+                continue  # too close to the alarm for another choice: it rides to the alarm's steep fees
+            self.fee1.close(rec, False, self.now)
+            self.say("FEE1_REPICK", f"{gid} {oid} sat {self.now - rec.posted_at} min at {rec.schedule[0]['feeCents']}")
+            self.withdraw(gid)
 
     def offer_home(self) -> None:
         """Direct offers to drivers who live near a gig's delivery but too far from its pickup to be notified: the trip home
