@@ -207,6 +207,9 @@ class Desk:
         q = self.quoted.get(rid, {})
         if not r or not q or self.cfg.experiment_quote:
             return
+        fastest = r["options"][0]
+        if self.cfg.learn_fastest and not (fastest["kind"] in q and q[fastest["kind"]] < 3 * fastest["listPriceCents"]):
+            return  # a loss here says the dealer wanted speed, not that our price was high
         ratios = [q[o["kind"]] / o["listPriceCents"] for o in r["options"] if o["kind"] in q and q[o["kind"]] < 3 * o["listPriceCents"]]
         if ratios:
             self.market.observe(at, r["dealerId"], min(ratios) / self.trust_factor(r["dealerId"]), won, r["legs"][0]["pickup"]["placeId"], lane_of(r))

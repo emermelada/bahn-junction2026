@@ -17,6 +17,8 @@ class Config:
     lane_w: float = 0.0                # weight of the cross-world lane table (Javier's lanes.json) in the competitor level
     max_per_batch: int = 0             # decline once we hold this many orders from one batch (a yard sending many cars)
     place_lr: float = 0.0              # per (pickup place, day) shift, spread over 80 km: the outage (0 = off)
+    learn_fastest: bool = False        # learn the competitor only from requests where we quoted the fastest option: with only a slower
+                                       # option quoted the dealer often wants speed (win 0.31 vs 0.52 at the same ratio, 16,818 quotes), which drags mu down
     dealer_lr: float = 0.006           # per dealer: the competitor cuts where we win most
     min_ratio: float = 1.00            # never quote under list
     max_ratio: float = 1.80
