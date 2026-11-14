@@ -146,6 +146,7 @@ class Desk:
         self.warned: set[str] = set()  # orders that had a deadline warning
         self._strict_cfg: Optional[Config] = None
         self._fee1 = None  # Fee1 engine (fee1.py), built on first use when cfg.fee1
+        self._vol_off = False  # vol_guard tripped: no extra volume for the rest of the week
 
     # ------------------------------------------------------------------ helpers
     def say(self, code: str, detail: str = "") -> None:
@@ -681,10 +682,28 @@ class Desk:
         rate = (sum(done) + 0.7 * 10) / (len(done) + 10)
         return min(self.cfg.cap_max, max(self.cfg.cap_min, rate / 0.7))
 
+    def volume_ok(self) -> bool:
+        """vol_guard (min orders, warned share, fee/typical): the week is not spiralling. Once 'warned share' of our orders had a
+        deadline warning, or our last 60 bookings paid 'fee/typical' on average, extra volume stops for the rest of the week (sticky).
+        nf-04-type weeks (warned 21%, fee 1.30x) tipped under 0.90 with every volume arm; normal weeks stay <= 5.7% / 1.06x by Thursday."""
+        g = self.cfg.vol_guard
+        if not g:
+            return True
+        if self._vol_off:
+            return False
+        n_min, w_max, f_max = g
+        if self.won_count >= n_min:
+            xs = self.book_ratios[-60:]
+            if len(self.warned) / max(1, self.won_count) >= w_max or (len(xs) >= 30 and sum(xs) / len(xs) >= f_max):
+                self._vol_off = True
+                self.say("VOL_OFF", f"warned {len(self.warned)}/{self.won_count}, fee/typ {sum(xs) / max(1, len(xs)):.2f}: no extra volume this week")
+                return False
+        return True
+
     def due_load(self, day: int) -> float:
         """Our orders due on this day (won, not cancelled), over the number of drivers in the world."""
         n = self.due_count.get(day, 0)
-        if self.cfg.load_bundle_w < 1.0:
+        if self.cfg.load_bundle_w < 1.0 and self.volume_ok():
             chained = 0
             for rec in self.gigs.values():
                 oids = {o for o, _ in rec.legs}

@@ -231,3 +231,6 @@ PRESETS["k-f1h5fV1b"] = PRESETS["k-f1h5fV1"] + ["load_bundle_booked=true"]
 PRESETS["k-f1h5fV1p"] = PRESETS["k-f1h5fV1"] + ["bundle_km=50", "hold_minutes=120", "hold_lead=360"]
 # Coarse fee1 grid as a safety margin (Halal: a finer grid cost -624/wk, "the coarse steps act as a safety margin"; ARCHIVE suggestion).
 PRESETS["k-f1h5fG"] = PRESETS["k-f1h5f"] + ["fee1_grid=(0.85,1.0,1.15,1.3,1.5)"]
+# V1 with a spiral switch: the pair weight stops for the week once 6% of our orders were warned or our last 60 bookings averaged
+# 1.10x typical (V1 tipped H3 nf-04, warned 21%, fee 1.30x, to 0.875; normal weeks <= 5.7% / 1.06x through Thursday noon).
+PRESETS["k-f1h5fV1g"] = PRESETS["k-f1h5fV1"] + ["vol_guard=(60,0.06,1.10)"]

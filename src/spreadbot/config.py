@@ -198,6 +198,7 @@ class Config:
     bundle_soon_slack: int = 180       # such a chain needs this long before its last start, and splits this long before it
     load_bundle_w: float = 1.0         # a car in one of our live chains counts this much in the day's load (one driver moves two)
     load_bundle_booked: bool = False   # load_bundle_w only for pairs a driver holds: an open pair may still split into two lone cars
+    vol_guard: tuple = ()              # (min orders, warned share, fee/typical of the last 60 bookings): extra volume (load_bundle_w) stops for the week once either is reached (() = off)
     bundle_rel: tuple = ()             # ((hours before the chain's last start, fee as a share of the two typical fees), ...); () = fee_rel on the bundle fee
     hold_minutes: int = 0              # hold a won car up to this long, unposted, to find a chain partner (0 = post at once)
     hold_lead: int = 12 * 60           # post a held car at the latest this long before its pickup window opens
