@@ -267,3 +267,5 @@ PRESETS["v5La-pc1"] = PRESETS["v5La"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0
 PRESETS["v5La-pc2"] = PRESETS["v5La"] + ["bundle_climb=((0,0.60),(27,0.67),(54,0.74),(81,0.80))"]
 # The barrier's other direction: v5La96 (target 0.96) lost -202 with 14 fewer orders; 0.95 lets more volume through it.
 PRESETS["v5La95"] = PRESETS["v5aV2"] + ["late_barrier=(0.95,300,4,20)"]
+# pc1b: pc1's 0.68 start, back at the usual 0.84 by +50 min (pc1: +75): pc1 split 27% vs 23% and instant bookings 34% vs 59% (c_pairdrop.py).
+PRESETS["v5La-pc1b"] = PRESETS["v5La"] + ["bundle_climb=((0,0.68),(25,0.76))"]
