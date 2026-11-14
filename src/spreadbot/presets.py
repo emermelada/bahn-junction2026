@@ -192,3 +192,6 @@ PRESETS["k-f1h"] = PRESETS["k-f1"] + ["quote_cost_hold=1.05"]
 PRESETS["k-f1h5"] = PRESETS["k-f1h"] + ["fee1_long=(240,1.0)", "fee1_last_call=150", "fee1_rel_share=0.05"]
 PRESETS["k-f1h5f"] = PRESETS["k-f1h5"] + ["quote_cost_floor=true"]  # MARKET: quote cost = max(1.05, cost_mult): fee1 savings only stop the fall below 1.05
 PRESETS["k-f1h5e"] = PRESETS["k-f1h5"] + ["quote_cost_equiv=1.0"]  # MARKET: the quote as under the old fleet (bookings 1.00x), fee1 savings stay margin
+# MARKET: load_slope 0.5 lifted every weak tuning week (+200..+1,700, p10 +457) but failed H1 through lateness (dev-65 0.900, worst on k-safe-dcl
+# 0.909); k-f1h5f's H1 worst on-time is 0.942: try the volume on the safer stack.
+PRESETS["k-f1h5f-ls"] = PRESETS["k-f1h5f"] + ["load_slope=0.5"]
