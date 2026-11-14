@@ -123,14 +123,22 @@ class Planner:
         last = last_start // DAY
         return [d for d in range(first, last + 1) if d * DAY + 8 * HOUR <= last_start or d == first]
 
-    def planned_day(self, r: dict, deadline: int) -> int:
-        days = self.feasible_days(r["legs"], r["respondBy"], deadline)
-        region = self.supply.region(r["legs"][0]["pickup"]["placeId"])
-        if not days:
-            return deadline // DAY
+    def pick_day(self, region: str, days: list[int], hours: float) -> int:
+        """The day among `days` whose utilisation after this car is lowest (ties -> the earlier day). The deadline day is
+        dropped when another day is feasible (a day of slack), and days with almost no driver-hours (weekends) are used
+        only when nothing else is."""
         if len(days) > 1:
             days = days[:-1]
-        return min(days, key=lambda d: (round(self.lam(region, d), 0), d))
+        live = [d for d in days if self.supply.hours(region, d) >= self.cfg.v2_min_day_hours]
+        days = live or days
+        cap = {d: max(1.0, self.supply.hours(region, d)) for d in days}
+        return min(days, key=lambda d: (round((self.hours_planned[(region, d)] + self.hours_future[(region, d)] + hours) / cap[d], 2), d))
+
+    def planned_day(self, r: dict, deadline: int) -> int:
+        days = self.feasible_days(r["legs"], r["respondBy"], deadline)
+        if not days:
+            return deadline // DAY
+        return self.pick_day(self.supply.region(r["legs"][0]["pickup"]["placeId"]), days, self.hours_of(r))
 
     def has_partner(self, r: dict, day: int) -> bool:
         """A planned simple car on that day whose delivery is near this request's pickup, or the reverse: one driver could
@@ -209,10 +217,7 @@ class Planner:
             if not days:
                 self.unplanned.append(oid)
                 days = [max(today, deadline // DAY)]
-            if len(days) > 1:
-                days = days[:-1]  # keep a day of slack: a pickup on the deadline day has no room for a drop or a slow site
-            cap = {d: max(1.0, self.supply.hours(region, d)) for d in days}
-            day = min(days, key=lambda d: (round(self.hours_planned[(region, d)] / cap[d], 1), d))
+            day = self.pick_day(region, days, hours)
             self.hours_planned[(region, day)] += hours
             self.day_of[oid] = day
         # 3. chains per (region, day): nearest-end greedy
@@ -264,14 +269,9 @@ class Planner:
             for d in range(today, 5):
                 groups = demand.expected(region, d, now) if demand is not None else []
                 for e in groups:
-                    days = [x for x in range(d, e.deadline_day + 1) if x <= 7]
-                    if len(days) > 1:
-                        days = days[:-1]
-                    if not days:
-                        days = [e.deadline_day]
-                    cap = {x: max(1.0, self.supply.hours(region, x)) for x in days}
-                    day = min(days, key=lambda x: (round((self.hours_planned[(region, x)] + self.hours_future[(region, x)]) / cap[x], 1), x))
-                    self.hours_future[(region, day)] += e.n_cars * (e.mean_drive_min + cfg.v2_handling_min) / 60.0
+                    days = [x for x in range(d, e.deadline_day + 1) if x <= 7] or [e.deadline_day]
+                    hours = e.n_cars * (e.mean_drive_min + cfg.v2_handling_min) / 60.0
+                    self.hours_future[(region, self.pick_day(region, days, hours))] += hours
 
 
 # ---------------------------------------------------------------------- stubs until supply.py / fees.py land

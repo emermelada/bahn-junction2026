@@ -53,6 +53,7 @@ class Config:
     v2_lam_eur: float = 20.0           # EUR per driver-hour at utilisation 2 x free: a car of 3 h pays EUR 60 when the day is half over its free share
     v2_lam_free: float = 0.5           # utilisation under which a driver-hour is free (idle hours cost nothing)
     v2_lam_max: float = 150.0          # cap on lam, EUR per hour: above this the car is in effect declined
+    v2_min_day_hours: float = 5.0      # a day with fewer driver-hours than this (weekends) takes a car only when no other day can
     v2_handling_min: int = 30          # minutes per car beyond driving: pickup, plates, delivery
     v2_chain_hours: float = 12.0       # RULES: a driver's day is at most 12 h of driving
     v2_chain_cars: int = 3             # cars per chain
