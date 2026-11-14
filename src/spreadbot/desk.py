@@ -158,6 +158,7 @@ class Desk:
         self.won_log: list[int] = []  # minutes of our wins (scarcity)
         self.admitted: set[str] = set()  # requests quoted by safe_admit
         self.admits: dict[int, int] = defaultdict(int)  # day of quote -> safe_admit quotes (rebuilt by the replay of price requests)
+        self._vol_off = False  # vol_guard tripped: no extra volume for the rest of the week
 
     # ------------------------------------------------------------------ helpers
     def say(self, code: str, detail: str = "") -> None:
@@ -819,14 +820,32 @@ class Desk:
             self._brake_at = self.now
         return self._brake_x
 
+    def volume_ok(self) -> bool:
+        """vol_guard (min orders, warned share, fee/typical): the week is not spiralling. Once 'warned share' of our orders had a
+        deadline warning, or our last 60 bookings paid 'fee/typical' on average, extra volume stops for the rest of the week (sticky).
+        nf-04-type weeks (warned 21%, fee 1.30x) tipped under 0.90 with every volume arm; normal weeks stay <= 5.7% / 1.06x by Thursday."""
+        g = self.cfg.vol_guard
+        if not g:
+            return True
+        if self._vol_off:
+            return False
+        n_min, w_max, f_max = g
+        if self.won_count >= n_min:
+            xs = self.book_ratios[-60:]
+            if len(self.warned) / max(1, self.won_count) >= w_max or (len(xs) >= 30 and sum(xs) / len(xs) >= f_max):
+                self._vol_off = True
+                self.say("VOL_OFF", f"warned {len(self.warned)}/{self.won_count}, fee/typ {sum(xs) / max(1, len(xs)):.2f}: no extra volume this week")
+                return False
+        return True
+
     def due_load(self, day: int) -> float:
         """Our orders due on this day (won, not cancelled), over the number of drivers in the world."""
         n = self.due_count.get(day, 0)
-        if self.cfg.load_bundle_w < 1.0:
+        if self.cfg.load_bundle_w < 1.0 and self.volume_ok():
             chained = 0
             for rec in self.gigs.values():
                 oids = {o for o, _ in rec.legs}
-                if len(oids) > 1 and rec.status in ("open", "booked", "working"):
+                if len(oids) > 1 and rec.status in (("booked", "working") if self.cfg.load_bundle_booked else ("open", "booked", "working")):
                     for o in oids:
                         ob = self.orders.get(o)
                         if ob and min(self.deadline(ob.order, l) for l in range(len(ob.order["legs"]))) // DAY == day:
@@ -1926,13 +1945,21 @@ class Desk:
             if not last_call:
                 # v5_repost: one re-pick at a flat fee, then the car keeps it to the last call (no second model re-pick)
                 max_posts = min(cfg.fee1_max_posts, 2) if cfg.v5_repost and not getattr(self, "scarce", False) else cfg.fee1_max_posts
-                if self.now < repick_at(rec.posted_at, cfg.fee1_repick) or posts >= max_posts:
+                if self.now < repick_at(rec.posted_at, cfg.fee1_repick) or (posts >= max_posts and not cfg.fee1_after_ladder):
                     continue  # (a re-pick that would fall at night waits for the morning: nobody plans a trip then)
-                if left < cfg.fee1_min_minutes + (cfg.fee1_last_call or 0):
+                if left < cfg.fee1_min_minutes + (cfg.fee1_last_call or 0) and not cfg.fee1_after_ladder:
                     continue  # too close to the alarm for another choice: the last call (or the alarm) takes it
             if not last_call and cfg.v5_pair2 and not getattr(self, "scarce", False) and self.v5_pair2(rec):
                 continue  # paired with another sitting single of ours: one driver, two cars, at the pair's fee
             self.fee1.close(rec, False, self.now)
+            if cfg.fee1_after_ladder and not last_call:
+                # The miss rejoins the old ladder in place (fee_open now, then the fee_rel steps): ARCHIVE's split of k-f1h5f, a re-posted
+                # car cost EUR 3.6-6.0 more than under the ladder (-103..-220/wk) while fee1's first picks gained +540/wk every week.
+                cur = current_fee(rec.schedule, self.now)
+                rec.schedule = self.ladder_from_now(ob, legs, cur)
+                self.outbox.append({"type": "reprice", "gigId": gid, "schedule": rec.schedule})
+                self.say("FEE1_LADDER", f"{gid} {oid} sat {self.now - rec.posted_at} min at {cur} -> {rec.schedule[0]['feeCents']}..{rec.schedule[-1]['feeCents']}")
+                continue
             self.say("FEE1_REPICK", f"{gid} {oid} sat {self.now - rec.posted_at} min at {rec.schedule[0]['feeCents']}{' last-call' if last_call else ''}")
             self.withdraw(gid)
 
@@ -1968,6 +1995,22 @@ class Desk:
             self.withdraw(r.id)
         self.post_bundle(first, second, last, why="pair2")
         return True
+    def ladder_from_now(self, ob: OrderBook, legs: list[int], cur: int) -> list[dict]:
+        """The relative ladder from now for a sitting gig: fee_open (never under its current fee), then the fee_rel steps before the
+        last pickup. Two or more steps, so the gig is no longer a fee1 gig."""
+        cfg, now = self.cfg, self.now
+        base = self.base_fee(ob, legs)
+        last = self.last_pickup(ob, legs)
+        prev = max(cur, int(round(base * cfg.fee_open)))
+        out = [{"at": now, "feeCents": prev}]
+        for hours_before, mult in cfg.fee_rel:
+            fee = max(prev, int(round(base * mult)))
+            out.append({"at": max(now + cfg.fee_hold, last - int(hours_before * HOUR)), "feeCents": fee})
+            prev = fee
+        out = dedupe(sorted(out, key=lambda x: (x["at"], x["feeCents"])))
+        if len(out) < 2:  # keep it out of fee1's hands: one more step at the steep plan's first rung before the alarm
+            out.append({"at": max(now + cfg.fee_hold, last - cfg.alarm_minutes), "feeCents": max(prev + 1, int(round(base * cfg.steep_plan[0])))})
+        return dedupe(out)
 
     def offer_home(self) -> None:
         """Direct offers to drivers who live near a gig's delivery but too far from its pickup to be notified: the trip home

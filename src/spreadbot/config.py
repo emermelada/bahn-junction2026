@@ -207,6 +207,8 @@ class Config:
     bundle_soon_mult: float = 1.0      # fee of such a chain over the two typical fees: still under two single gigs (~1.18x)
     bundle_soon_slack: int = 180       # such a chain needs this long before its last start, and splits this long before it
     load_bundle_w: float = 1.0         # a car in one of our live chains counts this much in the day's load (one driver moves two)
+    load_bundle_booked: bool = False   # load_bundle_w only for pairs a driver holds: an open pair may still split into two lone cars
+    vol_guard: tuple = ()              # (min orders, warned share, fee/typical of the last 60 bookings): extra volume (load_bundle_w) stops for the week once either is reached (() = off)
     bundle_rel: tuple = ()             # ((hours before the chain's last start, fee as a share of the two typical fees), ...); () = fee_rel on the bundle fee
     hold_minutes: int = 0              # hold a won car up to this long, unposted, to find a chain partner (0 = post at once)
     hold_lead: int = 12 * 60           # post a held car at the latest this long before its pickup window opens
@@ -248,6 +250,10 @@ class Config:
     fee1_desert_floor: float = 1.05    # desert deliveries (desert_n) never below this (the tail guard of d-feerd)
     fee1_long: tuple = ()              # (drive min, floor): long cars never below this fee. k-f1h WAR: cheaper long gigs got warned, long_warn
                                        # then declined long cars 38-40x/wk vs 27 (the highest-margin cars, EUR 63-77 each; -8.7 won/wk) (() = off)
+    fee1_only: tuple = ()              # (min hours to the last pickup, min drivers <= 30 road min from the delivery): fee1 only for such cars (() = all)
+    fee1_window_fee: bool = False      # booking-time profile by fee (low fees book later: a 6 h miss is weak evidence; PROBE forks)
+    fee1_after_ladder: bool = False    # a fee1 gig unbooked at its re-pick time joins the old ladder in place instead of a new post
+    fee1_long_ladder: bool = False     # long cars (fee1_long[0]) are not fee1 cars at all: the opening + ladder as before
     fee1_last_call: int = 0            # minutes before our alarm: a fee1 car still unbooked gets one more new post at a safe fee (0 = off)
     fee1_harm: float = 1.0             # weight of the harm a fee above the going fee does to our other waiting gigs (0 = off; Halal: -EUR 2,967/wk without)
     fee1_rel_share: float = 0.15       # share of a fee's pull that comes from our own other gigs: PROBE measured ~0.1-0.3 (DRIVERS.md: +10% on our
@@ -257,6 +263,8 @@ class Config:
     # + ln(drive min) + posted Fri..Mon2 + private end + premium; sigma. PROBE's counterfactual forks (57 cars, 227 probes,
     # research/re/probe/out/clear_fit.json): median clearing fee ~0.98 (few drivers near the delivery, < 8 h) to 0.64 (many, > 40 h).
     fee1_clear: tuple = (0.1892, -0.0561, -0.0130, -0.1032, 0.0275, -0.0573, 0.0076, 0.0241, 0.2250)
+    fee1_sigma: float = 0.0            # override sigma (0 = fee1_clear's). f1h5: 0.80 picks booked 57% vs 74% predicted, 1.00 78% vs 84%: too
+                                       # steep; PROBE's population curve and Halal's flat fees imply 0.29-0.31
     fee1_delta: tuple = (0.10, 0.30, 1440)  # this week's offset of ln(clearing fee): prior sd, clamp, half-life of a post's weight (min)
                                        # (Halal learns its intercept: -EUR 505/wk without; drivers booking us: 48 Mon, 61-62 Tue-Thu, 38 Fri)
     fee1_obs_minutes: int = 240        # a first post unbooked for this many daytime minutes counts as "did not clear" for the offset
@@ -266,6 +274,7 @@ class Config:
     v5_repost: float = 0.0             # fee1's re-pick posts once at max(this, floors); no further model re-picks (last call and alarm unchanged; 0 = off)
     v5_pair2: bool = False             # at the re-pick, first try to pair the car with another open unbooked single of ours (pairs pay 0.84x)
     v5_short_open: float = 0.0         # ladder singles with < 8 h to the last pickup (fee1 cannot choose) open at this, not fee_open (0 = off)
+                                       # (a censored-exposure version, 85f9226, was -301 (se 152) on WAR vs this one: kept this)
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
     backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little
     backhaul_mult: float = 1.0         # offer fee over typical fee (never under the app fee unless backhaul_below)

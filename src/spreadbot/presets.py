@@ -261,3 +261,49 @@ PRESETS["v5L"] = PRESETS["k-f1h5fD"] + ["load_bundle_w=0.6", "load_free=0.12", "
 PRESETS["v5La"] = PRESETS["v5aV2"] + LB  # the first test (v5-run3 tag v5V2lb): with v5a's long cars down to 0.90
 PRESETS["v5L45"] = PRESETS["v5L"] + ["late_barrier=(0.945,300,4,20)"]  # looser target: keep more of V2's volume in normal weeks
 PRESETS["v5L14"] = PRESETS["v5L"] + ["load_free=0.14"]                   # bolder volume under the same barrier
+# fee1 v6: sigma 0.30 (v5's bottom fees booked less than predicted) + a censored week-offset likelihood (night/alarm misses count
+# by their exposure; v5's offset sat at -0.02..-0.06 while first posts missed more than predicted).
+PRESETS["k-f1h6"] = PRESETS["k-f1h5f"] + ["fee1_sigma=0.30"]  # on MARKET's quote floor
+# fee1 v7: long cars (>= 4 h) leave fee1 for the old ladder (k-f1h5's worst weeks lost 11-28 orders to +12..+83 long_warn declines).
+PRESETS["k-f1h7"] = PRESETS["k-f1h6"] + ["fee1_long_ladder=true"]
+# fee1 v8, narrow: only cars with >= 20 h to the last pickup and >= 30 drivers near the delivery (not long), one re-pick, no last call:
+# fewer extra fresh posts (k-f1h7: long gigs got fewer views, long_warn declines +11/wk).
+PRESETS["k-f1h8"] = PRESETS["k-f1h7"] + ["fee1_only=(20,30)", "fee1_max_posts=2", "fee1_last_call=0"]
+# fee1 first pick only: a miss joins the old ladder in place at the 6 h re-pick, no last call (ARCHIVE B_REPORT: first picks +540/wk on
+# every week class, re-posts -103..-220, long_warn -46..-157).
+PRESETS["k-f1h5fL"] = PRESETS["k-f1h5f"] + ["fee1_after_ladder=true", "fee1_last_call=0"]
+# long_warn on distinct cars (ARCHIVE D_LONGWARN.md: the guard counted warning events; one re-planned car warned 5x set off 85 declines).
+PRESETS["k-f1h5fD"] = PRESETS["k-f1h5f"] + ["long_warn_distinct=true"]
+PRESETS["k-safe-dclD"] = PRESETS["k-safe-dcl"] + ["long_warn_distinct=true"]
+# fee1 on PROBE's 21:13 clearing-fee refit (148 cars / 651 probes incl. 0.62-0.80; leave-one-seed-out log-lik -1.397 vs -1.533 intercept
+# only): premium +0.32 and private +0.11 on ln(clearing fee) (were +0.02 / +0.01), lead -0.146, sigma 0.261. On the release k-f1h5f.
+PRESETS["k-f1h5fP"] = PRESETS["k-f1h5f"] + ["fee1_clear=(0.2771,-0.0694,0.0153,-0.1463,-0.0037,0.0635,0.1097,0.3214,0.2609)"]
+# + booking time by fee (PROBE: ~45% of cars unbooked at 6 h still book at the same fee; 18% of bookings come after 6 h at 0.85):
+# the re-pick no longer reads a 6 h miss as "fee below the clearing fee" (ARCHIVE: re-picked cars cost EUR 3.6-6 more).
+PRESETS["k-f1h5fPW"] = PRESETS["k-f1h5fP"] + ["fee1_window_fee=true"]
+# FLEET volume arms on the release k-f1h5f (Franco 21:35: highest mean on H1+H3, every week ranked):
+# V1: a car in one of our live pairs counts 0.6 in the day's load (RoutePulse: pairs = 1.45 driver slots, most of +23 orders/wk).
+PRESETS["k-f1h5fV1"] = PRESETS["k-f1h5f"] + ["load_bundle_w=0.6"]
+# V2: + the load barrier at the measured knee (fee/typ flat to day load 0.12, late 4-5% to 0.12): c3g +944/+868/+1,057 on the three
+# tuning sets; killed then for one week at 0.914 without long_warn/desert guards, which this stack has.
+PRESETS["k-f1h5fV2"] = PRESETS["k-f1h5fV1"] + ["load_free=0.12", "load_slope=2"]
+# V2 with a hard day cap: no new car due on a day whose load is already 0.15 (late 11.9% at 0.14-0.16 vs 4-5% under 0.12, feeload.py).
+PRESETS["k-f1h5fV2c"] = PRESETS["k-f1h5fV2"] + ["load_cap=0.15"]
+# V2 + strict governor once 7% of our orders had a deadline warning (V2's worst weeks: 8-9% warned vs 3-6% normal; base dev-43 8%).
+PRESETS["k-f1h5fV2s"] = PRESETS["k-f1h5fV2"] + ["strict_warn=0.07"]
+# Kill V2s: strict_warn 0.07 fired in 6/8 weeks, on-time unchanged (0.918 vs 0.921), -500..-2,100 where it fired: too late a signal.
+# V2m: the gentler volume arm, barrier at day load 0.10 (between V1 +154 / worst 0.946 and V2 +780 / worst 0.921).
+PRESETS["k-f1h5fV2m"] = PRESETS["k-f1h5fV1"] + ["load_free=0.10", "load_slope=2"]
+# V1b: pairs count 0.6 only once a driver holds them (V2/V2m broke fresh-20: open pairs that split in a scarce week hid load).
+PRESETS["k-f1h5fV1b"] = PRESETS["k-f1h5fV1"] + ["load_bundle_booked=true"]
+# V1 + wider pairing (k-safe-kmh's: 50 km links, hold a new car 120 min for a partner; it raised pairs 0.33 -> 0.38 but earned 0 while
+# the day's load counted every car; with V1 the freed drivers can admit cars). ARCHIVE c_vol: volume makes pairs, pairs never bought volume.
+PRESETS["k-f1h5fV1p"] = PRESETS["k-f1h5fV1"] + ["bundle_km=50", "hold_minutes=120", "hold_lead=360"]
+# Coarse fee1 grid as a safety margin (Halal: a finer grid cost -624/wk, "the coarse steps act as a safety margin"; ARCHIVE suggestion).
+PRESETS["k-f1h5fG"] = PRESETS["k-f1h5f"] + ["fee1_grid=(0.85,1.0,1.15,1.3,1.5)"]
+# V1 with a spiral switch: the pair weight stops for the week once 6% of our orders were warned or our last 60 bookings averaged
+# 1.10x typical (V1 tipped H3 nf-04, warned 21%, fee 1.30x, to 0.875; normal weeks <= 5.7% / 1.06x through Thursday noon).
+PRESETS["k-f1h5fV1g"] = PRESETS["k-f1h5fV1"] + ["vol_guard=(60,0.06,1.10)"]
+# V1g fired too early (5/11 WAR weeks on Mon/Tue at 6% of 60 orders = 4 cars; +38 vs V1 +154). Thresholds from ARCHIVE's Tuesday
+# signals (c_spiral_sig.csv): harsh weeks warn 0.092-0.099, fee60 1.17-1.20; normal warn 0.02-0.06, fee60 0.88-0.99.
+PRESETS["k-f1h5fV1g2"] = PRESETS["k-f1h5fV1"] + ["vol_guard=(100,0.09,1.15)"]
