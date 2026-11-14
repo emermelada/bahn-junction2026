@@ -150,6 +150,7 @@ class Desk:
             self.risk = Risk(self)
             self.demand = Demand(self)
             self.planner = Planner(self, self.supply, self.fees)
+        self.v2_dispatch = bool(cfg.v2 and cfg.v2_dispatch)  # False: c3's hold/release/pairs with V2's pricing
         self.gov_logged = -1
         self.warned: set[str] = set()  # orders that had a deadline warning
         self._strict_cfg: Optional[Config] = None
@@ -216,7 +217,7 @@ class Desk:
         self.orders[o["id"]] = ob
         self.won_count += 1
         self.observe_outcome(o["id"], e["at"], True)
-        if self.cfg.hold and self.planner is None:
+        if self.cfg.hold and not self.v2_dispatch:
             rel = self.release_at(ob)
             if rel is not None:
                 self.held[o["id"]] = rel
@@ -716,7 +717,7 @@ class Desk:
         legs = [l for l in self.undelivered(oid) if (oid, l) not in self.leg_gig and not self._pending(oid, l)]
         if not legs:
             return
-        if self.planner is not None:
+        if self.v2_dispatch:
             self.dispatch_v2(ob, legs, why)
             return
         if self.cfg.bundle and self.cfg.hold_minutes and (why == "won" or oid in self.chain_held) and legs == [0] and len(ob.order["legs"]) == 1 and self.simple(ob):
@@ -1536,7 +1537,7 @@ class Desk:
             self.planner.replan(self.now)
             st = self.planner.state()
             self.say("PLAN", f"chains={st['chains']} unplanned={st['unplanned']} lam=" + str({k: v for k, v in st["lam"].items() if v}))
-        if self.held and self.planner is None:
+        if self.held and not self.v2_dispatch:
             self.release_held()  # before the loop below, which would post released cars one by one
         for oid in list(self.orders):
             ob = self.orders[oid]

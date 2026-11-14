@@ -50,6 +50,7 @@ class Config:
     steer_down: bool = False           # instead lower next_day to steer x same_day
     # --- V2 capacity-first planner (research/sessionA/V2_SPEC.md); off = c3 exactly
     v2: bool = False                   # plan driver-hours per (region, day) first, price with lam, post chains at a flat clearing fee
+    v2_dispatch: bool = True           # False: keep c3's hold/evening release/pairs and only price with the planner (ablation)
     v2_lam_eur: float = 20.0           # EUR per driver-hour at utilisation 2 x free: a car of 3 h pays EUR 60 when the day is half over its free share
     v2_lam_free: float = 0.5           # utilisation under which a driver-hour is free (idle hours cost nothing)
     v2_lam_max: float = 150.0          # cap on lam, EUR per hour: above this the car is in effect declined
