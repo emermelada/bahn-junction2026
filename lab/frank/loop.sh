@@ -5,5 +5,5 @@ seeds=$1; shift
 for spec in "$@"; do
   tag=${spec%%|*}; sets=${spec#*|}; args=()
   for kv in $sets; do args+=(--set "$kv"); done
-  .venv/Scripts/python harness/sweep.py --tag "$tag" --seeds "$seeds" --par 3 ${REVEAL:+--reveal} "${args[@]}"
+  .venv/Scripts/python harness/sweep.py --tag "$tag" --seeds "$seeds" --par ${PAR:-3} ${REVEAL:+--reveal} "${args[@]}"
 done
