@@ -15,6 +15,8 @@ class Config:
     day_lr: float = 0.012              # today's shift: fast, the day factor and the price war are per day
     war_guard: bool = False            # freeze world and dealer learning on a day whose shift is below -war_shift
     war_shift: float = 0.12
+    war_floor: float = 0.0             # the learned level never falls below this x the usual level (war = 0.8); 0 = off
+    war_min_ratio: float = 0.0         # on a war day, quote down to this ratio over list (0 = min_ratio)
     lane_w: float = 0.0                # weight of the cross-world lane table (Javier's lanes.json) in the competitor level
     max_per_batch: int = 0             # decline once we hold this many orders from one batch (a yard sending many cars)
     place_lr: float = 0.0              # per (pickup place, day) shift, spread over 80 km: the outage (0 = off)
