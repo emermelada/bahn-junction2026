@@ -235,3 +235,29 @@ PRESETS["v5q2f"] = PRESETS["v5q1"] + ["scarcity=(1.08,9.0)", "scarcity_until=360
 PRESETS["v5p"] = PRESETS["v5a"] + ["v5_pair2=true"]
 # v5so: v5a + ladder singles under 8 h to the last pickup open at 0.95 instead of 1.05 (6-8 h 1.05 openings booked 97% on the first gig).
 PRESETS["v5so"] = PRESETS["v5a"] + ["v5_short_open=0.95"]
+# ARCHIVE (research/re/archive/R1_BADWEEKS.md): our weeks < EUR 7k are a rescue spiral (escalation 5.9-12k vs ~0.75k normally).
+# Spec A: cap escalation near Halal's 1.6x (their 2x rescue: -740 for +0.1 pt). Spec B: Halal's late price in the quote from Monday.
+STEEP_CAP = ["steep_rescue=(1.6,1.8,2.0)", "steep_plan=(1.5,1.7,1.9,2.1)"]
+LATE_BARRIER = ["late_barrier=(0.955,300,4,20)"]
+PRESETS["k-f1h5f-cap"] = PRESETS["k-f1h5f"] + STEEP_CAP
+PRESETS["k-f1h5f-lb"] = PRESETS["k-f1h5f"] + LATE_BARRIER
+PRESETS["k-f1h5f-lbc"] = PRESETS["k-f1h5f"] + LATE_BARRIER + STEEP_CAP
+PRESETS["k-safe-dcl-cap"] = PRESETS["k-safe-dcl"] + STEEP_CAP
+PRESETS["k-safe-dcl-lb"] = PRESETS["k-safe-dcl"] + LATE_BARRIER
+# ARCHIVE: RoutePulse's backlog brake (research/re/archive/R2_BADWEEKS.md 5.1) on V5's volume arm, for V5's scarcity gate (fresh-10/20 >= 0.91).
+BRAKE = ["backlog_brake=(0.03,10,16,24,0.24,0.10,0.86)"]
+PRESETS["v5aV2b"] = PRESETS["v5aV2"] + BRAKE
+PRESETS["k-f1h5f-bk"] = PRESETS["k-f1h5f"] + BRAKE
+PRESETS["v5aV2b0"] = PRESETS["v5aV2"] + ["backlog_brake=(0.03,10,16,24,0.0,0.0,1.0)"]  # dry: logs BRAKE U only, no effect
+# Offline calibration (research/re/archive/c_brake_cal.csv): hours with U > 0.03 x roster Mon-Thu: bad weeks fresh-10/20/15, dev-48 19-27,
+# good weeks 0-9; U peaks Wed-Thu (fresh-20 max 49-52 vs good <= 31). RoutePulse's charge is small (<= ~EUR 34/car); the strong arm
+# reacts twice as fast (scale 8) and cuts free load up to 30%.
+PRESETS["v5aV2bs"] = PRESETS["v5aV2"] + ["backlog_brake=(0.03,10,8,24,0.5,0.2,0.7)"]
+# V5L: FLEET's volume V2 held by ARCHIVE's late barrier (Halal: volume + a smooth late price toward the on-time target from Monday).
+# V2 alone: fresh-20 0.889 unranked; + barrier: fresh-20 0.920, fresh-10 0.948, scarcity set +578 (se 338) 7/7 ranked vs the release.
+LB = ["late_barrier=(0.955,300,4,20)"]
+# v5a failed the holdouts (LEAD 22:10: H1 -130, H3 -87, nf-04 0.890): v5L drops its cheap long cars, keeps the distinct guard.
+PRESETS["v5L"] = PRESETS["k-f1h5fD"] + ["load_bundle_w=0.6", "load_free=0.12", "load_slope=2"] + LB
+PRESETS["v5La"] = PRESETS["v5aV2"] + LB  # the first test (v5-run3 tag v5V2lb): with v5a's long cars down to 0.90
+PRESETS["v5L45"] = PRESETS["v5L"] + ["late_barrier=(0.945,300,4,20)"]  # looser target: keep more of V2's volume in normal weeks
+PRESETS["v5L14"] = PRESETS["v5L"] + ["load_free=0.14"]                   # bolder volume under the same barrier

@@ -147,6 +147,16 @@ class Config:
     flu_mult: float = 1.9              # P(late) multiplier for cars due on a flu day, at quote time and in the projection (8.9 / 4.7)
     repost_past_last: int = 0          # minutes after an open gig's last pickup to withdraw and post it again without the order's windows
                                        # (0 = off): till then no driver can book it (research/re/external/RIVAL_FEES.md #5)
+    backlog_brake: tuple = ()          # (soft_frac, soft_min, scale, horizon_h, quad_w, health_w, health_min): RoutePulse's backlog brake
+                                       # (market.ts:423-461@be87438). U = our won cars due to be picked up within horizon_h with no driver yet;
+                                       # excess = max(0, U - max(soft_min, soft_frac x drivers)) / scale. Each quote's cost += 1.45 x
+                                       # min(1, quad_w x excess^2) x (EUR 5.20 + 1.35/road h + 0.24 x typical), and the day's free load
+                                       # x clamp(1 - health_w x min(1.4, excess), health_min, 1). On 15:00 W3 RoutePulse halved its Tuesday
+                                       # intake (55 vs ~78 ours) and made 14.1k vs our 6.3k (research/re/archive/R2_BADWEEKS.md 5.1). () = off
+    late_barrier: tuple = ()           # (target, eur, grip, calm): Halal's late price (fleet.py:287-295@1ece2d5). Each quote's cost gets
+                                       # P(late) x eur x min(2, used)^grip, used = expected late / (calm + orders) / (1 - target): a week
+                                       # running short of on-time sells fewer, safer cars from Monday instead of buying on-time back at 2-4x
+                                       # (our 5 weeks < EUR 7k spent 5.9-12k on escalation; research/re/archive/R1_BADWEEKS.md). () = off
     long_warn: tuple = ()              # (drive min, n, window min): decline cars with drive >= this while >= n of our long cars got a
                                        # deadline warning in the last window min (() = off). Both unranked fresh weeks: 2-3x the usual long
                                        # cars, 36-39% late, warned 5x as often, P(on time) at quote ~0.94 as usual (research/re/H2_AUTOPSY.md)
