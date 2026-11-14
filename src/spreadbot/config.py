@@ -45,6 +45,20 @@ class Config:
     gate_safe_p: float = 0.95
     steer: float = 0.0                 # with both quoted: same_day at least next_day / steer (dealers take next_day under ~0.85x)
     steer_down: bool = False           # instead lower next_day to steer x same_day
+    # --- V2 capacity-first planner (research/sessionA/V2_SPEC.md); off = c3 exactly
+    v2: bool = False                   # plan driver-hours per (region, day) first, price with lam, post chains at a flat clearing fee
+    v2_lam_eur: float = 20.0           # EUR per driver-hour at utilisation 2 x free: a car of 3 h pays EUR 60 when the day is half over its free share
+    v2_lam_free: float = 0.5           # utilisation under which a driver-hour is free (idle hours cost nothing)
+    v2_lam_max: float = 150.0          # cap on lam, EUR per hour: above this the car is in effect declined
+    v2_handling_min: int = 30          # minutes per car beyond driving: pickup, plates, delivery
+    v2_chain_hours: float = 12.0       # RULES: a driver's day is at most 12 h of driving
+    v2_chain_cars: int = 3             # cars per chain
+    v2_req_per_hour: float = 21.0      # requests per request hour in a level 8 week (1,040 a week over 50 hours)
+    v2_hours_per_car: float = 3.5      # average driver-hours of a won car (drive + handling), from the reveals
+    v2_supply_scale: float = 1.0       # scale on the stub supply (until supply.py lands)
+    v2_fee_per_min: float = 18.0       # stub clearing fee: cents per driving minute (typical fee ~ EUR 60 for 3 h)
+    v2_fee_fixed: float = 1500.0       # stub clearing fee: cents per car
+    v2_fee_mult: float = 1.1           # stub: flat fee over that base that books the day before (1.08-1.10 in the reveals)
     # --- on-time selection
     ontime_fee_assumed: float = 1.6    # the fee the on-time model assumes (fee_plan reaches about this)
     ontime_shift: float = 0.0
