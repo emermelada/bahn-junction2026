@@ -103,8 +103,16 @@ class Market:
         self.day_obs: dict[int, list[bool]] = defaultdict(list)
 
     def mu_for(self, dealer: str, day: int, place: str = "", lane: str = "") -> float:
-        return (self.mu + self.day_shift[day] + self.dealer_shift[dealer] + self.place_shift.get((place, day), 0.0)
-                + self.cfg.lane_w * lane_shift(lane))
+        base = self.mu + self.dealer_shift[dealer] + self.place_shift.get((place, day), 0.0) + self.cfg.lane_w * lane_shift(lane)
+        total = base + self.day_shift[day]
+        if self.cfg.war_floor:
+            # The price war is 20% under the competitor's usual prices, never more: a day shift that takes the level
+            # below war_floor x the usual level is our own losses talking (board: mu 0.93-0.99 on war days, 4 of 4 weeks).
+            total = max(total, self.cfg.war_floor * base)
+        return total
+
+    def war_day(self, day: int) -> bool:
+        return self.day_shift[day] < -self.cfg.war_shift
 
     def p_win(self, ratio_eff: float, dealer: str, day: int, place: str = "", lane: str = "") -> float:
         # win_cap: about a third of requests are lost at any price (36 k18 weeks: 0.68 at the lowest ratios). Without the
@@ -137,6 +145,8 @@ class Market:
         cfg = self.cfg
         best, best_ev = 0.0, 0.0
         r = cfg.min_ratio
+        if cfg.war_min_ratio and self.war_day(day):
+            r = min(r, cfg.war_min_ratio)  # on the war day the competitor sits near list: quote down to this
         while r <= cfg.max_ratio + 1e-9:
             price = list_cents * r * tf
             ev = self.p_win(r, dealer, day, place, lane) * (price * (1 - risk_frac) - cost - shadow)
