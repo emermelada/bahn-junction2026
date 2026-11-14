@@ -205,3 +205,6 @@ PRESETS["k-f1h5fL"] = PRESETS["k-f1h5f"] + ["fee1_after_ladder=true", "fee1_last
 # long_warn on distinct cars (ARCHIVE D_LONGWARN.md: the guard counted warning events; one re-planned car warned 5x set off 85 declines).
 PRESETS["k-f1h5fD"] = PRESETS["k-f1h5f"] + ["long_warn_distinct=true"]
 PRESETS["k-safe-dclD"] = PRESETS["k-safe-dcl"] + ["long_warn_distinct=true"]
+# fee1 on PROBE's 21:13 clearing-fee refit (148 cars / 651 probes incl. 0.62-0.80; leave-one-seed-out log-lik -1.397 vs -1.533 intercept
+# only): premium +0.32 and private +0.11 on ln(clearing fee) (were +0.02 / +0.01), lead -0.146, sigma 0.261. On the release k-f1h5f.
+PRESETS["k-f1h5fP"] = PRESETS["k-f1h5f"] + ["fee1_clear=(0.2771,-0.0694,0.0153,-0.1463,-0.0037,0.0635,0.1097,0.3214,0.2609)"]
