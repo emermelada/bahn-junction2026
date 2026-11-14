@@ -707,8 +707,9 @@ class Desk:
 
     # ------------------------------------------------------------------ V2 dispatch: the plan's chains at a flat fee
     def dispatch_v2(self, ob: OrderBook, legs: list[int], why: str) -> None:
-        """A car waits until the evening (hold_hour) before its planned day, then its whole chain is posted at the
-        predicted clearing fee, flat (one insurance raise). Cars whose last pickup is near go at once on c3's ladder."""
+        """A car waits until the evening (hold_hour) before its planned day, then goes out: alone on c3's schedule, or as
+        the plan's chain (one driver, cars priced like c3's pairs: the sum of typical fees x bundle_mult, the fee_rel
+        ladder anchored to the chain's last start). Cars whose last pickup is near go at once; own_alarm still escalates."""
         pl, oid, cfg = self.planner, ob.order["id"], self.cfg
         if oid not in pl.day_of:
             pl.replan(self.now)
@@ -717,45 +718,45 @@ class Desk:
         last = self.last_pickup(ob, legs)
         if self.now < release and last - self.now > cfg.alarm_minutes + 2 * HOUR and not ob.urgent:
             return
-        if ob.urgent or last - self.now < 2 * HOUR:
-            self.post(ob, legs, why)  # the plan missed: c3's steep ladder saves the car
-            return
         chain = [(o, l) for o, l in pl.chain_for(oid) if o in self.orders and self.orders[o].order["status"] != "cancelled"
                  and (o, l) not in self.leg_gig and not self._pending(o, l) and l in self.undelivered(o)]
-        if len(chain) < 2 or not all(self.simple(self.orders[o]) for o, _ in chain):
-            chain = [(oid, l) for l in legs]
+        if ob.urgent or last - self.now < 2 * HOUR or len({o for o, _ in chain}) < 2 or not all(self.simple(self.orders[o]) for o, _ in chain):
+            groups = [legs]
             if len(legs) == 2 and self.trade_minutes(ob.order) > 12 * HOUR - 10:
-                for l in legs:  # a trade-in too long for one driver's day: two gigs
-                    self.dispatch_v2(ob, [l], why)
-                return
-        drive, prev = 0, None
+                groups = [[l] for l in legs]  # a trade-in too long for one driver's day: two gigs
+            for g in groups:
+                self.post(ob, g, why)
+            self.say("V2POST", f"{oid} day={day} alone {why}")
+            return
+        # the chain's last start: every car still on time when the driver takes them in order
+        lastc, at, prev = 10 ** 9, 0, None
         for o, l in chain:
             L = self.orders[o].order["legs"][l]
             if prev:
-                drive += self.geo.drive(prev, L["pickup"]["placeId"])
-            drive += self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"])
+                at += self.geo.drive(prev, L["pickup"]["placeId"])
+            lastc = min(lastc, self.last_pickup(self.orders[o], [l]) - at)
+            at += self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) + cfg.v2_handling_min
             prev = L["delivery"]["placeId"]
-        region = self.supply.region(self.orders[chain[0][0]].order["legs"][chain[0][1]]["pickup"]["placeId"])
-        fee = max(1, int(round(self.fees.clearing(region, day, 8, drive, len(chain)))))
         stops = []
         for o, l in chain:
             stops += self.stops_for(self.orders[o], l)
-        audience = {"experienced": any(self.orders[o].order["legs"][l]["car"]["premium"] for o, l in chain),
-                    "manualLicence": any(self.orders[o].manual or self.leg_note(o, l).manual for o, l in chain)}
-        sched = [{"at": self.now, "feeCents": fee}]
-        if cfg.v2_fee_rel:
-            sched.append({"at": max(self.now + cfg.fee_hold, last - int(cfg.v2_fee_rel[0] * HOUR)), "feeCents": int(round(fee * cfg.v2_fee_rel[1]))})
-        action = {"type": "post", "stops": stops, "audience": audience, "schedule": dedupe(sched)}
+        audience = {"experienced": any(self.orders[o].order["legs"][l]["car"]["premium"] for o, l in chain), "manualLicence": False}
+        base = sum(self.base_fee(self.orders[o], [l]) for o, l in chain) * cfg.bundle_mult
+        out = [{"at": self.now, "feeCents": int(round(base * cfg.fee_open))}]
+        prev_fee = out[0]["feeCents"]
+        for hours_before, mult in cfg.fee_rel:
+            fee = max(prev_fee, int(round(base * mult)))
+            out.append({"at": max(self.now + cfg.fee_hold, lastc - int(hours_before * HOUR)), "feeCents": fee})
+            prev_fee = fee
+        sched = dedupe(sorted(out, key=lambda x: (x["at"], x["feeCents"])))
+        action = {"type": "post", "stops": stops, "audience": audience, "schedule": sched}
         self.outbox.append(action)
-        self.pending_posts.append((action, "chain" if len(chain) > 1 else why))
-        if len({o for o, _ in chain}) > 1:
-            lastc = min(self.last_pickup(self.orders[o], [l]) for o, l in chain)
-            for o, _ in chain:
-                self.bundle_last[o] = lastc
+        self.pending_posts.append((action, "bundle"))
         for o, _ in chain:
+            self.bundle_last[o] = lastc
             if self.orders[o].first_post_at is None:
                 self.orders[o].first_post_at = self.now
-        self.say("V2POST", "+".join(f"{o}/{l}" for o, l in chain) + f" day={day} fee={fee} {why}")
+        self.say("V2POST", "+".join(f"{o}/{l}" for o, l in chain) + f" day={day} last={lastc} fee0={sched[0]['feeCents']} {why}")
 
     # ------------------------------------------------------------------ bundles
     def chainable(self, r: dict) -> bool:
