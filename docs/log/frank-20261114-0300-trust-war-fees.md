@@ -14,3 +14,12 @@
 **Fee plans.** Fewer or no raises did not help: the opening fee plus two raises anchored to the last pickup (1.05x, 1.25x at 8 h, 1.6x at 5 h) remains best.
 
 **Price-war guard.** No gain on these weeks; the day shift alone already absorbs the war day.
+
+## Release check rc2 (= v1am defaults) on fresh seeds dev-19..30
+
+| Tag | Ranked | Min on-time | p10 | Median | Mean | Orders |
+|---|---|---|---|---|---|---|
+| rc1 (load 0.07) | 12/12 | 0.934 | 5,642 | 9,266 | 9,245 | 339 |
+| rc2 (load 0.05) | 12/12 | 0.935 | 5,394 | 8,868 | 9,364 | 311 |
+
+The +€660 of load 0.05 on dev-07..18 shrinks to +€120 on fresh seeds: within noise. rc2 is no worse and wins 8% fewer cars for the same money, so it keeps more slack against the gate.
