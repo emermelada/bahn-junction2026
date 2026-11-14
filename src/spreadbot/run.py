@@ -22,6 +22,18 @@ from .geo import DAY, HOUR, load_geo
 WAKE = ["order_changed", "order_cancelled", "visit_failed", "gig_expired", "deadline_close", "gig_dropped", "no_show", "driver_late"]
 STEP = 12  # minutes per daytime step: < 15 so every request gets its quote before respondBy
 REGISTRY = "data/worlds_frank.jsonl"
+# Test finals 14:00 and 20:00 Helsinki: no new practice world from 40 min before to 50 min after (rate limits drop
+# to 20/s for everyone). Laptop clock (local time) = Helsinki - 1 h. Harness only, never inside decisions.
+BLACKOUT = [(12 * 60 + 20, 13 * 60 + 50), (18 * 60 + 20, 19 * 60 + 50)]
+
+
+def wait_blackout() -> None:
+    while True:
+        t = time.localtime()
+        m = t.tm_hour * 60 + t.tm_min
+        if not any(a <= m < b for a, b in BLACKOUT):
+            return
+        time.sleep(60)
 
 
 def daytime(now: int) -> bool:
@@ -74,6 +86,8 @@ def practice(args) -> int:
     geo = load_geo(client)
     # The team's 8 practice slots are shared: wait for one instead of failing.
     for attempt in range(180):
+        if not args.board:
+            wait_blackout()
         try:
             world = client.create(args.level, board=True) if args.board else client.create(args.level, seed=args.seed)
             break
