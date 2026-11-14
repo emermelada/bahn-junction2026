@@ -277,8 +277,17 @@ class Config:
                                        # instead of the model's pick (0.80 picks ended 0.91x after 1.6-1.7 gigs/car; a 0.90 opening 0.945x, openings2.py)
     v5_repost: float = 0.0             # fee1's re-pick posts once at max(this, floors); no further model re-picks (last call and alarm unchanged; 0 = off)
     v5_pair2: bool = False             # at the re-pick, first try to pair the car with another open unbooked single of ours (pairs pay 0.84x)
+    v5_pair2_hub: int = 0              # v5_pair2 only into a chain whose final delivery has >= this many drivers living <= 30 road min, and only
+                                       # for a car with >= 6 h left (Franco's second-attempt cap; 0 = any end, any time)
+    v5_pair2_fee: float = 0.0          # v5_pair2's pair opens at this share of the two typical fees (0 = bundle_mult x fee_open = 0.84)
     v5_short_open: float = 0.0         # ladder singles with < 8 h to the last pickup (fee1 cannot choose) open at this, not fee_open (0 = off)
                                        # (a censored-exposure version, 85f9226, was -301 (se 152) on WAR vs this one: kept this)
+    # --- V5 HUB: pairs book by their END (research/re/drivers/PAIRS.md; research/re/v5/HUB_BUILD.md). Off by default.
+    pair_end: tuple = ()               # (w, min_nd): R1, rank pair/chain partners by score = base key in hours + w x ln(1 + drivers living
+                                       # <= 30 road min of the final delivery); min_nd > 0: never build a chain ending under min_nd such drivers.
+                                       # Pairs at 0.84: end nd30 0-10 book 67% in 60 min, warned 9.7%; 150+ 91%, 1.6% (() = off)
+    pair_long_empty: tuple = ()        # (drive_min, nd_max): R2, no chain with more than drive_min road minutes whose final delivery has
+                                       # <= nd_max drivers living <= 30 road min: post singles (PAIRS.md: such pairs 18.5% warned, singles 3.7%; () = off)
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
     backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little
     backhaul_mult: float = 1.0         # offer fee over typical fee (never under the app fee unless backhaul_below)
