@@ -339,6 +339,10 @@ PRESETS["v5La-pc1"] = PRESETS["v5La"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0
 PRESETS["v5La-pc2"] = PRESETS["v5La"] + ["bundle_climb=((0,0.60),(27,0.67),(54,0.74),(81,0.80))"]
 # The barrier's other direction: v5La96 (target 0.96) lost -202 with 14 fewer orders; 0.95 lets more volume through it.
 PRESETS["v5La95"] = PRESETS["v5aV2"] + ["late_barrier=(0.95,300,4,20)"]
+# Franco's fast-track spec (FLEET): combined_z = (z_fee + z_warn) / sqrt(2) >= 2.5, i.e. z_fee + z_warn >= 3.536, sticky for the week;
+# safe mode = v5La's knobs. Kept the early tier (sum >= 8 from Mon 12:00): without it the flip came at Tue 24:00, too late on nf-04.
+SWZF = ["scarcity=(9.0,9.0)", "scarcity_z=(1.002,0.044,0.037,0.029,3.536,8.0,720)"]
+PRESETS["v5La-lw5zF"] = PRESETS["v5La"] + ["long_warn=(240,5,1440)"] + SWZF + ["scarce_set=(('long_warn',(240,3,1440)),)"]
 # V5 HUB (research/re/v5/HUB_BUILD.md): pairs book by their END (research/re/drivers/PAIRS.md). Pair score in hours = old key / 60 + w x
 # ln(1 + nd30 of the final delivery). w = 2: nd30 5 -> 100 adds 2 x 2.8 = 5.6 h, above the usual spread of the old keys among a car's
 # feasible partners (latest start: p75 spread on the fixture week in HUB_BUILD.md; release hop: <= ~1 h, 98% of pairs hop <= 30 min);
@@ -362,3 +366,10 @@ PRESETS["v5o"] = PRESETS["v5La"] + ["v5_open=(8,0.88)", "v5_repost=0.88", "fee1_
 # 42 non-holdout weeks vs v5La: +408 (se 181), 42/42 ranked, worst 0.921 (research/re/LOG.md 23:05; v1-stack/data/runs/stkB).
 # Out (measured vs v5La): B2 rescue cap ~0, lw5z2 ~+39, dc8 -34, v5o -222, v5Lf02 -273; v5La+pc1+B2+lw5z2 left fresh-20 at 0.889.
 PRESETS["v5S"] = PRESETS["v5La"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0.80))", "pair_end=(2.0,0)", "pair_long_empty=(240,10)"]
+# Franco's Priority 2 (FLEET): second-attempt cap. A single missing its first gig with >= 6 h left is re-posted in a pair whose final
+# stop is a driver-dense hub (nd30 >= 80, PAIRS.md: pairs book by their end; V5's pair_end ranks partners by it), at 0.94x the two typical
+# fees instead of ~1.03x alone. v5p (pair at the re-pick, any end, 0.84x) was null (-26/-106): the hub and the price are the new parts.
+PRESETS["v5La-P2"] = PRESETS["v5La"] + ["v5_pair2=true", "v5_pair2_hub=80", "v5_pair2_fee=0.94"]  # (pair_end left off: it would also re-rank release pairs)
+# P2 on the stack base v5S (LEAD 23:20): Franco's second-attempt cap. v5S already ranks pairs by their end (pair_end) and keeps long chains
+# out of empty towns; P2 adds the pair at the re-pick into a hub end (nd30 >= 80, >= 6 h left) at 0.94x the two typical fees.
+PRESETS["v5S-P2"] = PRESETS["v5S"] + ["v5_pair2=true", "v5_pair2_hub=80", "v5_pair2_fee=0.94"]

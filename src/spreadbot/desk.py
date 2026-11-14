@@ -1365,6 +1365,8 @@ class Desk:
             mult = cfg.bundle_soon_mult  # starts soon: drivers' days are mostly planned, pay nearly two gigs' worth
             self.bundle_soon.update((first.order["id"], second.order["id"]))
         opening = mult * cfg.fee_open
+        if why == "pair2" and cfg.v5_pair2_fee:
+            opening = cfg.v5_pair2_fee  # second-attempt pair at a fixed share of the two typical fees (Franco: 0.92-0.96 vs ~1.03 alone)
         if cfg.bundle_open_dense and last - self.now >= cfg.bundle_open_dense[0] * HOUR and                 self.home_near_delivery(second.order["legs"][0]["delivery"]["placeId"]) >= cfg.bundle_open_dense[1]:
             opening = min(opening, cfg.bundle_open_dense[2])  # the chain ends where many drivers live: their ride home is free
         out = [{"at": self.now, "feeCents": int(round(typical * opening))}]
@@ -2068,6 +2070,8 @@ class Desk:
         ob = self.orders.get(rec.legs[0][0])
         if not ob or len(rec.legs) != 1 or not self.simple(ob):
             return False
+        if self.cfg.v5_pair2_hub and self.last_pickup(ob, [l for _, l in rec.legs]) - self.now < 6 * HOUR:
+            return False  # Franco's second attempt: only a miss with >= 6 h left (time for the fresh post's view burst)
         best = None
         self.pair_blocks.clear()
         for gid in sorted(self.gigs):
@@ -2081,6 +2085,8 @@ class Desk:
                 continue  # MARKET review: a partner near its last pickup would restart its booking clock in a new post
             for first, second in ((ob, other), (other, ob)):
                 last = self.chain(first, second)
+                if last is not None and self.cfg.v5_pair2_hub and                         self.home_near_delivery(second.order["legs"][0]["delivery"]["placeId"], PAIR_END_RADIUS) < self.cfg.v5_pair2_hub:
+                    continue  # the chain must end at a driver-dense hub: drivers living there take it home (pairs book by their end)
                 if last is not None and (best is None or self.chain_key(last, first, second) > self.chain_key(best[0], best[1], best[2])):
                     best = (last, first, second, r2)
         if best is None:

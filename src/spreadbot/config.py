@@ -286,6 +286,9 @@ class Config:
                                        # instead of the model's pick (0.80 picks ended 0.91x after 1.6-1.7 gigs/car; a 0.90 opening 0.945x, openings2.py)
     v5_repost: float = 0.0             # fee1's re-pick posts once at max(this, floors); no further model re-picks (last call and alarm unchanged; 0 = off)
     v5_pair2: bool = False             # at the re-pick, first try to pair the car with another open unbooked single of ours (pairs pay 0.84x)
+    v5_pair2_hub: int = 0              # v5_pair2 only into a chain whose final delivery has >= this many drivers living <= 30 road min, and only
+                                       # for a car with >= 6 h left (Franco's second-attempt cap; 0 = any end, any time)
+    v5_pair2_fee: float = 0.0          # v5_pair2's pair opens at this share of the two typical fees (0 = bundle_mult x fee_open = 0.84)
     v5_short_open: float = 0.0         # ladder singles with < 8 h to the last pickup (fee1 cannot choose) open at this, not fee_open (0 = off)
                                        # (a censored-exposure version, 85f9226, was -301 (se 152) on WAR vs this one: kept this)
     # --- V5 HUB: pairs book by their END (research/re/drivers/PAIRS.md; research/re/v5/HUB_BUILD.md). Off by default.
