@@ -133,7 +133,7 @@ function tierOf(f: Feasibility, option: DeliveryOption, legs: Leg[], geo: Geo, c
     else if (f.slackHours >= b.slackHours && (r30p >= b.reach30Pickup || r80p >= b.reach80Pickup || r30d >= b.reach30Delivery)) tier = "B"
     else tier = "C"
   }
-  const downgrades = ["private_pickup", "trade_in", "unparsed_note", "weekend_crossing"].filter((x) => f.flags.includes(x)).length
+  const downgrades = cfg.gate.downgrades.filter((x) => f.flags.includes(x)).length
   for (let i = 0; i < downgrades; i++) tier = tier === "A" ? "B" : "C"
   return tier
 }

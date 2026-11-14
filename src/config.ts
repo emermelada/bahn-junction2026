@@ -26,6 +26,7 @@ export type Cfg = {
     nextDay: { maxDriveMin: number }               // next_day with a longer drive is tier C (measured 82-85% on time at 4h+)
     poolBrake: { warnings: number; windowMin: number } // a pickup pool with this many deadline warnings on unbooked cars in the window: tier A only; warnings 0 = off
     reachMarginMin: number                         // minutes a driver needs to see a gig and get to the pickup
+    downgrades: string[]                           // flags that each cost one tier
     snowFactor: number
   }
   capacity: { safety: number; active: number; active80: number; pWin: number; dealerShareMax: number; dealerShareMinRequests: number; dealerSharePenalty: number; globalDayCap: number }
@@ -63,6 +64,7 @@ export const DEFAULT_CFG: Cfg = {
     nextDay: { maxDriveMin: 100000 },
     poolBrake: { warnings: 0, windowMin: 1440 },
     reachMarginMin: 90,
+    downgrades: ["private_pickup", "trade_in", "unparsed_note", "weekend_crossing"],
     snowFactor: 1.3,
   },
   capacity: { safety: 0.8, active: 0.3, active80: 0.1, pWin: 0.9, dealerShareMax: 0.6, dealerShareMinRequests: 5, dealerSharePenalty: 0.08, globalDayCap: 0.8 },

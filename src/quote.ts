@@ -17,7 +17,7 @@ type Kind = DeliveryOption["kind"]
 const SLOW_FIRST: Kind[] = ["within_3_days", "next_day", "same_day"]
 const TIER_RANK: Record<Tier, number> = { A: 0, B: 1, C: 2 }
 
-export type OptionDecision = { kind: Kind; tier: Tier; slack: number; day: number | null; admitted: boolean; why: string; price: number; list: number }
+export type OptionDecision = { kind: Kind; tier: Tier; slack: number; day: number | null; admitted: boolean; why: string; price: number; list: number; flags?: string[]; drive?: number; r30?: number }
 
 /** Price ratio source (pricing.ts later): returns the ratio to list for the slowest admitted option. */
 export type RatioFn = (request: PriceRequest, option: DeliveryOption, f: Feasibility) => number
@@ -88,7 +88,7 @@ export class Quoter {
         const admitted = why === ""
         if (admitted && day !== null) planned[option.kind] = day
         if (admitted) worstP = Math.min(worstP, this.cfg.governor.pOnTime[tier])
-        decisions.push({ kind: option.kind, tier, slack: Math.round(f.slackHours * 10) / 10, day, admitted, why, price: 0, list: option.listPriceCents })
+        decisions.push({ kind: option.kind, tier, slack: Math.round(f.slackHours * 10) / 10, day, admitted, why, price: 0, list: option.listPriceCents, flags: f.flags, drive: f.drive, r30: f.reachPickup })
       }
 
       // Prices: the ladder quotes every admitted option, slower cheaper; without it only the first admitted option.
