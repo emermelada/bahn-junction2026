@@ -124,7 +124,7 @@ class Market:
             for other, w in self.desk.nearby(place):
                 key = (other, day)
                 self.place_shift[key] = min(0.45, max(-0.3, self.place_shift.get(key, 0.0) + self.cfg.place_lr * w * k * g))
-        self.mu = min(max(self.mu, 0.95), 1.9)
+        self.mu = min(max(self.mu, 0.95, self.cfg.mu_floor), 1.9)
         self.day_shift[day] = min(max(self.day_shift[day], -0.4), 0.4)
         self.dealer_shift[dealer] = min(max(self.dealer_shift[dealer], -0.3), 0.3)
         self.n_obs += 1
