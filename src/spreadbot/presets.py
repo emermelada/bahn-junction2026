@@ -77,3 +77,6 @@ PRESETS["k-load"] = PRESETS["c3g"] + ["load_free=0.12", "load_slope=2"]
 # Stacks: + re-drivers' opening-fee rule (d-fee), + re-market's last-Monday load room (m2mon2 at a gentler 0.15).
 PRESETS["k-s1"] = PRESETS["k-load"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))"]
 PRESETS["k-s2"] = PRESETS["k-s1"] + ["load_free_mon2=0.15"]
+# k-s1 with the governor tightened by its measured error: projection at the last win is up to +0.021 above the final share
+# (research/re/projerr.py, 69 high-volume weeks), so the bar tightens under 0.945 to keep the worst week >= 0.93.
+PRESETS["k-s1g"] = PRESETS["k-s1"] + ["gov_tight=0.945", "gov_rescue=0.93", "gov_relaxed=0.95"]
