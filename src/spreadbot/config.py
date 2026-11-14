@@ -22,7 +22,7 @@ class Config:
     max_ratio: float = 1.80
     shadow_cents: int = 0              # opportunity cost of one car of driver capacity
     min_ev_cents: int = 200            # expected margin below this is not worth a driver
-    late_cost_frac: float = 0.6        # a late car: refund 10-50%, trust halved, the gate at risk
+    late_cost_frac: float = 2.0        # rc3: a late car costs refund + trust + gate risk; 2.0 with load 0.07 = y4, +24% over rc2 on 5 fresh weeks, 5/5 ranked
     drive_cost: bool = False           # expected fee by drive time (table in desk.py), not one average
     cost_prior: float = 1.15           # expected fee over typical fee with fee_plan (research: 0.9 books 64% in time)
     cost_prior_n: int = 30
@@ -60,7 +60,7 @@ class Config:
     cong_radius: float = 80.0          # km: drivers come from about this far for a typical gig
     cong_horizon: int = 18 * 60        # only gigs whose last pickup is within this many minutes
     # --- load: our cars due per day over the world's drivers
-    load_free: float = 0.05            # v1am: mean 9,661 vs 9,000 at 0.07, min on-time 0.938 (12 seeds)
+    load_free: float = 0.07            # rc3: with late 2.0 the long and thin-town cars get dear, so the safe ones can take more load (y4)
     adaptive_load: bool = False        # scale load_free by how easily our first posts book this week
     cap_min: float = 0.7
     cap_max: float = 1.4
@@ -106,8 +106,8 @@ class Config:
     bundle_mult: float = 0.8           # one driver, no trip home in between: the pair costs less than two gigs
     unbundle_minutes: int = 5 * 60     # unbooked this close to its last start: post the cars alone
     # --- evening release: hold cars picked up on a later day, release them together and pair them first
-    hold: bool = False                 # singles post at once; with hold, a car for a later day waits for its release
-    hold_hour: int = 18                # release at this hour of the day before the pickup day
+    hold: bool = True                  # rc3: a car for a later day waits for its release (+14% on dev-19..30, 12/12 ranked)
+    hold_hour: int = 16                # release at 16:00 the day before: 14-16 best; at 18-20 pairs stay unbooked into the night
     hold_all: bool = False             # hold every car (default: only cars that could be paired, see simple())
     hold_open: bool = True             # at a release, also pair with our open unbooked single gigs
     hold_price: bool = False           # quote a car that pairs with a held car (same pickup day, near) at the bundle cost
