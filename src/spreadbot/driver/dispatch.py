@@ -20,6 +20,7 @@ HOUR, DAY = 60, 24 * 60
 MID_SLACK = 8 * HOUR  # fee ladder: with 8-24 h to the last pickup, gigs near the typical fee still booked in time
 SPLIT_MINUTES = 12 * HOUR  # RULES: a gig with more than one car may plan at most 12 hours of driving
 EXPLICIT_MIN = 30  # a pickup window shorter than this is not worth posting: no driver could plan around it
+BUNDLE_REPOST_AGE = 180  # minutes: an open single this young has shown few drivers its fee, so re-posting it as a chain costs little
 BUNDLE_BUFFER = 60  # minutes of spare time a chain keeps before each car's deadline, for real driving times
 REFUSED_BACKOFF = 30  # minutes before we try a refused post again; refusals name a window, so the next try usually differs
 
@@ -50,14 +51,22 @@ def dispatch(state: State, now: int) -> list[Action]:
         need = [leg for leg in need if not _backing_off(state, (oid, leg), now)]
         if not need:
             continue
-        if FLAGS["bundle"] and pairable(state, order, need, now):
+        if FLAGS["bundle"] and need == [0] and pairable(state, order, now):
             waiting.append(order)
             continue
         groups = [need] if len(need) == 1 or drive_minutes(state, order, need) <= SPLIT_MINUTES else [[leg] for leg in need]
         for legs in groups:
             actions.append(post(state, order, legs, now))
             state.log(now, "post", oid, legs=legs, retry=any((oid, leg) in state.failures for leg in legs))
-    return actions + bundles(state, waiting, now) + chain_offers(state, now)
+    paired: set[str] = set()
+    if waiting:
+        chains, paired = bundles(state, waiting, now)
+        actions += chains
+    for order in waiting:  # cars without a partner go out alone at once
+        if order["id"] not in paired:
+            actions.append(post(state, order, [0], now))
+            state.log(now, "post", order["id"], legs=[0], retry=False)
+    return actions + chain_offers(state, now)
 
 
 def post(state: State, order: Order, legs: list[int], now: int) -> Action:
@@ -165,15 +174,15 @@ def gig_base(state: State, gig) -> float:
 
 # --- two-car chains ----------------------------------------------------------------------------------------------
 # A driver who delivers car A where car B waits saves a trip home and a trip out (HANDBOOK: a gig that ends near
-# the next pickup is cheap). We hold a new single car for a while, pair it with another whose pickup lies near
-# its delivery, and post both as one gig at a discount on the two fees.
+# the next pickup is cheap). Each new single car is paired with another new car, or with a single still open and
+# unbooked, whose pickup lies near its delivery; both go out as one gig at a discount on the two fees. Nothing is
+# held back. In a shortage a driver-day is the scarce thing; a chain moves two cars with one.
 
-def pairable(state: State, order: Order, need: list[int], now: int) -> bool:
-    """A new single car, with time to spare, still inside its holding time."""
+def pairable(state: State, order: Order, now: int) -> bool:
+    """A single-car order with time to spare: a candidate for a two-car chain."""
     oid = order["id"]
-    return (len(order["legs"]) == 1 and need == [0] and oid not in state.urgent and (oid, 0) not in state.failures
-            and (oid, 0) not in state.expired and order["lastPickupAt"] - now >= FLAGS["bundle_slack"]
-            and now - state.requests[oid]["respondBy"] < FLAGS["bundle_hold"])
+    return (len(order["legs"]) == 1 and oid not in state.urgent and (oid, 0) not in state.failures
+            and (oid, 0) not in state.expired and order["lastPickupAt"] - now >= FLAGS["bundle_slack"])
 
 
 def chain_ok(state: State, a: Order, b: Order, now: int) -> bool:
@@ -189,25 +198,45 @@ def chain_ok(state: State, a: Order, b: Order, now: int) -> bool:
             and at_pb + state.minutes(pb, db) <= b["deadline"] - BUNDLE_BUFFER)
 
 
-def bundles(state: State, waiting: list[Order], now: int) -> list[Action]:
-    """Pairs held cars greedily, in the order won. Unpaired cars wait until their holding time is over."""
+def open_singles(state: State, now: int) -> list[tuple[Order, str]]:
+    """Single-car gigs still open, posted recently and never repriced: they can be withdrawn and re-posted as a chain."""
+    out = []
+    for gid, gig in state.gigs.items():
+        if gig["status"] != "open" or len(gig["stops"]) != 2 or now - gig["postedAt"] > BUNDLE_REPOST_AGE \
+                or gig["scheduledAt"] != gig["postedAt"]:
+            continue
+        order = state.orders.get(gig["stops"][0]["orderId"])
+        if order is not None and pairable(state, order, now) and state.gig_of.get((order["id"], 0)) == gid:
+            out.append((order, gid))
+    return out
+
+
+def bundles(state: State, waiting: list[Order], now: int) -> tuple[list[Action], set[str]]:
+    """Pairs each new car with another new car or an open single, without holding anything back. Returns the
+    actions (a withdraw for a paired open single, then the chain's post) and the new orders it paired."""
     actions: list[Action] = []
     used: set[str] = set()
+    pool = [(o, None) for o in waiting] + open_singles(state, now)
     for a in waiting:
         if a["id"] in used:
             continue
-        for b in waiting:
-            if b["id"] in used or b is a or not chain_ok(state, a, b, now):
+        for b, gid in pool:
+            if b["id"] in used or b is a:
                 continue
-            pa, pb = post(state, a, [0], now), post(state, b, [0], now)
-            fee = round((pa["schedule"][0]["feeCents"] + pb["schedule"][0]["feeCents"]) * FLAGS["bundle_factor"])
-            audience = {k: pa["audience"][k] or pb["audience"][k] for k in pa["audience"]}
-            actions.append({"type": "post", "stops": pa["stops"] + pb["stops"], "audience": audience,
+            first, second = (a, b) if chain_ok(state, a, b, now) else (b, a) if chain_ok(state, b, a, now) else (None, None)
+            if first is None:
+                continue
+            if gid is not None:
+                actions.append({"type": "withdraw", "gigId": gid})
+            pf, ps = post(state, first, [0], now), post(state, second, [0], now)
+            fee = round((pf["schedule"][0]["feeCents"] + ps["schedule"][0]["feeCents"]) * FLAGS["bundle_factor"])
+            audience = {k: pf["audience"][k] or ps["audience"][k] for k in pf["audience"]}
+            actions.append({"type": "post", "stops": pf["stops"] + ps["stops"], "audience": audience,
                             "schedule": [{"at": now, "feeCents": fee}]})
             used.update((a["id"], b["id"]))
-            state.log(now, "post_bundle", a["id"], with_order=b["id"], fee=fee)
+            state.log(now, "post_bundle", first["id"], with_order=second["id"], fee=fee, rebundled=gid)
             break
-    return actions
+    return actions, used
 
 
 def _backing_off(state: State, leg: tuple[str, int], now: int) -> bool:

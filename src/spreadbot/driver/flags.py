@@ -13,7 +13,6 @@ FLAGS = {
     "chain_offer": 0.0,  # offer an open gig to a booked driver finishing near its pickup, at this multiple of the typical fee; 0 is off
     "bundle": False,  # post two single cars as one chain when car A delivers near car B's pickup
     "bundle_factor": 0.8,  # the chain's fee as a share of the two single fees
-    "bundle_hold": 120,  # minutes a new car waits for a partner before it is posted alone
     "bundle_slack": 480,  # only cars with at least this many minutes to their last pickup wait for a partner
     "bundle_gap": 45,  # road minutes at most from car A's delivery to car B's pickup
     "min_drivers_near": 0,  # decline pickups with fewer drivers living within 30 km; 0 is off
