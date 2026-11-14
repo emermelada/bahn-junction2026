@@ -180,3 +180,7 @@ PRESETS["k-safe-kmh"] = PRESETS["k-safe"] + ["bundle_km=50", "hold_minutes=120",
 # k-safe-dc + re-drivers' long_split: a pair with >= 6 h of driving still unbooked 3 h after posting goes out as singles
 # (long pairs carry 4.4 of 20.5 warned singles a week; k-safe-ls vs k-safe: +540/+220, worst 0.960/0.948 vs 0.942).
 PRESETS["k-safe-dcls"] = PRESETS["k-safe-dc"] + ["long_split=(360,180)"]
+# MARKET v4: quote each car at its own expected fee (fee_gbm.py: 0.90x for cars ending where drivers live .. 1.23x for lone cars
+# ending far from them) instead of one week-mean cost; the week's fee level stays cost_mult.
+PRESETS["kdcl-fm"] = PRESETS["k-safe-dcl"] + ["fee_model=1.0"]
+PRESETS["kdcl-fm5"] = PRESETS["k-safe-dcl"] + ["fee_model=0.5"]

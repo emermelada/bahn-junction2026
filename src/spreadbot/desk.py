@@ -137,6 +137,8 @@ class Desk:
         self.quote_meta: dict[str, dict] = {}  # request id -> option -> on-time chance at quote time
         self.market = Market(self)
         self.ontime = OnTime(self)
+        self.fee_model = None  # FeeModel, built on first quote when cfg.fee_model
+        self.fee_meta: dict[str, dict] = {}  # request id -> option -> the trees' fee mult at quote time
         self.gov = Governor(self)
         self.book_ratios: list[float] = []
         self.gig_open: dict[str, int] = {}     # gig -> its first posted fee (relooks and escalations replace the schedule)
@@ -196,6 +198,8 @@ class Desk:
             ob.p_exp = self.p_expensive(self.requests[o["id"]], o)
         self.due_count[min(self.deadline(o, l) for l in range(len(o["legs"]))) // DAY] += 1 if o["id"] in self.requests else 0
         ob.p_ok = self.quote_meta.get(o["id"], {}).get(o["option"], 0.85)
+        if self.fee_model is not None and o["option"] in self.fee_meta.get(o["id"], {}):
+            self.fee_model.won.append(self.fee_meta[o["id"]][o["option"]])
         self.orders[o["id"]] = ob
         self.won_count += 1
         self.observe_outcome(o["id"], e["at"], True)
@@ -560,6 +564,15 @@ class Desk:
             if cfg.quote_move_cost:
                 # The fee rule opens cheap where drivers live near the delivery and the pickup is far off: quote that cost.
                 c_opt = cost * self.move_cost(r, opt) / max(1.0, r["referenceFeeCents"] * self.cost_mult())
+            fm = 0.0
+            if cfg.fee_model:
+                # The car's own expected fee (where its drivers live, its lead, pairing chances) over the mean of our recent wins.
+                if self.fee_model is None:
+                    from .fee_gbm import FeeModel
+                    self.fee_model = FeeModel(self)
+                fm = self.fee_model.mult(r, opt)
+                self.fee_meta.setdefault(r["id"], {})[kind] = fm
+                c_opt = c_opt * (1.0 + cfg.fee_model * (fm / self.fee_model.level() - 1.0))
             ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, c_opt, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 info.append(f"{kind}:noev")
@@ -575,7 +588,7 @@ class Desk:
                     info.append("invest")
             prices[kind] = int(round(opt["listPriceCents"] * ratio * tf))
             meta[kind] = p_ok
-            info.append(f"{kind}:r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f},L={load:.3f}")
+            info.append(f"{kind}:r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f},L={load:.3f}" + (f",fm={fm:.2f}" if fm else ""))
         if cfg.menu and cands:
             place = r["legs"][0]["pickup"]["placeId"]
             fast = r["options"][0]
