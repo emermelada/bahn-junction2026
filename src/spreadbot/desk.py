@@ -516,7 +516,7 @@ class Desk:
                 # V2: the car costs its predicted clearing fee plus the shadow price of its driver-hours on the day the
                 # planner would move it (free while that day has idle hours). No load charge: lam is the load.
                 # the dealer's typical fee carries the lane (hard lanes pay more for the same minutes): never under it
-                v2_cost = max(self.fees.clearing(region, pday, 8, drive, 1), r["referenceFeeCents"] * cfg.v2_fee_mult * self.fees.adj())
+                v2_cost = max(self.fees.clearing(region, pday, 8, drive, 1), r["referenceFeeCents"] * cfg.v2_fee_mult * getattr(self.fees, "adj", lambda: 1.0)())
                 if cfg.v2_war_chain and self.market.day_shift[day] < -cfg.war_shift and self.planner.has_partner(r, pday):
                     v2_cost *= cfg.bundle_mult  # price war: only a car that shares a driver with a planned one still pays
                 load_cost = self.planner.lam(region, pday) * 100.0 * self.planner.hours_of(r)
