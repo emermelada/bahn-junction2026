@@ -28,19 +28,20 @@ export class Governor {
   }
 
   /** Headroom under the budget when the candidate with on-time probability p is added. */
-  headroom(now: number, p: number, atRisk: number): number {
+  headroom(now: number, p: number, atRisk: number, extra = { late: 0, won: 0 }): number {
     const g = this.cfg.governor
-    const won = this.books.wonCount
-    const late = this.books.lateCount + g.atRiskWeight * atRisk + (1 - p)
+    const won = this.books.wonCount + extra.won
+    const late = this.books.lateCount + extra.late + g.atRiskWeight * atRisk + (1 - p)
     return g.lateBudget - late / Math.max(won + 1, g.minDenominator)
   }
 
   /** Updates the mode with hysteresis and tells whether a candidate of this tier is admitted now. */
-  admit(tier: Tier, now: number, atRisk: number): { ok: boolean; mode: Mode; headroom: number } {
+  /** `extra` = expected late cars and expected wins of quotes still pending (sent, outcome not known). */
+  admit(tier: Tier, now: number, atRisk: number, extra = { late: 0, won: 0 }): { ok: boolean; mode: Mode; headroom: number } {
     const g = this.cfg.governor
     const p = g.pOnTime[tier]
-    const h = this.headroom(now, p, atRisk)
-    const hNoCandidate = this.headroom(now, 1, atRisk)
+    const h = this.headroom(now, p, atRisk, extra)
+    const hNoCandidate = this.headroom(now, 1, atRisk, extra)
     if (this.mode === "GREEN" && hNoCandidate <= g.amberHeadroom) this.mode = "AMBER"
     else if (this.mode === "AMBER" && hNoCandidate > g.greenHeadroom) this.mode = "GREEN"
     if (this.mode !== "RED" && hNoCandidate <= 0) this.mode = "RED"

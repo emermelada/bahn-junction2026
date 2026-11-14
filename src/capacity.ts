@@ -90,6 +90,15 @@ export class Capacity {
     this.add(c, +1)
   }
 
+  /** On order_won with the option the dealer chose: drop the pending reservation, commit on that option's planned day. */
+  commitAt(orderId: string, pickup: string, day: number): void {
+    this.release(orderId)
+    const c: Reservation = { pool: this.geo.poolId(pickup), day, weight: 1 }
+    this.free(orderId)
+    this.committed.set(orderId, c)
+    this.add(c, +1)
+  }
+
   /** When a driver books the car (or the order ends) its load is given back: the driver is now accounted for. */
   free(orderId: string): void {
     const c = this.committed.get(orderId)

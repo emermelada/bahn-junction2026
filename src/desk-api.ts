@@ -25,6 +25,9 @@ export interface Desk {
   readonly now: number
   /** Rebuild all books from a snapshot and the full event history, then answer what was missed. */
   rejoin(snapshot: DeskSnapshot, history: DeskEvent[]): Promise<void>
+  /** Sets the desk clock to the minute the world reached, before that stop's events are handled (the kit does
+   * `desk.now = step.now` first; the regression depends on it). No decisions. */
+  setClock(now: number): void
   /** Ingest one event. The caller has already dropped repeats by seq. Await it: it may call ctx.act. */
   handle(event: DeskEvent): Promise<void>
   /** Time-based work (at-risk sweeps, scheduled offers). Called at every stop of the clock, after the events. */
@@ -48,14 +51,18 @@ export const WAKE_ON: DeskEventKind[] = [
 export const WAKE_ON_STARTER: DeskEventKind[] = ["price_request", "order_won", "order_changed", "order_cancelled", "visit_failed", "gig_expired", "deadline_close"]
 
 export type StepPolicy = {
-  /** "stride": advance untilEvent WAKE_ON with max = now + strideMin (plus night/Sunday skips); "starter": the kit's one-step-per-request loop. */
+  /** "stride": advance untilEvent WAKE_ON with max = now + strideMin; at night / weekends (no request expected) the
+   * advance also wakes on price_request and runs to the next day start. "starter": the kit's one-step-per-request loop. */
   kind: "stride" | "starter"
   strideMin: number
   nightSkip: boolean
+  /** Minutes of day [dayFrom, dayTo) on Mon-Fri when requests are frequent enough that the stride is used. */
+  dayFrom: number
+  dayTo: number
 }
 
-export const STRIDE_POLICY: StepPolicy = { kind: "stride", strideMin: 14, nightSkip: true }
-export const STARTER_POLICY: StepPolicy = { kind: "starter", strideMin: 0, nightSkip: false }
+export const STRIDE_POLICY: StepPolicy = { kind: "stride", strideMin: 14, nightSkip: true, dayFrom: 8 * 60, dayTo: 18 * 60 + 30 }
+export const STARTER_POLICY: StepPolicy = { kind: "starter", strideMin: 0, nightSkip: false, dayFrom: 0, dayTo: 0 }
 
 /** Per-run artifacts under runs/<runId>/ (written by the runners, read by analyze.ts):
  *   meta.json        RunMeta

@@ -5,6 +5,10 @@ import type { Cfg } from "./config.ts"
 import type { Desk, DeskContext } from "./desk-api.ts"
 import { DAY, HOUR } from "./desk-api.ts"
 import { Geo } from "./geo.ts"
+import { Books } from "./books.ts"
+import { Capacity } from "./capacity.ts"
+import { Governor } from "./governor.ts"
+import { Quoter } from "./quote.ts"
 
 /** How to post a leg again after a failed visit. */
 export type Retry = { pickupFrom: number; manualLicence: boolean; plates: boolean }
@@ -30,12 +34,24 @@ export class V2Desk implements Desk {
   readonly urgent = new Set<string>() // orders whose deadline warning has come
   // --- books (v2) ---
   readonly quoted = new Set<string>() // requests answered (so rejoin does not quote twice)
+  readonly books: Books
+  readonly capacity: Capacity
+  readonly governor: Governor
+  readonly quoter: Quoter
+  readonly toQuote: PriceRequest[] = [] // requests waiting for the one-pass quote decision (v2 quote path)
+  readonly v2Quote: boolean
 
   constructor(cfg: Cfg, ctx: DeskContext) {
     this.cfg = cfg
     this.ctx = ctx
     this.level = ctx.level
     this.geo = new Geo(ctx.map, ctx.roster)
+    this.books = new Books(this.geo)
+    this.capacity = new Capacity(cfg, this.geo, this.books)
+    this.governor = new Governor(cfg, this.books)
+    this.quoter = new Quoter(cfg, this.geo, this.books, this.capacity, this.governor)
+    const f = cfg.flags
+    this.v2Quote = f.gate || f.capacity || f.governor || f.ladder || f.pricing
   }
 
   // ------------------------------------------------------------------ lifecycle
@@ -62,6 +78,10 @@ export class V2Desk implements Desk {
 
   async handle(event: DeskEvent): Promise<void> {
     this.now = Math.max(this.now, event.at)
+    this.books.track(event)
+    if (event.kind === "order_won") this.quoter.onWon(event.order)
+    else if (event.kind === "order_lost") this.quoter.onLost(event.requestId)
+    else if (event.kind === "order_cancelled") this.quoter.onCancelled(event.orderId)
     if (event.kind === "price_request") this.quote(event.request)
     else if (event.kind === "order_won") await this.win(event.order)
     else if (event.kind === "order_changed") await this.change(event.order)
@@ -74,12 +94,46 @@ export class V2Desk implements Desk {
     else if (event.kind === "delivered") this.delivered(event.orderId, event.leg, event.at)
   }
 
-  async tick(now: number): Promise<void> {
+  setClock(now: number): void {
     this.now = Math.max(this.now, now)
   }
 
+  async tick(now: number): Promise<void> {
+    this.now = Math.max(this.now, now)
+    if (this.v2Quote) this.markMissed()
+  }
+
   drain(): Action[] {
+    this.flushQuotes()
     return this.outbox.splice(0)
+  }
+
+  /** Decides every waiting request in one pass (v2 quote path). Quotes go to the front of the outbox. */
+  flushQuotes(): void {
+    if (this.toQuote.length === 0) return
+    const requests = this.toQuote.splice(0)
+    const quotes = this.quoter.decide(requests, this.now, this.atRisk(), this.ctx.log)
+    this.outbox.unshift(...quotes)
+  }
+
+  /** Orders without a driver whose last pickup is within atRiskMin minutes (for the governor). */
+  atRisk(): number {
+    return this.governor.atRisk(this.now, (orderId) => {
+      const gigs = this.gigsOf(orderId)
+      if (gigs.length === 0) return "none"
+      return gigs.every((g) => this.booked.has(g)) ? "booked" : "open"
+    })
+  }
+
+  /** Sticky lateness: an order whose last pickup minute has passed with no driver holding its gig counts as late. */
+  markMissed(): void {
+    for (const book of this.books.orders.values()) {
+      if (book.late || book.deliveredAll) continue
+      if (this.now <= book.order.lastPickupAt) continue
+      const gigs = this.gigsOf(book.order.id)
+      if (gigs.length > 0 && gigs.every((g) => this.booked.has(g))) continue
+      this.books.markLate(book, "missed_last_pickup")
+    }
   }
 
   onResults(actions: Action[], results: ActionResult[]): void {
@@ -102,6 +156,11 @@ export class V2Desk implements Desk {
     this.requests.set(request.id, request)
     if (this.quoted.has(request.id)) return
     this.quoted.add(request.id)
+    if (this.v2Quote) {
+      if (!this.books.requests.has(request.id)) this.books.requests.set(request.id, request)
+      this.toQuote.push(request)
+      return
+    }
     const first = request.options[0]!
     this.outbox.push({ type: "quote", requestId: request.id, prices: { [first.kind]: first.listPriceCents } })
   }
@@ -193,7 +252,12 @@ export class V2Desk implements Desk {
 
   readResults(actions: Action[], results: ActionResult[]): void {
     actions.forEach((action, i) => {
-      if (action.type === "post" && results[i]?.ok) this.carry(action, (results[i] as { ok: true; id: string }).id)
+      if (action.type === "post" && results[i]?.ok) {
+        const id = (results[i] as { ok: true; id: string }).id
+        this.carry(action, id)
+        const last = action.stops.at(-1)!
+        this.books.posted(id, [...new Set(action.stops.map((s) => s.orderId))], pickups(action), this.now, action.schedule[0]?.feeCents ?? 0, this.books.placeOf(last.orderId, last.leg, last.kind), "")
+      }
     })
   }
 }
