@@ -25,6 +25,7 @@ FLAGS = {
     "skip_private": True,  # decline private pickups and deliveries: 20-23% late for next_day (b11: rc1 8/9 -> 9/9 ranked)
     "gov_tight": 0.05,  # projected late share above which the governor goes tight (plan: budget 5%)
     "gov_rescue": 0.08,  # and above which it goes to rescue (never spend 10%)
+    "gov_warning_weight": 0.5,  # how much an unheld order with a deadline warning counts as late in the projection
     "gov_loose": 0.0,  # projected late share under which Monday-Wednesday goes loose (more backlog); 0 is off
     "loose_backlog": 1.6,  # backlog cap multiplier in loose mode
     "governor": True,  # risk_mode from the projected late share; tight and rescue make serviceability stricter (b7: 3/3 ranked)

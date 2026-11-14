@@ -32,7 +32,7 @@ def projected_late_share(state: State, now: int) -> float:
         if unheld and now > order["lastPickupAt"]:
             late += 1
         elif unheld and order["id"] in state.urgent:
-            late += 0.5
+            late += FLAGS["gov_warning_weight"]  # a deadline warning without a driver: likely late
     return late / max(won, MIN_ORDERS)
 
 
