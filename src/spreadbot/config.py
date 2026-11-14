@@ -26,6 +26,7 @@ class Config:
     outage_up: float = 0.25            # the flagged region's competitor level, times (1 + this)
     outage_min: int = 4                # results in the region before it can be flagged
     fee_model: float = 0.0             # MARKET v4: weight of the per-car fee shape (fee_gbm.py trees / their mean on our wins) in the quote cost (0 = off, 1 = full)
+    fee_model_knee: float = 0.0        # with fee_model: only the excess of the car's fee shape over this is added (1 + max(0, shape - knee)): dear cars cost more, cheap ones keep the flat cost (0 = full shape)
     fee_model_abs: bool = False        # with fee_model: quote cost = typical x the trees' fee x this week's paid/predicted per car (the true expected fee), not cost_mult's level
     quote_cost_hold: float = 0.0       # quote cost = typical x this constant instead of cost_mult (our running booking ratio): fee savings stay margin
                                        # instead of passing to dealers while the load charge binds (m25: -396 at equal orders); 1.05 = k-safe-dcl's mean (0 = off)

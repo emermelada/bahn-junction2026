@@ -577,6 +577,10 @@ class Desk:
                 self.fee_meta.setdefault(r["id"], {})[kind] = fm
                 if cfg.fee_model_abs:
                     c_opt = r["referenceFeeCents"] * fm * self.fee_model.calib()  # the car's own expected fee, at this week's level
+                elif cfg.fee_model_knee:
+                    # Only the cars our fleet moves far above the usual fee (lone, far from drivers' homes: top decile 1.23x, 10-16% late)
+                    # are priced up; the rest keep the flat cost (discounting cheap cars gave their margin away, m21-fm autopsy).
+                    c_opt = c_opt * (1.0 + max(0.0, fm / self.fee_model.level() - cfg.fee_model_knee))
                 else:
                     c_opt = c_opt * (1.0 + cfg.fee_model * (fm / self.fee_model.level() - 1.0))
             ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, c_opt, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))

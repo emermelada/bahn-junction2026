@@ -194,3 +194,4 @@ PRESETS["kdcl-hold"] = PRESETS["k-safe-dcl"] + ["quote_cost_hold=1.05"]  # contr
 # re-market's measured over-reaction of mu's parts (PRICING.md: day 0.65, dealer 0.33-0.49, lane 0.56-0.63), killed at 14:00 after one week:
 # judged here on the floor (cheap-competitor weeks) on all 35 tuning weeks.
 PRESETS["kdcl-muw"] = PRESETS["k-safe-dcl"] + ["mu_w=(0.65,0.4,0.6)"]
+PRESETS["kdcl-fmtop"] = PRESETS["k-safe-dcl"] + ["fee_model=1.0", "fee_model_knee=1.1"]  # only cars > 1.1x the usual fee priced up
