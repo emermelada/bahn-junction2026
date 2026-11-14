@@ -186,3 +186,4 @@ PRESETS["kdcl-fm"] = PRESETS["k-safe-dcl"] + ["fee_model=1.0"]
 PRESETS["kdcl-fm5"] = PRESETS["k-safe-dcl"] + ["fee_model=0.5"]
 # fee_model alone: EUR -58 (se 233) but on time 0.965 -> 0.974 at equal orders (fewer dear late cars): spend that room on volume.
 PRESETS["kdcl-fm-ls"] = PRESETS["kdcl-fm"] + ["load_slope=0.5"]
+PRESETS["kdcl-ls"] = PRESETS["k-safe-dcl"] + ["load_slope=0.5"]  # control for kdcl-fm-ls: the load change alone
