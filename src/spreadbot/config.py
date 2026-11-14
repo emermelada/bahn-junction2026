@@ -59,6 +59,9 @@ class Config:
     gov_tight: float = 0.95            # projected on-time share under which the bar tightens (v1w: min on-time 0.932 vs 0.919)
     gov_rescue: float = 0.93 
     gov_stuck_p: float = 0.0           # projection: an order whose gig is posted but unbooked for gov_stuck_age minutes counts as this likely
+    gov_stuck_left: int = 100000        # gov_stuck_p applies when the last pickup is this close; further out the cap is gov_stuck_far
+    gov_stuck_far: float = 0.0         # (0 = gov_stuck_p for every stuck order, the first version)
+    gov_stuck_steep: bool = True       # the escalation level also reads the stuck-adjusted projection (False: only the admission bar)
     gov_stuck_age: int = 60            # on time (0 = off). Such orders end late 40-55% of the time in every week (lab/build/openstate.py, 13 weeks)
     strict_warn: float = 0.0           # when this share of our orders has had a deadline warning, switch to the strict governor (0 = off):
     strict_after: int = 60             # (judged once we hold this many orders) dev-43: c1 had 20 warnings by Thursday (8%), normal weeks 2-5%

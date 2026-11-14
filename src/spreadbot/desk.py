@@ -1155,7 +1155,7 @@ class Desk:
         cfg = self.gov_cfg()
         if not cfg.gov_steep:
             return cfg.steep_plan
-        proj = self.gov.projection()
+        proj = self.gov.projection(stuck=cfg.gov_stuck_steep)
         level = 0 if proj >= cfg.gov_relaxed else 1 if proj >= cfg.gov_tight else 2
         if cfg.protect_trust_cents and ob is not None:
             loss = self.trust_value(ob.order["dealerId"])[1]

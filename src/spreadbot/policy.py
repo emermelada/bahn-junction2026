@@ -167,7 +167,7 @@ class Governor:
         k = len(done) / (len(done) + 30)  # shrink to 1 while few orders are done
         return min(1.05, max(0.75, k * obs / max(pred, 1e-6) + (1 - k)))
 
-    def projection(self) -> float:
+    def projection(self, stuck: bool = True) -> float:
         """Expected final on-time share of the orders won so far, from the live state of each open order."""
         d = self.desk
         ontime = len(d.ontime_orders)
@@ -189,9 +189,13 @@ class Governor:
                 p = 0.45
             else:
                 p = ob.p_ok * cal
-                if d.cfg.gov_stuck_p and any((g := d.leg_gig.get((oid, l))) and d.gigs[g].status == "open"
-                                             and d.now - d.gigs[g].posted_at >= d.cfg.gov_stuck_age for l in legs):
-                    p = min(p, d.cfg.gov_stuck_p)  # nobody booked it for an hour: about a coin flip
+                c = d.cfg
+                if stuck and c.gov_stuck_p and any((g := d.leg_gig.get((oid, l))) and d.gigs[g].status == "open"
+                                                   and d.now - d.gigs[g].posted_at >= c.gov_stuck_age for l in legs):
+                    # Nobody booked it for an hour. Measured: 30-40% late with under a day to its last pickup, 15-20% with more.
+                    near = d.last_pickup(ob, legs) - d.now <= c.gov_stuck_left
+                    cap = c.gov_stuck_p if near else (c.gov_stuck_far or 1.0)
+                    p = min(p, cap)
             open_p += p
         total = ontime + late + n_open
         return (ontime + open_p) / total if total else 1.0
