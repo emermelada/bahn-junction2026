@@ -1,6 +1,7 @@
 # v1 (branch-v1-frank) — status and commands
 
 ## Where it stands (Fri 13 Nov, 23:59 Helsinki)
+- **Preset `chains` (recommended)** (`./run_final.sh --preset chains`): money settings with an on-time guard at 92% plus the hold-and-pair chain planner. 36 weeks ranked 36/36, min on-time 0.906; fresh dev-31..42: €13.1k/week vs rc2 €10.2k. Log: `docs/log/frank-20261114-1300-chains.md`.
 - **Preset `money`** (`--preset money`): on 12 fresh seeds €12.1k/week mean and median (+29% vs rc2), but only 9/12 weeks reach 90% on time.
 - **Tag `rc2`** (load_free 0.05) on 12 fresh level 8 seeds (dev-19..30): ranked 12/12, worst on-time 0.935, median €8.9k, mean €9.4k, worst week €5.4k. rc1: 12/12, mean €9.2k.
 - Top of the Friday 20:01 board: Juhus ~€14.0k/week, House best ~€12.1k/week (5 runs each).
