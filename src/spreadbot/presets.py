@@ -61,3 +61,4 @@ PRESETS["d-fee"] = PRESETS["c3gf"]
 PRESETS["d-fee2"] = PRESETS["c3gf2"]
 PRESETS["d-pair"] = PRESETS["c3ge"]
 PRESETS["d-offer"] = PRESETS["c3go"]
+PRESETS["d-feer"] = PRESETS["d-fee"] + ["relook_minutes=90", "relook_mult=1.05"]  # a low opening unbooked after 90 min goes back to 1.05 now
