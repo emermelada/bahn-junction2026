@@ -161,6 +161,15 @@ class Config:
     relook_minutes: int = 0            # an open single still unbooked this long after posting gets one raise now (Halal 360); 0 = off
     relook_mult: float = 1.2           # to this x typical fee (one step above fee_open 1.05); later fee_rel steps stay above it
     relook_min_left: int = 8 * 60      # only while its last pickup is further than this: closer, fee_rel's own raises take over
+    # --- V3 engine (src/spreadbot/v3.py): win by fleet cost, flat fee per gig, barrier price on lateness
+    engine: str = "c3"                 # "c3" = the desk as is; "v3" = V3Desk's quote and fee (preset v3)
+    v3_target: float = 0.96            # on-time share where the barrier reaches v3_barrier_cents (Halal 0.96; 0.95 let a hold week fall to 89.7%)
+    v3_barrier_cents: int = 30000      # price of one more expected late car at the target (Halal and alignas: EUR 300); x16 at twice the late share
+    v3_refund_frac: float = 0.45       # expected refund share of a late car's price (10/25/50/100% tiers, most late cars are hours late)
+    v3_late_cents: int = 2000          # plus goodwill and trust: -1.5% of that dealer's prices per late car (research/trust/TRUST.md)
+    v3_fee_grid: tuple = (0.85, 1.0, 1.15, 1.3, 1.5)  # flat fees tried per gig (Halal's grid; 0.70 books 39%, too few)
+    v3_floor: float = 0.925            # always ranked first: with the projection under this, only cars with P(late) <= v3_floor_pl
+    v3_floor_pl: float = 0.05
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
     backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little
     backhaul_mult: float = 1.0         # offer fee over typical fee (never under the app fee unless backhaul_below)

@@ -22,6 +22,7 @@ import spread
 import spread.stream
 
 from .config import Config
+from .v3 import make_desk
 from .desk import Desk
 from .geo import DAY, HOUR, load_geo
 
@@ -123,7 +124,7 @@ def play_on(world: "spread.World", geo, cfg: Config, level: int, quiet: bool, bo
         try:
             events = world.events()
             snap = world.snapshot()
-            desk = Desk(geo, cfg, level, snap["now"], world.roster())
+            desk = make_desk(geo, cfg, level, snap["now"], world.roster())
             rejoin(desk, snap, events)
             rebuilds += 1
             play_practice(world, desk, snap["endsAt"], events, quiet=quiet, after=events[-1]["seq"] if events else -1)
@@ -177,7 +178,7 @@ def practice(args) -> int:
     rebuilds = 0
     try:
         snap = patient(world.snapshot)
-        desk = Desk(geo, cfg, args.level, snap["now"], patient(world.roster))
+        desk = make_desk(geo, cfg, args.level, snap["now"], patient(world.roster))
         play_practice(world, desk, snap["endsAt"], events, quiet=args.quiet)
         score = patient(world.score)
     except BaseException as first_error:
@@ -424,7 +425,7 @@ def run_live(world, client, geo, cfg: Config, logf, clock) -> bool:
         level = next((w["level"] for w in client.worlds() if w["worldId"] == world.id), 8)
     except spread.SpreadError:
         level = 8  # the final is level 8; the list costs a practice token and may fail on its own
-    desk = Desk(geo, cfg, level, snapshot["now"], roster)
+    desk = make_desk(geo, cfg, level, snapshot["now"], roster)
     rejoin(desk, snapshot, history)
     print(f"rebuilt at minute {desk.now}: {len(history)} events, {len(desk.orders)} orders, {len(desk.held)} held, "
           f"{len(snapshot['openRequests'])} open requests, {len(desk.outbox)} actions to send", flush=True)

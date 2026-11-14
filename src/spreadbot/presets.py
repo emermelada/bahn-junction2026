@@ -48,3 +48,6 @@ PRESETS["best"] = PRESETS["c1"]  # the current best version (team objective: raw
 PRESETS["c3bp"] = PRESETS["c3"] + ["repair_pairs=true", "repair_lead=180", "repair_mult=0.85", "repair_split=60"]
 PRESETS["c3rl"] = PRESETS["c3"] + ["relook_minutes=360"]
 PRESETS["c3bprl"] = PRESETS["c3bp"] + ["relook_minutes=360"]
+# V3 (claude/v3-fresh): the volume engine on c3's desk. Quote by fleet cost with a barrier on lateness (no load price, no bar),
+# one flat fee per gig from the on-time model, pairs at 0.70x, sitting cars paired at 0.85x and split after 60 min, second look at 6 h.
+PRESETS["v3"] = PRESETS["c3bprl"] + ["engine=v3", "fee_open=1.0", "fee_rel=()", "bundle_mult=0.7", "relook_mult=1.15"]
