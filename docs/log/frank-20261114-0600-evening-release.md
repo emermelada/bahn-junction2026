@@ -68,3 +68,7 @@ Money line with stricter guards (all + hold 16): y5 guard 0.93: 11/12, mean 10,8
 | hold 16:00 + late 1.2 + load 0.06 (y3) | 62,185 | 12,437 | 5/5 | 0.947 | 5,340 |
 
 y4 +24% over rc2, and the only version that also lifts the bad week (dev-32: 7,132 vs 5,276). Candidate rc3 = y4.
+
+## Restart test (emulated live week, emu-05, y4 defaults)
+Killed at minute 2350 (Tue 15:10, an hour before the 16:00 release, 157 held cars over the week), rebuilt from snapshot and events, played on.
+End: 20,406, 392 orders, on-time 0.967, ranked; 55 release pairs, 10 split back; no errors from the bot (a DNS failure hit the emulator's ticker at the very end; the world was advanced to its end by hand).
