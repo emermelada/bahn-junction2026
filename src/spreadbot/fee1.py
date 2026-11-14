@@ -41,7 +41,6 @@ class Fee1:
         self.closed_h = 0.0   # predicted cumulative hazard of finished fee1 exposures (uncalibrated)
         self.closed_n = 0     # and their bookings
         self.done: set[str] = set()
-        self.picks: dict[str, int] = {}  # order -> fee1 posts so far (re-picks are capped)
 
     # ------------------------------------------------------------------ features (as research/re/fleet/book_data.py)
     def home_near_pickup(self, place: str, minutes: int) -> int:
@@ -69,9 +68,30 @@ class Fee1:
                 near.append(current_fee(rec.schedule, d.now) / max(1.0, d.gig_base(rec)))
         return near, n_open
 
+    def history(self, oid: str, before: int) -> tuple[int, float]:
+        """(n_prev, first posted minute): our gigs, any status, that carried this order and were posted before `before`.
+        Read from the gigs themselves, so a restart rebuilds it from the snapshot."""
+        n, first = 0, None
+        for gid in sorted(self.desk.gigs):
+            rec = self.desk.gigs[gid]
+            if rec.posted_at < before and any(o == oid for o, _ in rec.legs):
+                n += 1
+                first = rec.posted_at if first is None else min(first, rec.posted_at)
+        return n, (float(first) if first is not None else float(before))
+
+    def posts(self, oid: str, legs: list[int]) -> int:
+        """Single-order gigs we posted for these legs of the order (the re-pick cap counts them; restart-proof)."""
+        n = 0
+        for gid in sorted(self.desk.gigs):
+            rec = self.desk.gigs[gid]
+            if {o for o, _ in rec.legs} == {oid} and any(l in legs for _, l in rec.legs):
+                n += 1
+        return n
+
     def features(self, ob: "OrderBook", legs: list[int], last: int, at: int, skip: Optional[str] = None) -> dict:
         d = self.desk
         o = ob.order
+        n_prev, first = self.history(o["id"], at)
         L0, L1 = o["legs"][legs[0]], o["legs"][legs[-1]]
         p, q = L0["pickup"]["placeId"], L1["delivery"]["placeId"]
         drive = sum(d.geo.drive(o["legs"][l]["pickup"]["placeId"], o["legs"][l]["delivery"]["placeId"]) for l in legs)
@@ -87,7 +107,7 @@ class Fee1:
             "premium": float(any(o["legs"][l]["car"]["premium"] for l in legs)), "same_town": float(p == q),
             "nd30": d.home_near_delivery(q, 30), "nd60": d.home_near_delivery(q, 60), "nd120": d.home_near_delivery(q, 120),
             "np30": self.home_near_pickup(p, 30), "np60": self.home_near_pickup(p, 60), "roster": len(d.roster),
-            "typ": d.base_fee(ob, legs) / 100,
+            "typ": d.base_fee(ob, legs) / 100, "n_prev": n_prev, "prev_h": (at - first) / 60 if n_prev else 0.0,
         }
 
     # ------------------------------------------------------------------ the decision
@@ -117,9 +137,11 @@ class Fee1:
         x = self.features(ob, legs, last, d.now)
         N = cfg.fee1_repick
         v_next, T1 = v_res, T
-        if N and T > N + cfg.fee1_min_minutes and self.picks.get(ob.order["id"], 0) + 1 < cfg.fee1_max_posts:
+        if N and T > N + cfg.fee1_min_minutes and self.posts(ob.order["id"], legs) + 1 < cfg.fee1_max_posts:
             x2 = self.features(ob, legs, last, d.now + N)
             x2["n_open"], x2["n_open_near"], x2["_med"] = x["n_open"], x["n_open_near"], x["_med"]
+            x2["n_prev"] = x["n_prev"] + 1  # the re-pick is a re-post of this car
+            x2["prev_h"] = x["prev_h"] + N / 60 if x["n_prev"] else N / 60
             costs = []
             for m in grid:
                 p2 = self.p_book(x2, m, T - N)

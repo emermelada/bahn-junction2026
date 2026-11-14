@@ -159,7 +159,8 @@ class Desk:
 
     def fee1_gig(self, rec: "GigRec") -> bool:
         """A gig on one fee chosen by fee1: one order, a one-step schedule, not escalated (stateless, so it survives a restart)."""
-        return bool(self.cfg.fee1) and not rec.escalated and len(rec.schedule) == 1 and len({o for o, _ in rec.legs}) == 1
+        return (bool(self.cfg.fee1) and not rec.escalated and len(rec.schedule) == 1 and len({o for o, _ in rec.legs}) == 1
+                and not getattr(rec, "view_raised", False))
 
     def supply_near(self, place: str, radius: float = 30.0) -> int:
         return sum(c for p, c in self.home_count.items() if self.geo.air(p, place) <= radius)
@@ -1261,7 +1262,6 @@ class Desk:
             if pick:
                 m, why = pick
                 oid = ob.order["id"]
-                self.fee1.picks[oid] = self.fee1.picks.get(oid, 0) + 1
                 self.say("FEE1", f"{oid} {why}")
                 return [{"at": now, "feeCents": max(1, int(round(base * m)))}]
         if cfg.fee_mode == "relative":
@@ -1582,6 +1582,8 @@ class Desk:
                 if a["type"] == "withdraw" and a["gigId"] in self.gigs:
                     # A driver booked it first (or it started): the gig is live, so its cars must not be posted again.
                     rec = self.gigs[a["gigId"]]
+                    if self.cfg.fee1 and self._fee1 is not None and rec.id in self._fee1.done and rec.status == "withdrawn":
+                        self._fee1.closed_n += 1  # a re-pick's withdraw lost to a booking: the calibration counts the booking
                     rec.status = "booked"
                     for key in rec.legs:
                         if key[0] in self.orders and self.orders[key[0]].order["deliveredAt"][key[1]] is None:
@@ -1752,9 +1754,9 @@ class Desk:
                 continue
             oid = rec.legs[0][0]
             ob = self.orders.get(oid)
-            if not ob or ob.urgent or self.fee1.picks.get(oid, 0) >= cfg.fee1_max_posts:
-                continue
             legs = [l for _, l in rec.legs]
+            if not ob or ob.urgent or self.fee1.posts(oid, legs) >= cfg.fee1_max_posts:
+                continue
             q = ob.order["legs"][legs[-1]]["delivery"]["placeId"]
             alarm = max(cfg.alarm_minutes, cfg.desert_alarm) if (cfg.desert_n and self.desert(q)) else cfg.alarm_minutes
             if self.last_pickup(ob, legs) - alarm - self.now < cfg.fee1_min_minutes:
