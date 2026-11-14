@@ -15,6 +15,7 @@ from .config import Config
 from .geo import DAY, HOUR, Geo, open_intervals
 from .notes_safe import LegNote, read_note_safe
 from .planner import FeesStub, Planner, SupplyStub
+from .demand import Demand
 from .risk import Risk
 from .policy import Governor, Market, OnTime
 
@@ -147,6 +148,7 @@ class Desk:
                 _Fees = FeesStub
             self.supply, self.fees = _Supply(self), _Fees(self)
             self.risk = Risk(self)
+            self.demand = Demand(self)
             self.planner = Planner(self, self.supply, self.fees)
         self.gov_logged = -1
         self.warned: set[str] = set()  # orders that had a deadline warning
@@ -173,7 +175,7 @@ class Desk:
     def handle(self, e: dict) -> None:
         k = e["kind"]
         if self.planner is not None:
-            for part in (self.supply, self.fees):
+            for part in (self.supply, self.fees, self.demand):
                 try:
                     part.on_event(e)
                 except Exception as exc:

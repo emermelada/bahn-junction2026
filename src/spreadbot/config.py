@@ -56,8 +56,6 @@ class Config:
     v2_handling_min: int = 30          # minutes per car beyond driving: pickup, plates, delivery
     v2_chain_hours: float = 12.0       # RULES: a driver's day is at most 12 h of driving
     v2_chain_cars: int = 3             # cars per chain
-    v2_req_per_hour: float = 21.0      # requests per request hour in a level 8 week (1,040 a week over 50 hours)
-    v2_hours_per_car: float = 3.5      # average driver-hours of a won car (drive + handling), from the reveals
     v2_supply_scale: float = 1.0       # scale on the stub supply (until supply.py lands)
     v2_war_chain: bool = True          # on a price-war day a car that shares a driver with a planned one is priced at bundle_mult of its cost
     v2_hot_p: float = 0.12             # Risk.p_late at or above this: post v2_hot_early hours earlier and open at fee_open_hot (unwarned cars are ~2% late, warned 66-77%)

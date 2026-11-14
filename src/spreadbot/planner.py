@@ -254,25 +254,24 @@ class Planner:
         self._future(now)
 
     def _future(self, now: int) -> None:
-        """Hours the requests still to come will add per (region, day): request rate per region and business hour
-        (prior 1,040 requests a week over 50 request hours; this week's count replaces it as it grows) x the share we win
-        x hours per car. A request on day t lands on t (same_day) or t + 1 (next_day and later), half each."""
-        desk, cfg = self.desk, self.cfg
+        """Hours the requests still to come will add per (region, day), from a5's Demand (57-week request prior, c3 win
+        rates, weak online win scale; held-out error 73 cars vs 183 for a request-rate rule): each expected group of cars
+        goes to the day the planner would choose between its arrival day and its deadline day."""
+        cfg = self.cfg
         today = now // DAY
-        hour = (now % DAY) / 60.0
-        win = (desk.n_won_quoted + 0.45 * 20) / (desk.n_quoted_outcomes + 20)
-        regions = self.supply.regions()
-        elapsed = sum(max(0.0, min(10.0, (8 + 10 if d < today else hour - 8))) for d in range(today + 1) if d < 5)
-        for region in regions:
-            seen = sum(self.req_count[(region, d)] for d in range(today + 1))
-            prior = cfg.v2_req_per_hour * self.supply.hours(region, 1) / max(1.0, sum(self.supply.hours(x, 1) for x in regions))
-            rate = (seen + prior * 10.0) / (elapsed + 10.0)  # requests per request-hour in this region
+        demand = getattr(self.desk, "demand", None)
+        for region in self.supply.regions():
             for d in range(today, 5):
-                hours_left = max(0.0, 18 - max(8.0, hour)) if d == today else 10.0
-                n = rate * hours_left * win
-                self.hours_future[(region, d)] += 0.5 * n * cfg.v2_hours_per_car
-                if d + 1 <= 6:
-                    self.hours_future[(region, d + 1)] += 0.5 * n * cfg.v2_hours_per_car
+                groups = demand.expected(region, d, now) if demand is not None else []
+                for e in groups:
+                    days = [x for x in range(d, e.deadline_day + 1) if x <= 7]
+                    if len(days) > 1:
+                        days = days[:-1]
+                    if not days:
+                        days = [e.deadline_day]
+                    cap = {x: max(1.0, self.supply.hours(region, x)) for x in days}
+                    day = min(days, key=lambda x: (round((self.hours_planned[(region, x)] + self.hours_future[(region, x)]) / cap[x], 1), x))
+                    self.hours_future[(region, day)] += e.n_cars * (e.mean_drive_min + cfg.v2_handling_min) / 60.0
 
 
 # ---------------------------------------------------------------------- stubs until supply.py / fees.py land
