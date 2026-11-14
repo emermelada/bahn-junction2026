@@ -84,3 +84,9 @@ PRESETS["k-s1g"] = PRESETS["k-s1"] + ["gov_tight=0.945", "gov_rescue=0.93", "gov
 # worst 0.936-0.947) + re-market's last-Monday room at 0.15 (Mon2 late 1-3% up to load 0.12, 5-6% at 0.14-0.16; dev-43..50 +1,271, 8/8).
 PRESETS["k-s3"] = PRESETS["c3g"] + ["load_slope=0.5", "fee_open_rule=((24,0,0.92),(12,80,0.95))", "relook_minutes=90", "relook_mult=1.05",
                                     "load_free_mon2=0.15"]
+# Tail-risk guard: under 0.94 projected on time, a car with P(on time) >= 0.95 is worth up to EUR 40 more (full at 0.92): it dilutes
+# the late ones. c3g is unranked on 2/20 fresh weeks; the governor's late tightening (k-s1g) cannot undo cars already won.
+GATE = ["gate_bonus_cents=4000", "gate_target=0.94", "gate_span=0.02", "gate_safe_p=0.95"]
+PRESETS["k-s1d"] = PRESETS["k-s1"] + GATE
+PRESETS["k-s3d"] = PRESETS["k-s3"] + GATE
+PRESETS["c3gd"] = PRESETS["c3g"] + GATE
