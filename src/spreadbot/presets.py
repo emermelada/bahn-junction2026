@@ -42,3 +42,9 @@ PRESETS["c3k"] = PRESETS["c3"] + ["day_kalman=true"]
 PRESETS["chains_plus"] = PRESETS["chains"] + ["max_per_batch=6"]
 PRESETS["c1_plus"] = PRESETS["c1"] + ["max_per_batch=6"]
 PRESETS["best"] = PRESETS["c1"]  # the current best version (team objective: raw mean margin); replaced when a combination beats it
+# Candidates (claude/main-relook, not accepted), from Halal's ablation (research/TOP_TEAMS.md §2, §5.1):
+# board pairs = a new car may pair with one of our singles sitting unbooked >= bundle_window, at 0.85x, split back after 60 min;
+# second look = a single unbooked for 6 h gets one raise to 1.2x now.
+PRESETS["c3bp"] = PRESETS["c3"] + ["repair_pairs=true", "repair_lead=180", "repair_mult=0.85", "repair_split=60"]
+PRESETS["c3rl"] = PRESETS["c3"] + ["relook_minutes=360"]
+PRESETS["c3bprl"] = PRESETS["c3bp"] + ["relook_minutes=360"]
