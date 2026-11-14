@@ -491,6 +491,13 @@ class Desk:
             per_car = cfg.load_flat_cents if cfg.load_flat_cents else r["referenceFeeCents"]
             load_cost = cfg.load_slope * per_car * max(0.0, load - free * self.capacity_factor()) / 0.05
             risk_frac = (1 - p_ok) * cfg.late_cost_frac * self.pl_factor(drive)
+            short = 0.0
+            if cfg.short_fee and drive >= cfg.short_fee[1]:
+                lead_h = (self.est_last_pickup(r, opt["deadline"]) - r["respondBy"]) / 60
+                if lead_h < cfg.short_fee[0]:
+                    short = cost * (cfg.short_fee[2] - 1)  # a long car won at short notice pays well over the usual fee
+                    info.append(f"sfee={kind}/{lead_h:.1f}h")
+            load_cost += short
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain) + cfg.trust_loss_w * (1 - p_ok) * t_loss
             # Under the on-time target, a safe car is worth more than its margin: it dilutes the late ones.
@@ -560,6 +567,25 @@ class Desk:
         if ns and ns[0].deadline:
             d = min(d, ns[0].deadline)
         return d // DAY
+
+    def est_last_pickup(self, r: dict, deadline: int) -> int:
+        """lastPickupAt before the win: the latest pickup inside the pickup's hours (or slot) that reaches the delivery while
+        it is open, by the deadline (a note's tighter one included). Matches the world's on 85% of won cars to the minute,
+        97% within 30 min; deadline - drive alone misses a quarter of the cars under 8 h (research/re/market/SHORT_NOTICE.md)."""
+        L0 = r["legs"][0]
+        drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
+        n = self.leg_note(r["id"], 0)
+        if n.deadline:
+            deadline = min(deadline, n.deadline)
+        dw, pw = L0["delivery"]["window"], L0["pickup"]["window"]
+        priv_d, priv_p = L0["delivery"]["privateAddress"], L0["pickup"]["privateAddress"]
+        dend = min(deadline, dw["to"]) if priv_d else deadline
+        iv = open_intervals(None if priv_d else L0["delivery"]["hours"], dend - 4 * DAY, dend)
+        if iv:
+            dend = iv[-1][1]
+        pend = min(dend - drive, pw["to"])
+        iv = open_intervals(None if priv_p else L0["pickup"]["hours"], pend - 4 * DAY, pend)
+        return iv[-1][1] if iv else pend
 
     def nearby(self, place: str) -> list[tuple[str, float]]:
         """Places within 80 km (the outage radius in RULES.md), weighted 1 at the place down to 0.3 at 80 km."""

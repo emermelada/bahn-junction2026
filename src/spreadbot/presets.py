@@ -79,3 +79,8 @@ PRESETS["k-s1"] = PRESETS["k-load"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))
 PRESETS["k-s2"] = PRESETS["k-s1"] + ["load_free_mon2=0.15"]
 # re-market: Mon2 cars free of the load charge only when the drive is under 4 h (long Mon2 gigs wait for Monday and go late).
 PRESETS["m8mon2s"] = PRESETS["c3g"] + ["load_free_mon2=0.2", "mon2_max_drive=240"]
+# re-market: a car won < 6 h before its last pickup with >= 4 h of driving paid 1.26x the fee the quote assumed (1.00-1.10 for every
+# other lead x drive); quote its fee x1.25. 34 c3g weeks replayed: -1.9 orders, -0.32 late, -0.8 warned, +10 EUR/week (SHORT_NOTICE.md).
+PRESETS["m7short"] = PRESETS["c3g"] + ["short_fee=(6,240,1.25)"]
+# re-market: the lateness trees fed the site-hours last pickup they were trained on.
+PRESETS["m9lead"] = PRESETS["c3g"] + ["gbm_site_lead=true"]
