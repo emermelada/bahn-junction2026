@@ -105,6 +105,21 @@ class Config:
     bundle_window: int = 120           # pair with gigs posted at most this many minutes ago
     bundle_mult: float = 0.8           # one driver, no trip home in between: the pair costs less than two gigs
     unbundle_minutes: int = 5 * 60     # unbooked this close to its last start: post the cars alone
+    # --- chain planner (branch-v1-frank, preset chains): hold a won car a few hours, unposted, to find a chain partner
+    bundle_max_drive: int = 12 * 60 - 30  # road minutes of a chain; k5: 74% booked under 4 h, 17% at 10-12 h
+    bundle_min_lead: int = 0           # minutes from now to the chain's start; k5: 46% booked under 2 h, 70% at 18-30 h
+    bundle_short: bool = False         # pick the partner that makes the shortest chain (short chains book more often), not the one with most slack
+    bundle_keep_drop: bool = False     # a dropped bundle with time to spare stays in the app as a bundle (split later if still unbooked)
+    bundle3: bool = False              # a held or new car may join an open two-car chain as its first or third car
+    bundle3_mult: float = 0.75         # fee of a three-car chain, as a share of the three typical fees
+    bundle_soon_lead: int = 0          # a chain starting sooner than this (minutes) is allowed, at bundle_soon_mult (0 = off)
+    bundle_soon_mult: float = 1.0      # fee of such a chain over the two typical fees: still under two single gigs (~1.18x)
+    bundle_soon_slack: int = 180       # such a chain needs this long before its last start, and splits this long before it
+    load_bundle_w: float = 1.0         # a car in one of our live chains counts this much in the day's load (one driver moves two)
+    bundle_rel: tuple = ()             # ((hours before the chain's last start, fee as a share of the two typical fees), ...); () = fee_rel on the bundle fee
+    hold_minutes: int = 0              # hold a won car up to this long, unposted, to find a chain partner (0 = post at once)
+    hold_lead: int = 12 * 60           # post a held car at the latest this long before its pickup window opens
+    hold_slack: int = 8 * 60           # and this long before its last pickup
     # --- evening release: hold cars picked up on a later day, release them together and pair them first
     hold: bool = True                  # rc3: a car for a later day waits for its release (+14% on dev-19..30, 12/12 ranked)
     hold_hour: int = 16                # release at 16:00 the day before: 14-16 best; at 18-20 pairs stay unbooked into the night

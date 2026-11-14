@@ -1,6 +1,6 @@
 """Run one config on many seeds (at most --par worlds at once) and print the summary table.
 
-  python harness/sweep.py --tag base --seeds dev-01..dev-06 [--level 8] [--par 3] [--set k=v ...]
+  python harness/sweep.py --tag base --seeds dev-01..dev-06 [--level 8] [--par 3] [--preset NAME] [--set k=v ...]
   python harness/sweep.py --report base [other ...]      # table(s) from saved runs, paired on common seeds
 """
 from __future__ import annotations
@@ -58,6 +58,7 @@ def main() -> int:
     ap.add_argument("--level", type=int, default=8)
     ap.add_argument("--par", type=int, default=3)
     ap.add_argument("--set", action="append", default=[])
+    ap.add_argument("--preset", default="", help="named overrides from presets.py (applied before --set)")
     ap.add_argument("--report", nargs="*")
     ap.add_argument("--reveal", action="store_true")
     args = ap.parse_args()
@@ -86,6 +87,8 @@ def main() -> int:
         while todo and len(running) < args.par:
             s = todo.pop(0)
             cmd = [sys.executable, "-m", "spreadbot.run", "practice", "--level", str(args.level), "--seed", s, "--tag", args.tag, "--quiet"]
+            if args.preset:
+                cmd += ["--preset", args.preset]
             for kv in args.set:
                 cmd += ["--set", kv]
             if args.reveal:
