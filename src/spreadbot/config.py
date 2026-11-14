@@ -33,6 +33,7 @@ class Config:
                                        # speed, so past that gap it takes next_day for less (our weeks: gap €15-20 -> takes same_day 38%) (0 = off)
     mu_w: tuple = ()                   # (day, dealer, lane) weights of mu's parts when pricing (learning unchanged): fitted on 34 c3g weeks,
                                        # 0.65/0.4/0.6, the full parts over-react (research/re/market/PRICING.md) (() = 1/1/1)
+    short_fee: tuple = ()              # (hours, drive min, mult): an option whose estimated last pickup is < hours after respondBy and drive >= min quotes the fee x mult; such cars paid 1.26x the assumed fee vs 1.00-1.10 elsewhere (research/re/market/SHORT_NOTICE.md) (() = off)
     shadow_cents: int = 0              # opportunity cost of one car of driver capacity
     min_ev_cents: int = 200            # expected margin below this is not worth a driver
     pl_cal: tuple = ()                 # ((drive minutes under, factor), ...): scale the quoted P(late) in the risk price by drive time.
@@ -64,6 +65,7 @@ class Config:
     ontime_fee_assumed: float = 1.6    # the fee the on-time model assumes (fee_plan reaches about this)
     ontime_shift: float = 0.0
     ontime_model: str = "policy"       # "policy": fit on weeks of this dispatch policy; "research": the first fit; "gbm": late_gbm.py trees
+    gbm_site_lead: bool = False        # gbm lead_h from the site-hours last pickup (as trained), not deadline - drive: 4-5 h band P(late) 0.036 -> 0.079 vs 0.087 seen (research/re/market/SHORT_NOTICE.md)
     dilute: bool = True               # in rescue, the bar is the projection (+ margin), not a fixed 0.92
     dilute_margin: float = 0.01
     calibrate: bool = False            # scale P(on time) by this world's observed/predicted on-time ratio
@@ -89,6 +91,7 @@ class Config:
     # --- load: our cars due per day over the world's drivers
     load_free: float = 0.07            # rc3: with late 2.0 the long and thin-town cars get dear, so the safe ones can take more load (y4)
     load_free_mon2: float = 0.0        # load_free for cars due on the last Monday (0 = load_free): Friday noev is 80-94% the load charge, Mon2 cars 2.4-3.2% late (research/re/market/WAR_FRIDAY.md)
+    mon2_max_drive: int = 0            # load_free_mon2 only for drives under this (min): long Mon2 gigs wait ~77 h, 29-44% late (research/re/market/MON2_LATE.md) (0 = all)
     adaptive_load: bool = False        # scale load_free by how easily our first posts book this week
     cap_min: float = 0.7
     cap_max: float = 1.4
