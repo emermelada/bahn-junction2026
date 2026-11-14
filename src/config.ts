@@ -22,7 +22,7 @@ export type Cfg = {
   gate: {
     tierA: { slackHours: number; reach30Pickup: number; reach30Delivery: number }
     tierB: { slackHours: number; reach30Pickup: number; reach80Pickup: number; reach30Delivery: number }
-    sameDay: { maxDriveMin: number; slackHours: number; reach30Pickup: number }
+    sameDay: { maxDriveMin: number; slackHours: number; reach30Pickup: number; fridayLatestStart?: number }
     nextDay: { maxDriveMin: number }               // next_day with a longer drive is tier C (measured 82-85% on time at 4h+)
     poolBrake: { warnings: number; windowMin: number } // a pickup pool with this many deadline warnings on unbooked cars in the window: tier A only; warnings 0 = off
     reachMarginMin: number                         // minutes a driver needs to see a gig and get to the pickup

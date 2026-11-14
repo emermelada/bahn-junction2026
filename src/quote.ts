@@ -11,7 +11,8 @@ import type { Geo } from "./geo.ts"
 import type { Feasibility, Tier } from "./feasibility.ts"
 import { assess } from "./feasibility.ts"
 import { readNote } from "./notes.ts"
-import { dayOf } from "./books.ts"
+import { dayOf, weekday } from "./books.ts"
+import { DAY } from "./desk-api.ts"
 
 type Kind = DeliveryOption["kind"]
 const SLOW_FIRST: Kind[] = ["within_3_days", "next_day", "same_day"]
@@ -74,6 +75,12 @@ export class Quoter {
         if (flags.gate && tier === "C" && !cViaGovernor) why = "tier C"
         if (!why && this.cfg.capacity.batchMax > 0 && request.batchId && (this.batchAdmitted.get(request.batchId) ?? 0) >= Math.max(this.cfg.capacity.batchMax, Math.round(this.cfg.capacity.batchPerReach * this.geo.reach30(pickup).all))) (tier = "C"), (why = "batch cap")
         if (!why && flags.gate && option.kind === "next_day" && f.drive > this.cfg.gate.nextDay.maxDriveMin) (tier = "C"), (why = "long next_day")
+        // Friday same_day that cannot start before fridayLatestStart: 29% late at volume (thin Friday afternoon supply).
+        const fri = this.cfg.gate.sameDay.fridayLatestStart
+        if (!why && flags.gate && fri !== undefined && option.kind === "same_day") {
+          const start = Math.max(now, f.readyFrom)
+          if (weekday(start) === 4 && start - dayOf(start) * DAY >= fri) (tier = "C"), (why = "friday same_day")
+        }
         if (!why && flags.gate && tier !== "A" && this.braked(pickup, now)) (tier = "C"), (why = "pool brake")
         if (!why && flags.governor && maxTier === "A" && tier === "B") (tier = "C"), (why = "calendar")
         let day: number | null = dayOf(Math.max(now, f.readyFrom))
