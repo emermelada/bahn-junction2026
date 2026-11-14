@@ -158,17 +158,14 @@ class Planner:
             rec = desk.gigs[gid]
             if rec.status not in ("booked", "working"):
                 continue
-            start = rec.schedule[0]["at"] if rec.schedule else now
-            pick = next((s for s in rec.stops if s["kind"] == "pickup"), None)
-            place = pick["placeId"] if pick and "placeId" in pick else None
-            day = max(today, (pick.get("window", {}).get("from", start) if pick else start) // DAY)
             for oid, leg in rec.legs:
                 committed.add(oid)
                 o = desk.orders.get(oid)
                 if o is None:
                     continue
                 L = o.order["legs"][leg]
-                region = self.supply.region(place or L["pickup"]["placeId"])
+                day = max(today, L["pickup"]["window"]["from"] // DAY)
+                region = self.supply.region(L["pickup"]["placeId"])
                 self.hours_planned[(region, day)] += (geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) + cfg.v2_handling_min) / 60.0
         # 2. open cars -> a day each
         cars = []
@@ -287,16 +284,20 @@ class SupplyStub:
 
 
 class FeesStub:
-    """Prior-only Fees: the typical fee x v2_fee_mult, a bundle at bundle_mult per extra car. Replaced by a4's Fees."""
+    """Prior-only Fees: cents per driving minute, learned this week from the dealers' typical fees (referenceFeeCents over
+    the legs' driving minutes; prior v2_fee_per_min), times v2_fee_mult: the flat fee that books the day before."""
 
     def __init__(self, desk: "Desk") -> None:
         self.desk = desk
+        self.ref_sum, self.drive_sum = 0.0, 0.0
 
     def clearing(self, region: str, day: int, hour: int, drive: int, n_cars: int) -> float:
         cfg = self.desk.cfg
-        # 1.21-1.25x on the deadline day against 1.08-1.10x the day before (RESEARCH_2 L5); drive minutes set the base
-        per_min = cfg.v2_fee_per_min
+        per_min = (self.ref_sum + cfg.v2_fee_per_min * 600.0) / (self.drive_sum + 600.0)
         return (drive * per_min + n_cars * cfg.v2_fee_fixed) * cfg.v2_fee_mult
 
     def on_event(self, e: dict) -> None:
-        return None
+        if e["kind"] == "price_request":
+            r = e["request"]
+            self.ref_sum += r["referenceFeeCents"] - self.desk.cfg.v2_fee_fixed * len(r["legs"])
+            self.drive_sum += sum(self.desk.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
