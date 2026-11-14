@@ -47,7 +47,7 @@ export class Governor {
     if (this.mode !== "RED" && hNoCandidate <= 0) this.mode = "RED"
     else if (this.mode === "RED" && hNoCandidate > g.amberHeadroom) this.mode = "AMBER"
     let ok: boolean
-    if (this.mode === "GREEN") ok = tier !== "C" && h >= 0
+    if (this.mode === "GREEN") ok = tier !== "C" ? h >= 0 : g.admitC && h >= g.cMinHeadroom
     else if (this.mode === "AMBER") ok = tier === "A" && h >= 0
     else ok = tier === "A" && h >= 0
     // A safe order always helps the ratio: admit tier A even when the budget is tight, as long as it does not go negative.

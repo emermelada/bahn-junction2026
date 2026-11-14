@@ -68,9 +68,10 @@ export class Quoter {
       for (const { option, f } of fs) {
         let tier: Tier = flags.gate ? f.tier : "A"
         let why = ""
-        if (flags.gate && tier === "C") why = "tier C"
+        const cViaGovernor = flags.gate && tier === "C" && flags.governor && this.cfg.governor.admitC && f.slackHours >= this.cfg.governor.cMinSlack
+        if (flags.gate && tier === "C" && !cViaGovernor) why = "tier C"
         if (!why && flags.gate && option.kind === "next_day" && f.drive > this.cfg.gate.nextDay.maxDriveMin) (tier = "C"), (why = "long next_day")
-        if (!why && flags.gate && tier === "B" && this.braked(pickup, now)) (tier = "C"), (why = "pool brake")
+        if (!why && flags.gate && tier !== "A" && this.braked(pickup, now)) (tier = "C"), (why = "pool brake")
         if (!why && flags.governor && maxTier === "A" && tier === "B") (tier = "C"), (why = "calendar")
         let day: number | null = dayOf(Math.max(now, f.readyFrom))
         if (!why && flags.capacity) {

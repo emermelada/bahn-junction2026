@@ -1,0 +1,42 @@
+{
+ "name": "m13",
+ "flags": {
+  "gate": true,
+  "capacity": true,
+  "ladder": true,
+  "governor": true,
+  "fees": true,
+  "triage": true,
+  "pricing": true,
+  "trust": true
+ },
+ "pricing": {
+  "clamp": {
+   "lo": 1.05,
+   "hi": 1.75
+  }
+ },
+ "governor": {
+  "fridayTierAOnlyFrom": 100000,
+  "admitC": true
+ },
+ "gate": {
+  "nextDay": {
+   "maxDriveMin": 240
+  },
+  "poolBrake": {
+   "warnings": 2,
+   "windowMin": 1440
+  },
+  "sameDay": {
+   "maxDriveMin": 240,
+   "slackHours": 3,
+   "reach30Pickup": 3
+  },
+  "downgrades": [
+   "private_pickup",
+   "trade_in",
+   "unparsed_note"
+  ]
+ }
+}

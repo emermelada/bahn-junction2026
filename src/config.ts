@@ -30,7 +30,7 @@ export type Cfg = {
     snowFactor: number
   }
   capacity: { safety: number; active: number; active80: number; pWin: number; dealerShareMax: number; dealerShareMinRequests: number; dealerSharePenalty: number; globalDayCap: number }
-  governor: { lateBudget: number; atRiskWeight: number; atRiskMin: number; minDenominator: number; pOnTime: { A: number; B: number; C: number }; amberHeadroom: number; greenHeadroom: number; fridayTierAOnlyFrom: number }
+  governor: { admitC: boolean; cMinHeadroom: number; cMinSlack: number; lateBudget: number; atRiskWeight: number; atRiskMin: number; minDenominator: number; pOnTime: { A: number; B: number; C: number }; amberHeadroom: number; greenHeadroom: number; fridayTierAOnlyFrom: number }
   fees: {
     kBands: { upTo: number; k: number }[]          // by reach30(pickup): 0-2 -> 1.35, 3-9 -> 1.15, 10-39 -> 1.00, 40+ -> 0.90
     homeboundMult: number; eveningMult: number; privateMult: number; extraLegMult: number; premiumMult: number
@@ -68,7 +68,7 @@ export const DEFAULT_CFG: Cfg = {
     snowFactor: 1.3,
   },
   capacity: { safety: 0.8, active: 0.3, active80: 0.1, pWin: 0.9, dealerShareMax: 0.6, dealerShareMinRequests: 5, dealerSharePenalty: 0.08, globalDayCap: 0.8 },
-  governor: { lateBudget: 0.07, atRiskWeight: 0.5, atRiskMin: 240, minDenominator: 30, pOnTime: { A: 0.97, B: 0.92, C: 0.8 }, amberHeadroom: 0.03, greenHeadroom: 0.045, fridayTierAOnlyFrom: 4 * 24 * 60 + 12 * 60 },
+  governor: { admitC: false, cMinHeadroom: 0.03, cMinSlack: 2, lateBudget: 0.07, atRiskWeight: 0.5, atRiskMin: 240, minDenominator: 30, pOnTime: { A: 0.97, B: 0.92, C: 0.8 }, amberHeadroom: 0.03, greenHeadroom: 0.045, fridayTierAOnlyFrom: 4 * 24 * 60 + 12 * 60 },
   fees: {
     kBands: [{ upTo: 2, k: 1.35 }, { upTo: 9, k: 1.15 }, { upTo: 39, k: 1.0 }, { upTo: 1e9, k: 0.9 }],
     homeboundMult: 0.9, eveningMult: 1.15, privateMult: 1.15, extraLegMult: 1.1, premiumMult: 1.1,
