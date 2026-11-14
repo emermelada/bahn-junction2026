@@ -521,6 +521,12 @@ class Desk:
                 load_cost = self.planner.lam(region, pday) * 100.0 * self.planner.hours_of(r)
                 load = pday
             risk_frac = (1 - p_ok) * cfg.late_cost_frac * self.pl_factor(drive)
+            if self.planner is not None:
+                # V2: a late car costs its refund plus about EUR 20 (trust + goodwill, research/trust/TRUST.md: 92% -> 97%
+                # on time is worth ~EUR 400/week), plus a barrier near the 90% gate (an unranked week costs everything).
+                used = (1.0 - self.gov.projection()) / max(0.01, 1.0 - cfg.v2_barrier_target)
+                load_cost += (1 - p_ok) * (cfg.v2_late_cents + cfg.v2_barrier_cents * min(2.0, used) ** 4)
+                risk_frac = (1 - p_ok) * cfg.v2_refund_frac
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain) + cfg.trust_loss_w * (1 - p_ok) * t_loss
             # Under the on-time target, a safe car is worth more than its margin: it dilutes the late ones.

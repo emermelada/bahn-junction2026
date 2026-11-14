@@ -58,6 +58,10 @@ class Config:
     v2_chain_hours: float = 12.0       # RULES: a driver's day is at most 12 h of driving
     v2_chain_cars: int = 3             # cars per chain
     v2_supply_scale: float = 1.0       # scale on the stub supply (until supply.py lands)
+    v2_refund_frac: float = 0.54       # a late car refunds about this share of its price (c3 dev-07: EUR 65 of EUR 120 a car)
+    v2_late_cents: int = 2000          # plus trust and goodwill: ~EUR 15-20 a late car (research/trust/TRUST.md, 1,872 weeks)
+    v2_barrier_cents: int = 30000      # gate barrier per late car at the target (Halal: EUR 300 x min(2, used)^4)
+    v2_barrier_target: float = 0.94    # used = projected late share / (1 - this); the barrier is 16x at twice the target
     v2_war_chain: bool = True          # on a price-war day a car that shares a driver with a planned one is priced at bundle_mult of its cost
     v2_hot_p: float = 0.12             # Risk.p_late at or above this: post v2_hot_early hours earlier and open at fee_open_hot (unwarned cars are ~2% late, warned 66-77%)
     v2_hot_early: float = 2.0          # hours before hold_hour for a risky car
