@@ -269,20 +269,18 @@ class Fee1:
         return (math.log(max(0.05, m)) - self.mu(ob, legs, rec.posted_at)) / d.cfg.fee1_clear[-1]
 
     def close(self, rec: "GigRec", booked: bool, at: int) -> None:
-        """A fee1 gig's flat exposure ended (booked, withdrawn for a re-pick, or escalated at the alarm). First posts that sat a
-        full window are this week's evidence on the clearing fee."""
+        """A fee1 gig's flat exposure ended (booked, withdrawn for a re-pick, or escalated at the alarm). First posts are this
+        week's evidence on the clearing fee (re-picks are conditional on the miss before them: not used)."""
         if rec.id in self.done:
             return
         self.done.add(rec.id)
         try:
             ob = self.desk.orders.get(rec.legs[0][0])
             if not ob or self.prior_miss(ob.order["id"], [l for _, l in rec.legs], rec.posted_at) is not None:
-                return  # a re-pick's outcome is conditional on the miss before it: not used
-            if not booked and day_minutes(rec.posted_at, at) < self.desk.cfg.fee1_obs_minutes:
-                return  # too short a look to say the car did not clear
+                return
             z = self.z0(rec)
             if z is not None:
-                self.obs[rec.id] = (z, int(booked))
+                self.obs[rec.id] = (z, rec.posted_at, at if booked else None, at)
         except Exception as exc:  # the offset must never stop the desk
             self.desk.say("ERR", f"fee1 close {type(exc).__name__}: {exc}")
 
@@ -290,45 +288,59 @@ class Fee1:
         """A re-pick's withdraw was refused: a driver booked the gig first, so it did clear at its fee."""
         try:
             if gid in self.obs:
-                self.obs[gid] = (self.obs[gid][0], 1)
+                z, posted, _, closed = self.obs[gid]
+                self.obs[gid] = (z, posted, closed, closed)
         except Exception as exc:  # never stop the desk
             self.desk.say("ERR", f"fee1 booked_after_all {type(exc).__name__}: {exc}")
 
     def calibrate(self) -> None:
-        """delta: the week's offset of ln(clearing fee), by Newton steps on the probit likelihood of this week's first posts
-        (booked at m: residual <= z; sat a window unbooked: above) with a normal prior; once per world hour."""
+        """delta: the week's offset of ln(clearing fee), by Newton steps on the probit likelihood of "booked within the first
+        fee1_obs_minutes daytime minutes" of our first posts, P = window(W) Phi(z - delta / sigma), with a normal prior; only
+        posts whose W has passed (or that booked inside it), so fast bookings do not count before the slow misses can;
+        older posts weigh less (half-life fee1_delta[2] min), so the offset follows the week's days. Once per world hour."""
         d, cfg = self.desk, self.desk.cfg
         if d.now // 60 == self.d_at:
             return
         self.d_at = d.now // 60
         sig = cfg.fee1_clear[-1]
-        xs = [self.obs[g] for g in sorted(self.obs)]
-        for gid in sorted(d.gigs):  # open first posts that already sat a full window count as misses for now
+        W = cfg.fee1_obs_minutes
+        prior_sd, lim, half = cfg.fee1_delta
+        xs = []
+        for gid in sorted(self.obs):
+            z, posted, booked_at, closed = self.obs[gid]
+            if booked_at is not None and day_minutes(posted, booked_at) <= W:
+                b = 1
+            elif day_minutes(posted, closed) >= W:
+                b = 0
+            else:
+                continue  # closed unbooked before its window was over: no verdict
+            xs.append((z, b, 0.5 ** ((d.now - posted) / half)))
+        for gid in sorted(d.gigs):  # open first posts that already sat a full window count as misses
             rec = d.gigs[gid]
             if (rec.status == "open" and gid not in self.done and d.fee1_gig(rec)
-                    and day_minutes(rec.posted_at, d.now) >= cfg.fee1_obs_minutes):
+                    and day_minutes(rec.posted_at, d.now) >= W):
                 ob = d.orders.get(rec.legs[0][0])
                 if ob and self.prior_miss(ob.order["id"], [l for _, l in rec.legs], rec.posted_at) is None:
                     z = self.z0(rec)
                     if z is not None:
-                        xs.append((z, 0))
-        prior_sd, lim = cfg.fee1_delta
-        u = self.delta / sig  # offset in z units: P(booked) = Phi(z - u)
-        for _ in range(6):
-            g, h = -u / (prior_sd / sig) ** 2, -1 / (prior_sd / sig) ** 2
-            for z, b in xs:
+                        xs.append((z, 0, 0.5 ** ((d.now - rec.posted_at) / half)))
+        w = self.window(W)
+        u = self.delta / sig  # offset in z units: P(booked within W) = w Phi(z - u)
+        k = (sig / prior_sd) ** 2
+        for _ in range(8):
+            g, h = -u * k, -k
+            for z, b, wt in xs:
                 t = z - u
-                P = min(1 - 1e-9, max(1e-9, Phi(t)))
                 f = phi(t)
                 if b:
-                    r = f / P          # d/du ln Phi(t) = -f/P
-                    g -= r
-                    h -= r * (r + t)
+                    r = f / max(1e-9, Phi(t))              # d/du ln(w Phi(t)) = -r
+                    g -= wt * r
+                    h -= wt * r * (r + t)
                 else:
-                    r = f / (1 - P)    # d/du ln(1 - Phi(t)) = f/(1-P)
-                    g += r
-                    h -= r * (r - t)
+                    r = w * f / max(1e-9, 1 - w * Phi(t))  # d/du ln(1 - w Phi(t)) = r
+                    g += wt * r
+                    h -= wt * r * (r - t)
             if h >= -1e-9:
                 break
-            u -= g / h
+            u = max(-lim / sig, min(lim / sig, u - g / h))
         self.delta = max(-lim, min(lim, u * sig))
