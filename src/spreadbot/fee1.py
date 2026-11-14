@@ -41,6 +41,7 @@ class Fee1:
         self.closed_h = 0.0   # predicted cumulative hazard of finished fee1 exposures (uncalibrated)
         self.closed_n = 0     # and their bookings
         self.done: set[str] = set()
+        self._sens: dict[str, tuple[int, float]] = {}  # gig -> (world hour, its harm weight), see harm_weight
 
     # ------------------------------------------------------------------ features (as research/re/fleet/book_data.py)
     def home_near_pickup(self, place: str, minutes: int) -> int:
@@ -50,8 +51,9 @@ class Fee1:
             self._np[key] = sum(c for h, c in sorted(d.home_count.items()) if d.geo.drive(h, place) <= minutes)
         return self._np[key]
 
-    def others(self, p: str, skip: Optional[str] = None) -> tuple[list[float], int]:
-        """Current fee / typical of our other open unbooked gigs whose first pickup is <= 60 road min from p; and all open gigs."""
+    def others(self, p: str, skip: Optional[str] = None, ids: Optional[list] = None) -> tuple[list[float], int]:
+        """Current fee / typical of our other open unbooked gigs whose first pickup is <= 60 road min from p; and all open gigs.
+        `ids` (if given) collects those neighbours' gig ids."""
         from .desk import current_fee
         d = self.desk
         near, n_open = [], 0
@@ -66,6 +68,8 @@ class Fee1:
             p2 = ob.order["legs"][rec.legs[0][1]]["pickup"]["placeId"]
             if d.geo.drive(p2, p) <= 60:
                 near.append(current_fee(rec.schedule, d.now) / max(1.0, d.gig_base(rec)))
+                if ids is not None:
+                    ids.append(gid)
         return near, n_open
 
     def history(self, oid: str, before: int) -> tuple[int, float]:
@@ -122,6 +126,53 @@ class Fee1:
         h = -math.log(max(1e-9, 1.0 - min(p, 1 - 1e-9)))
         return 1.0 - math.exp(-self.k * h)
 
+    def harm_weight(self, gid: str) -> float:
+        """What our open gig `gid` loses, in cents, per unit of log(going fee near it): its booking chance's elasticity to its own
+        fee over the going fee (the model's fee_rel; a driver weighs a gig's fee against our other gigs near it) times what its
+        failing costs (rescue instead of its fee). Cached for a world hour."""
+        d, cfg = self.desk, self.desk.cfg
+        hit = self._sens.get(gid)
+        if hit and hit[0] == d.now // 60:
+            return hit[1]
+        w = 0.0
+        rec = d.gigs[gid]
+        ob = d.orders.get(rec.legs[0][0])
+        if ob and len({o for o, _ in rec.legs}) == 1:
+            legs = [l for _, l in rec.legs]
+            last = d.last_pickup(ob, legs)
+            q = ob.order["legs"][legs[-1]]["delivery"]["placeId"]
+            alarm = max(cfg.alarm_minutes, cfg.desert_alarm) if (cfg.desert_n and d.desert(q)) else cfg.alarm_minutes
+            T = last - alarm - d.now
+            if T > 0:
+                from .desk import current_fee
+                base = d.base_fee(ob, legs)
+                m = current_fee(rec.schedule, d.now) / max(1.0, base)
+                x = self.features(ob, legs, last, d.now, skip=gid)
+                if x["_med"] == x["_med"] and x["_med"] > 0:
+                    el = float(d.now - rec.posted_at)
+                    lo, hi = dict(x), dict(x)
+                    lo["_med"], hi["_med"] = x["_med"] * 1.1, x["_med"] / 1.1  # its fee_rel 10% lower / higher
+                    s = (self.p_book(hi, m, T, el) - self.p_book(lo, m, T, el)) / (2 * math.log(1.1))
+                    price = ob.order.get("priceCents") or 2 * base
+                    r_fee, r_late = cfg.fee1_rescue
+                    fail = r_fee * base + r_late * cfg.late_cost_frac * price - m * base
+                    w = max(0.0, s) * max(0.0, fail)
+        self._sens[gid] = (d.now // 60, w)
+        return w
+
+    def harm(self, p: str) -> tuple[float, float]:
+        """(A, going): a new gig at fee m near pickup p costs our open gigs within 60 road min about A * (m - going) / going cents.
+        Adding it moves their going fee (the mean) by (m - going) / (n + 1); each loses its harm_weight times that log change.
+        Halal's fee objective has this term; without it they paid 1.12x instead of 0.94x typical (-EUR 2,967/wk, 32 unseen weeks,
+        research/re/probe/LEADERS.md): a fee above the queue's pulls drivers off our own waiting cars."""
+        ids: list = []
+        near, _ = self.others(p, ids=ids)
+        if not near:
+            return 0.0, 1.0
+        going = sum(near) / len(near)
+        A = sum(self.harm_weight(g) for g in ids) / (len(ids) + 1)
+        return A, going
+
     def plan(self, ob: "OrderBook", legs: list[int], last: int, base: float, desert: bool) -> Optional[tuple]:
         """(fee m, expected cost in cents, P1(m), first window T1, V_next, features), or None with too little time before the alarm."""
         d, cfg = self.desk, self.desk.cfg
@@ -147,12 +198,14 @@ class Fee1:
                 p2 = self.p_book(x2, m, T - N)
                 costs.append(p2 * m * base + (1 - p2) * v_res)
             v_next, T1 = min(costs), N
+        A, going = self.harm(ob.order["legs"][legs[0]]["pickup"]["placeId"]) if cfg.fee1_harm else (0.0, 1.0)
         best = None
         for m in grid:
             p1 = self.p_book(x, m, T1)
-            e = p1 * m * base + (1 - p1) * v_next
+            e = p1 * m * base + (1 - p1) * v_next + cfg.fee1_harm * A * (m - going) / going
             if best is None or e < best[1] - 1e-9:
                 best = (m, e, p1)
+        x["_harm"], x["_going"] = A, going
         return best + (T1, v_next, x)
 
     def choose(self, ob: "OrderBook", legs: list[int], last: int, base: float, desert: bool) -> Optional[tuple[float, str]]:
@@ -162,7 +215,8 @@ class Fee1:
             return None
         m, e, p1, T1, v_next, x = pl
         b = max(1.0, base)
-        return m, f"m={m:.2f} p1={p1:.2f} T1={T1} E={e / b:.3f} Vn={v_next / b:.3f} k={self.k:.2f} nd30={x['nd30']} med={x['_med']:.2f}"
+        return m, (f"m={m:.2f} p1={p1:.2f} T1={T1} E={e / b:.3f} Vn={v_next / b:.3f} k={self.k:.2f} nd30={x['nd30']} med={x['_med']:.2f}"
+                   f" harm={x.get('_harm', 0) / b:.2f} going={x.get('_going', 1):.2f}")
 
     def quote_cost(self, r: dict, opt: dict) -> Optional[tuple[float, float]]:
         """For the quote (MARKET): (fee m, expected fee + rescue cost in cents) of moving this request's car alone if we win this

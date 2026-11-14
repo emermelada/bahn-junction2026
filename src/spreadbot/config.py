@@ -233,6 +233,7 @@ class Config:
     fee1_desert_floor: float = 1.05    # desert deliveries (desert_n) never below this (the tail guard of d-feerd)
     fee1_prior: float = 8.0            # pseudo-bookings of the week's calibration k (k = 1 until our gigs say otherwise)
     fee1_k_range: tuple = (0.5, 1.6)   # bounds of k
+    fee1_harm: float = 1.0             # weight of the harm a fee above the going fee does to our other waiting gigs (0 = off; Halal: -EUR 2,967/wk without)
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
     backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little
     backhaul_mult: float = 1.0         # offer fee over typical fee (never under the app fee unless backhaul_below)
