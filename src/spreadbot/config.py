@@ -225,15 +225,20 @@ class Config:
     relook_min_left: int = 8 * 60      # only while its last pickup is further than this: closer, fee_rel's own raises take over
     # --- fee1: one fee per single gig, chosen by a booking model (fee1.py, book_gbm.py), instead of the opening + raises
     fee1: bool = False                 # off: the opening + fee_rel ladder + relook
-    fee1_grid: tuple = (0.80, 0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.20, 1.35)  # fees tried (x typical); flat 1.15 already books 91% (Halal)
+    fee1_grid: tuple = (0.75, 0.80, 0.85, 0.90, 0.95, 1.00, 1.05, 1.15, 1.30)  # fees tried (x typical); flat 1.15 already books 91% (Halal)
     fee1_repick: int = 360             # minutes a fee1 gig sits unbooked before it is withdrawn and posted again at a new choice (Halal: 6 h)
     fee1_max_posts: int = 3            # fee1 posts per order at most (the first + 2 re-picks); later ones keep their fee to the alarm
     fee1_min_minutes: int = 120        # a choice needs at least this long before the alarm; shorter: the ladder and steep fees
     fee1_rescue: tuple = (1.31, 0.19)  # (fee x typical, P(late)) of a single not booked by our alarm (k-safe-dcl, rescue_cost.py)
     fee1_desert_floor: float = 1.05    # desert deliveries (desert_n) never below this (the tail guard of d-feerd)
-    fee1_prior: float = 8.0            # pseudo-bookings of the week's calibration k (k = 1 until our gigs say otherwise)
-    fee1_k_range: tuple = (0.5, 1.6)   # bounds of k
     fee1_harm: float = 1.0             # weight of the harm a fee above the going fee does to our other waiting gigs (0 = off; Halal: -EUR 2,967/wk without)
+    fee1_rel_share: float = 0.78       # share of a fee's pull that comes from our own other gigs: Halal's fee sign 3.96 on m/level, 0.88 on level
+    # ln(clearing fee) = intercept + ln(1+drivers <= 30 road min from the delivery) + same for the pickup + ln(lead h to the last pickup)
+    # + ln(drive min) + posted Fri..Mon2 + private end + premium; sigma. PROBE's counterfactual forks (57 cars, 227 probes,
+    # research/re/probe/out/clear_fit.json): median clearing fee ~0.98 (few drivers near the delivery, < 8 h) to 0.64 (many, > 40 h).
+    fee1_clear: tuple = (0.1892, -0.0561, -0.0130, -0.1032, 0.0275, -0.0573, 0.0076, 0.0241, 0.2250)
+    fee1_delta: tuple = (0.10, 0.30)   # this week's offset of ln(clearing fee): prior sd, clamp (Halal learns its intercept: -EUR 505/wk without)
+    fee1_obs_minutes: int = 240        # a first post unbooked for this many daytime minutes counts as "did not clear" for the offset
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
     backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little
     backhaul_mult: float = 1.0         # offer fee over typical fee (never under the app fee unless backhaul_below)

@@ -1747,11 +1747,12 @@ class Desk:
         """A fee1 gig unbooked for fee1_repick minutes: withdraw it; the next tick posts the car again at a new choice. A new post
         notifies drivers again (~10 views in 30 min); a raise reaches ~1 (research/mechanics/MECHANICS.md). Posting in the next tick,
         not in this flush, keeps a withdraw that loses to a booking from posting the car twice."""
+        from .fee1 import repick_at
         cfg = self.cfg
         for gid in sorted(self.gigs):
             rec = self.gigs[gid]
-            if rec.status != "open" or not self.fee1_gig(rec) or self.now - rec.posted_at < cfg.fee1_repick:
-                continue
+            if rec.status != "open" or not self.fee1_gig(rec) or self.now < repick_at(rec.posted_at, cfg.fee1_repick):
+                continue  # (a re-pick that would fall at night waits for the morning: nobody plans a trip then)
             oid = rec.legs[0][0]
             ob = self.orders.get(oid)
             legs = [l for _, l in rec.legs]
