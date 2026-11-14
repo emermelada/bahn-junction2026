@@ -121,6 +121,7 @@ class Desk:
         self.roster = {d["id"]: d for d in roster}
         self.home_count: dict[str, int] = defaultdict(int)
         self._near_q: dict[tuple[str, int], int] = {}
+        self.home_offered: set = set()  # gigs that already had their offer_home round
         for d in roster:
             self.home_count[d["homePlaceId"]] += 1
         self.won_count = 0
@@ -1457,6 +1458,8 @@ class Desk:
                         self.unbundle(rec, "repair-split")  # the pair did not catch a driver fast: the cars go back alone
         if self.cfg.relook_minutes:
             self.relook()
+        if self.cfg.offer_home_n:
+            self.offer_home()
         if self.cfg.view_raise_n:
             # Many drivers looked and none booked: the fee is short of the clearing fee. Raise once, now,
             # instead of waiting for the clock (a late raise finds drivers whose day is already planned).
@@ -1514,6 +1517,50 @@ class Desk:
             rec.schedule = dedupe([{"at": self.now, "feeCents": fee}] + later)
             self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": rec.schedule})
             self.say("RELOOK", f"{rec.id} {ob.order['id']} sat {self.now - rec.posted_at} min {cur}->{fee}")
+
+    def offer_home(self) -> None:
+        """Direct offers to drivers who live near a gig's delivery but too far from its pickup to be notified: the trip home
+        is the dear part of a driver's cost, so they book 26% of the gigs they see, yet see 1% (20 c3g weeks, reach.py)."""
+        cfg = self.cfg
+        hour = (self.now % DAY) // 60
+        if hour >= 22 or hour < 7:
+            return
+        for rec in list(self.gigs.values()):
+            if rec.status != "open" or rec.escalated or len(rec.legs) != 1 or rec.id in self.home_offered:
+                continue
+            if self.now - rec.posted_at < cfg.offer_home_after:
+                continue
+            ob = self.orders.get(rec.legs[0][0])
+            if not ob:
+                continue
+            legs = [l for _, l in rec.legs]
+            if (cfg.late_plan and self.is_late(ob, legs)) or self.last_pickup(ob, legs) - self.now < cfg.offer_home_slack:
+                continue
+            self.home_offered.add(rec.id)
+            L = ob.order["legs"][legs[0]]
+            p, q = L["pickup"]["placeId"], L["delivery"]["placeId"]
+            day = self.now // DAY
+            cands = []
+            for did in sorted(self.roster):
+                d = self.roster[did]
+                if (rec.id, did) in self.offered or self.offers_today[(did, day)] >= 3:
+                    continue
+                if rec.audience.get("manualLicence") and d["licence"] != "manual":
+                    continue
+                if rec.audience.get("experienced") and not (d["rating"] >= 4.8 and d["completedGigs"] >= 50):
+                    continue
+                h = d["homePlaceId"]
+                if self.geo.drive(q, h) > cfg.offer_home_min or self.geo.air(h, p) <= 30:
+                    continue
+                cands.append((self.offers_today[(did, day)], -d["completedGigs"], did))
+            cands.sort()
+            fee = current_fee(rec.schedule, self.now)
+            for _, _, did in cands[: max(0, cfg.offer_home_n - self.open_offers[rec.id])]:
+                self.outbox.append({"type": "offer", "gigId": rec.id, "driverId": did, "feeCents": int(fee)})
+                self.offers_today[(did, day)] += 1
+                self.open_offers[rec.id] += 1
+                self.offered.add((rec.id, did))
+                self.say("HOMEOFFER", f"{rec.id} {did} {fee}")
 
     def offer_viewers(self) -> None:
         """A driver who viewed our gig and did not book is active today and close by; in the app they may be

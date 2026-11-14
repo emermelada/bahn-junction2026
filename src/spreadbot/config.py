@@ -114,6 +114,11 @@ class Config:
     use_offers: bool = False           # offers to drivers near the pickup on a deadline warning
     viewer_offers: bool = False        # offers to drivers who viewed an unbooked gig
     offer_after: int = 20              # minutes a gig is open before its viewers get offers
+    offer_home_n: int = 0              # direct offers per unbooked single to drivers living near its delivery, not notified (home > 30 km
+                                       # from the pickup): they book 26% of the gigs they view but view 1% (0 = off; reach.py, 20 c3g weeks)
+    offer_home_after: int = 20         # minutes after posting: most singles book in the first 1-5 min, offers are 3 per driver per day
+    offer_home_slack: int = 6 * 60     # only while the last pickup is this far off: the driver must still get there
+    offer_home_min: int = 30           # road minutes from the delivery to the driver's home
     offer_mult: float = 1.15           # offer fee over typical fee (or the app fee, if higher)
     offer_mult_urgent: float = 1.8
     offer_max_km: float = 120.0
