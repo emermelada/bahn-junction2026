@@ -32,6 +32,9 @@ PRESETS = {
         "bundle_max_drive=300", "bundle_min_lead=360",    # chains under 5 h of driving, formed 6 h ahead: 85% booked
     ],
 }
+# c3 (from claude/evening-release 3aee9bd): c1 with late_cost_frac 1.2. dev-07..18: 12,927 vs 12,365 for c1 and 11,579 for y4,
+# 12/12 ranked, min on-time 0.912, best p10 (9,756). Fresh dev-43 (hard week): on-time 0.873, unranked (c1 0.892, y4 0.909).
+PRESETS["c3"] = PRESETS["c1"] + ["late_cost_frac=1.2"]  # milder lateness price: more cars won
 # chains_plus (Javier, origin/a/frank-plus 629708e): k18 + decline once we hold 6 orders from one batch (bulk-yard bursts).
 # rc10-01..12: mean 11,041 vs 10,791 for k18, 12/12 ranked, min on-time 0.918 vs 0.901.
 PRESETS["chains_plus"] = PRESETS["chains"] + ["max_per_batch=6"]
