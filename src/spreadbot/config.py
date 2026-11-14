@@ -165,6 +165,10 @@ class Config:
                                        # bookings made 2+ days ahead are a third dropped and a fifth late (RESEARCH_2 round 2), Mon2 drivers are idle
     repair_pairs: bool = False         # a car won during the day may pair with any open unbooked single of ours, not only one posted in the last bundle_window
     repair_drive: int = 300            # such a pair drives at most this many minutes (k18: chains under 5 h book 85%)
+    repair_mult: float = 0.0           # fee of a pair built from a sitting single, x summed typical (0 = bundle_mult); Halal: 0.85
+    relook_minutes: int = 0            # a single unbooked this long gets one reprice to the next relook step (0 = off; Halal: 6 h)
+    relook_steps: tuple = (1.05, 1.2, 1.35)
+    menu_equal: bool = False           # quote every option at the best option's euro margin (Halal +EUR 805)
     repair_lead: int = 360             # and starts at least this long from now (k18: pairs formed under 2 h ahead book 46%)
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
     backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little

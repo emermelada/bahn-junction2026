@@ -484,6 +484,7 @@ class Desk:
         congestion = cfg.cong_frac * r["referenceFeeCents"] * max(0, backlog - cfg.cong_free)
         prices: dict = {}
         meta: dict = {}
+        menu: dict = {}
         info = []
         for opt in r["options"]:
             kind = opt["kind"]
@@ -538,7 +539,21 @@ class Desk:
                     info.append("invest")
             prices[kind] = int(round(opt["listPriceCents"] * ratio * tf))
             meta[kind] = p_ok
+            menu[kind] = (ev, opt["listPriceCents"], v2_cost + cfg.shadow_cents + congestion + trust_adj + load_cost, risk_frac)
             info.append(f"{kind}:r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f},L={load:.3f}")
+        if cfg.menu_equal and len(prices) > 1:
+            # TOP_TEAMS 3: every option at the same euro margin as the best one; the dealer picks by its own value of
+            # speed (same_day EUR 14.5 over next_day, next_day EUR 6.1 over 3 days), which costs us nothing.
+            best_k = max(prices, key=lambda k: menu[k][0])
+            ev_b, list_b, cost_b, risk_b = menu[best_k]
+            margin = prices[best_k] * (1 - risk_b) - cost_b
+            for k in prices:
+                if k == best_k:
+                    continue
+                _, lst, cost_k, risk_k = menu[k]
+                price = (cost_k + margin) / max(0.05, 1 - risk_k)
+                prices[k] = int(round(min(max(price, lst * cfg.min_ratio * tf), lst * cfg.max_ratio * tf)))
+            info.append(f"menu={best_k}")
         if cfg.steer and "same_day" in prices and "next_day" in prices:
             # Steer dealers to next_day: it pays more per car, can wait for the evening release and pair, and a
             # pickup the day before the deadline costs less than one on the deadline day.
@@ -725,6 +740,9 @@ class Desk:
                  and (o, l) not in self.leg_gig and not self._pending(o, l) and l in self.undelivered(o)]
         # a3's finding: at volume the late cars are the ones no driver booked before the warning. A risky car goes out
         # earlier and opens at the hot fee.
+        if cfg.bundle and legs == [0] and len(ob.order["legs"]) == 1 and self.simple(ob) and why in ("won", "tick") and self.try_bundle(ob):
+            self.say("V2POST", f"{oid} board-pair {why}")  # TOP_TEAMS 1a: a new car joins a sitting single as one gig
+            return
         p_late = self.risk.p_late(ob.order, None, day, max(1, len({o for o, _ in chain})))
         hot = p_late >= cfg.v2_hot_p
         release = (day - 1) * DAY + cfg.hold_hour * 60 - (cfg.v2_hot_early * HOUR if hot else 0)
@@ -976,11 +994,12 @@ class Desk:
         if not best:
             return False
         last, first, second, rec = best
+        repair = rec is not None and self.now - rec.posted_at > self.cfg.bundle_window
         if rec is not None:
             self.withdraw(rec.id)
         self.chain_held.pop(first.order["id"], None)
         self.chain_held.pop(second.order["id"], None)
-        self.post_bundle(first, second, last)
+        self.post_bundle(first, second, last, mult=self.cfg.repair_mult if repair and self.cfg.repair_mult else None)
         return True
 
     def repair_ok(self, first: OrderBook, second: OrderBook) -> bool:
@@ -1058,12 +1077,12 @@ class Desk:
             if a.order["id"] not in used:
                 self.dispatch_order(a.order["id"], "release")
 
-    def post_bundle(self, first: OrderBook, second: OrderBook, last: int, why: str = "bundle") -> None:
+    def post_bundle(self, first: OrderBook, second: OrderBook, last: int, why: str = "bundle", mult: Optional[float] = None) -> None:
         stops = self.stops_for(first, 0) + self.stops_for(second, 0)
         audience = {"experienced": any(x.order["legs"][0]["car"]["premium"] for x in (first, second)), "manualLicence": False}
         cfg = self.cfg
         typical = self.base_fee(first, [0]) + self.base_fee(second, [0])
-        mult = cfg.bundle_mult
+        mult = mult or cfg.bundle_mult
         if cfg.bundle_soon_lead and max(self.now + cfg.bundle_lead, first.order["legs"][0]["pickup"]["window"]["from"]) - self.now < cfg.bundle_soon_lead:
             mult = cfg.bundle_soon_mult  # starts soon: drivers' days are mostly planned, pay nearly two gigs' worth
             self.bundle_soon.update((first.order["id"], second.order["id"]))
@@ -1515,6 +1534,24 @@ class Desk:
                     soon = all(o in self.bundle_soon for o, _ in rec.legs)
                     if last - self.now < (self.cfg.bundle_soon_slack if soon else self.cfg.unbundle_minutes):
                         self.unbundle(rec, "timeout")
+        if self.cfg.relook_minutes:
+            # TOP_TEAMS 1b (Halal's second look): a single that sits unbooked this long gets one reprice to the next step of
+            # relook_steps x typical; the later raises stay above it.
+            for rec in list(self.gigs.values()):
+                if rec.status != "open" or rec.escalated or getattr(rec, "relooked", False) or len(rec.legs) != 1:
+                    continue
+                if self.now - rec.posted_at < self.cfg.relook_minutes:
+                    continue
+                base = self.gig_base(rec)
+                cur = current_fee(rec.schedule, self.now)
+                nxt = next((int(round(base * m)) for m in self.cfg.relook_steps if int(round(base * m)) > cur), None)
+                rec.relooked = True
+                if nxt is None:
+                    continue
+                sched = [x for x in rec.schedule if x["at"] > self.now and x["feeCents"] > nxt]
+                rec.schedule = dedupe([{"at": self.now, "feeCents": nxt}] + sched)
+                self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": rec.schedule})
+                self.say("RELOOK", f"{rec.id} {cur}->{nxt}")
         if self.cfg.view_raise_n:
             # Many drivers looked and none booked: the fee is short of the clearing fee. Raise once, now,
             # instead of waiting for the clock (a late raise finds drivers whose day is already planned).
