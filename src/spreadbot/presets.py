@@ -77,3 +77,5 @@ PRESETS["k-load"] = PRESETS["c3g"] + ["load_free=0.12", "load_slope=2"]
 # Stacks: + re-drivers' opening-fee rule (d-fee), + re-market's last-Monday load room (m2mon2 at a gentler 0.15).
 PRESETS["k-s1"] = PRESETS["k-load"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))"]
 PRESETS["k-s2"] = PRESETS["k-s1"] + ["load_free_mon2=0.15"]
+# re-market: Mon2 cars free of the load charge only when the drive is under 4 h (long Mon2 gigs wait for Monday and go late).
+PRESETS["m8mon2s"] = PRESETS["c3g"] + ["load_free_mon2=0.2", "mon2_max_drive=240"]
