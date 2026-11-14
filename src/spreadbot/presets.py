@@ -231,3 +231,7 @@ PRESETS["v5s3"] = PRESETS["v5f3"] + ["safe_admit=(0.97,0.95,0.12)"] + SCARCITY
 # v5q2f: the switch on the fee signal alone, checked Tue 24:00 - Wed 12:00, no long declines (QUOTE_BUILD.md: the spec rule fires on 70%
 # of normal fee1 weeks by Thu 00:00, mostly via warned/won >= 0.06; fee >= 1.08 alone to Wed 12:00: 72% of bad weeks, 20% of normal).
 PRESETS["v5q2f"] = PRESETS["v5q1"] + ["scarcity=(1.08,9.0)", "scarcity_until=3600", "scarcity_risk=1.5"]
+# v5p: v5a + at the 6 h re-pick, pair a sitting single with another open single of ours (pairs pay 0.84x vs ~1.03x for a re-post).
+PRESETS["v5p"] = PRESETS["v5a"] + ["v5_pair2=true"]
+# v5so: v5a + ladder singles under 8 h to the last pickup open at 0.95 instead of 1.05 (6-8 h 1.05 openings booked 97% on the first gig).
+PRESETS["v5so"] = PRESETS["v5a"] + ["v5_short_open=0.95"]
