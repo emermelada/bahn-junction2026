@@ -191,23 +191,9 @@ PRESETS["k-f1h"] = PRESETS["k-f1"] + ["quote_cost_hold=1.05"]
 # relative weight 0.05 (PROBE's causal forks, research/re/probe/relstat.py).
 PRESETS["k-f1h5"] = PRESETS["k-f1h"] + ["fee1_long=(240,1.0)", "fee1_last_call=150", "fee1_rel_share=0.05"]
 PRESETS["k-f1h5f"] = PRESETS["k-f1h5"] + ["quote_cost_floor=true"]  # MARKET: quote cost = max(1.05, cost_mult): fee1 savings only stop the fall below 1.05
-<<<<<<< HEAD
-=======
-# fee1 v6: sigma 0.30 (v5's bottom fees booked less than predicted) + a censored week-offset likelihood (night/alarm misses count
-# by their exposure; v5's offset sat at -0.02..-0.06 while first posts missed more than predicted).
-PRESETS["k-f1h6"] = PRESETS["k-f1h5f"] + ["fee1_sigma=0.30"]  # on MARKET's quote floor
-# fee1 v7: long cars (>= 4 h) leave fee1 for the old ladder (k-f1h5's worst weeks lost 11-28 orders to +12..+83 long_warn declines).
-PRESETS["k-f1h7"] = PRESETS["k-f1h6"] + ["fee1_long_ladder=true"]
-# fee1 v8, narrow: only cars with >= 20 h to the last pickup and >= 30 drivers near the delivery (not long), one re-pick, no last call:
-# fewer extra fresh posts (k-f1h7: long gigs got fewer views, long_warn declines +11/wk).
-PRESETS["k-f1h8"] = PRESETS["k-f1h7"] + ["fee1_only=(20,30)", "fee1_max_posts=2", "fee1_last_call=0"]
-# fee1 first pick only: a miss joins the old ladder in place at the 6 h re-pick, no last call (ARCHIVE B_REPORT: first picks +540/wk on
-# every week class, re-posts -103..-220, long_warn -46..-157).
-PRESETS["k-f1h5fL"] = PRESETS["k-f1h5f"] + ["fee1_after_ladder=true", "fee1_last_call=0"]
 # long_warn on distinct cars (ARCHIVE D_LONGWARN.md: the guard counted warning events; one re-planned car warned 5x set off 85 declines).
 PRESETS["k-f1h5fD"] = PRESETS["k-f1h5f"] + ["long_warn_distinct=true"]
 PRESETS["k-safe-dclD"] = PRESETS["k-safe-dcl"] + ["long_warn_distinct=true"]
->>>>>>> 6182652 (long_warn_distinct (presets k-f1h5fD, k-safe-dclD): the long_warn guard counts distinct warned cars, not warning events (ARCHIVE: one car warned 5x drove 85 declines))
 # V5 (franc-5c, research/prompts/teamv4/6-V5.md): bold fee-first version on the release k-f1h5f. Each arm below is one step.
 # V5a: long cars (>= 4 h drive) may go down to 0.90 under fee1 (they paid 1.00-1.05x at 24 h+ leads: EUR ~900/wk above 0.90x,
 # research/re/v5/lead_open_f1h5f.out); the guard counts warned cars, not warning events (ARCHIVE D_LONGWARN.md).
