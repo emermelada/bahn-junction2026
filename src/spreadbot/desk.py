@@ -348,11 +348,18 @@ class Desk:
         rec = self.gigs.get(e["gigId"])
         if rec and rec.driver:
             self.positions[rec.driver] = (e["placeId"], e["at"])
+            if self.cfg.backhaul:
+                end = self.gig_end(rec, e["orderId"], e.get("leg", 0), e["placeId"], e["at"])
+                if end:
+                    self.backhaul(rec.driver, rec, *end)
 
     def on_delivered(self, e: dict) -> None:
         rec = self.gigs.get(e["gigId"])
         if rec and rec.driver:
             self.positions[rec.driver] = (e["placeId"], e["at"])
+            last = rec.stops[-1]
+            if self.cfg.backhaul and last["orderId"] == e["orderId"] and last["leg"] == e["leg"] and last["kind"] == "delivery":
+                self.backhaul(rec.driver, rec, e["placeId"], e["at"])
         ob = self.orders.get(e["orderId"])
         if ob:
             ob.order["deliveredAt"][e["leg"]] = e["at"]
@@ -1024,6 +1031,86 @@ class Desk:
             self.open_offers[rec.id] += 1
             self.offered.add((rec.id, did))
             self.say("OFFER", f"{rec.id} {did} {fee}")
+
+    # ------------------------------------------------------------------ backhaul offers
+    def stop_place(self, s: dict) -> Optional[str]:
+        ob = self.orders.get(s["orderId"])
+        if not ob:
+            return None
+        return ob.order["legs"][s["leg"]]["pickup" if s["kind"] == "pickup" else "delivery"]["placeId"]
+
+    def gig_end(self, rec: GigRec, oid: str, leg: int, place: str, at: int) -> Optional[tuple[str, int]]:
+        """Where and about when the driver finishes this gig, seen from the pickup that just happened."""
+        idx = next((i for i, s in enumerate(rec.stops) if s["orderId"] == oid and s["leg"] == leg and s["kind"] == "pickup"), None)
+        if idx is None:
+            return None
+        t, here = at, place
+        for s in rec.stops[idx + 1:]:
+            p = self.stop_place(s)
+            if p is None:
+                return None
+            t += 0 if p == here else self.geo.drive(here, p)
+            here = p
+        return here, t
+
+    def backhaul(self, driver: str, rec: GigRec, place: str, at: int) -> None:
+        """One of our drivers will be free at `place` near minute `at`. A second car near there costs them only the
+        extra time and tickets, and the app does not notify them where our gigs took them: offer the nearest open car."""
+        cfg = self.cfg
+        hour = (self.now % DAY) // 60
+        if hour >= 22 or hour < 7 or at % DAY > cfg.backhaul_free_by or at // DAY != self.now // DAY:
+            return
+        if self.offers_today[(driver, self.now // DAY)] >= 3:
+            return
+        d = self.roster.get(driver)
+        if not d:
+            return
+        best = None
+        for g in sorted(self.gigs.values(), key=lambda g: g.id):
+            if g.status != "open" or g.id == rec.id or len(g.stops) != 2 or (g.id, driver) in self.offered:
+                continue
+            if self.open_offers[g.id] >= 3:
+                continue
+            if g.audience.get("manualLicence") and d["licence"] != "manual":
+                continue
+            if g.audience.get("experienced") and not (d["rating"] >= 4.8 and d["completedGigs"] >= 50):
+                continue
+            oid, l0 = g.legs[0]
+            ob = self.orders.get(oid)
+            if not ob or ob.order["status"] == "cancelled":
+                continue
+            leg = ob.order["legs"][l0]
+            if leg["pickup"]["privateAddress"]:
+                continue
+            p2 = leg["pickup"]["placeId"]
+            tr = 0 if p2 == place else self.geo.drive(place, p2)
+            if tr > cfg.backhaul_road:
+                continue
+            ready = at + tr
+            ivs = open_intervals(leg["pickup"].get("hours"), max(ready, leg["pickup"]["window"]["from"]), ready + cfg.backhaul_wait)
+            ivs = [(a, b) for a, b in ivs if b - a >= 15]
+            if not ivs:
+                continue
+            arrive = ivs[0][0]
+            if arrive > leg["pickup"]["window"]["to"] or arrive > self.last_pickup(ob, [l0]) - 30:
+                continue
+            dB = self.geo.drive(p2, leg["delivery"]["placeId"])
+            if arrive // DAY != at // DAY or arrive % DAY + dB > cfg.backhaul_home_by:
+                continue
+            if best is None or tr < best[0]:
+                best = (tr, g, ob, l0)
+        if not best:
+            return
+        tr, g, ob, l0 = best
+        base = self.base_fee(ob, [l0])
+        fee = int(round(base * cfg.backhaul_mult))
+        if not cfg.backhaul_below:
+            fee = max(fee, current_fee(g.schedule, self.now))
+        self.outbox.append({"type": "offer", "gigId": g.id, "driverId": driver, "feeCents": fee})
+        self.offers_today[(driver, self.now // DAY)] += 1
+        self.open_offers[g.id] += 1
+        self.offered.add((g.id, driver))
+        self.say("BOFFER", f"{g.id} {driver} {fee} x{fee / max(1.0, base):.2f} tr={tr} from={rec.id}")
 
     def withdraw(self, gid: str) -> None:
         rec = self.gigs[gid]

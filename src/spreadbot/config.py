@@ -113,6 +113,14 @@ class Config:
     hold_price: bool = False           # quote a car that pairs with a held car (same pickup day, near) at the bundle cost
     bundle_keep: float = 0.0          # a dropped bundle with this many hours to spare stays a bundle, raised to this x its base (0 = split)
     hold_km: float = 0.0               # air km from A's delivery to B's pickup for a release pair (0 = bundle_km)
+    # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
+    backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little
+    backhaul_mult: float = 1.0         # offer fee over typical fee (never under the app fee unless backhaul_below)
+    backhaul_below: bool = False       # offer at backhaul_mult even when the app shows more
+    backhaul_road: int = 45            # road minutes from where the driver finishes to the next pickup
+    backhaul_wait: int = 90            # minutes the driver may wait for the pickup window or the site to open
+    backhaul_free_by: int = 17 * 60    # only drivers who finish by this minute of the day
+    backhaul_home_by: int = 21 * 60    # the second car is delivered by this minute of the day
     # --- experiments (research runs only)
     experiment_quote: bool = False
     exp_quote_lo: float = 1.0
