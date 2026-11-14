@@ -190,3 +190,4 @@ PRESETS["kdcl-ls"] = PRESETS["k-safe-dcl"] + ["load_slope=0.5"]  # control for k
 # The quote's cost level runs ~1.05x typical (Mon 1.08-1.15x: cost_prior 1.15) while cars cost 1.00x: quote the true expected fee.
 PRESETS["kdcl-fma-ls"] = PRESETS["kdcl-fm-ls"] + ["fee_model_abs=true"]
 PRESETS["kdcl-fma"] = PRESETS["kdcl-fm"] + ["fee_model_abs=true"]
+PRESETS["kdcl-hold"] = PRESETS["k-safe-dcl"] + ["quote_cost_hold=1.05"]  # control: the quote cost level fixed at its k-safe-dcl mean

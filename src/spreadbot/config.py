@@ -27,6 +27,8 @@ class Config:
     outage_min: int = 4                # results in the region before it can be flagged
     fee_model: float = 0.0             # MARKET v4: weight of the per-car fee shape (fee_gbm.py trees / their mean on our wins) in the quote cost (0 = off, 1 = full)
     fee_model_abs: bool = False        # with fee_model: quote cost = typical x the trees' fee x this week's paid/predicted per car (the true expected fee), not cost_mult's level
+    quote_cost_hold: float = 0.0       # quote cost = typical x this constant instead of cost_mult (our running booking ratio): fee savings stay margin
+                                       # instead of passing to dealers while the load charge binds (m25: -396 at equal orders); 1.05 = k-safe-dcl's mean (0 = off)
     quote_move_cost: bool = False      # quote each option at move_cost (the fee rule's opening: 0.92-0.95x where drivers live near the delivery), not the flat cost
     dist_lr: float = 0.0               # the competitor's price list changes shape once a week (HANDBOOK): learn a slope of its level on ln(km),
                                        # c3g residuals show a lasting step of ~0.14 ratio per ln km on one Tue-Thu morning (PRICE_EVENTS.md) (0 = off)
