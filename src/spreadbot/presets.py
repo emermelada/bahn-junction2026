@@ -228,3 +228,12 @@ PRESETS["v5f3"] = PRESETS["v5f2"] + ["v5_short_open=0.95"]
 # V5 stacks (fleet + quote): the fee-first fleet's saving spent on safe volume, with the Tuesday scarcity switch turning both off.
 PRESETS["v5s1"] = PRESETS["v5f1"] + ["safe_admit=(0.97,0.95,0.12)"]
 PRESETS["v5s3"] = PRESETS["v5f3"] + ["safe_admit=(0.97,0.95,0.12)"] + SCARCITY
+# ARCHIVE (research/re/archive/R1_BADWEEKS.md): our weeks < EUR 7k are a rescue spiral (escalation 5.9-12k vs ~0.75k normally).
+# Spec A: cap escalation near Halal's 1.6x (their 2x rescue: -740 for +0.1 pt). Spec B: Halal's late price in the quote from Monday.
+STEEP_CAP = ["steep_rescue=(1.6,1.8,2.0)", "steep_plan=(1.5,1.7,1.9,2.1)"]
+LATE_BARRIER = ["late_barrier=(0.955,300,4,20)"]
+PRESETS["k-f1h5f-cap"] = PRESETS["k-f1h5f"] + STEEP_CAP
+PRESETS["k-f1h5f-lb"] = PRESETS["k-f1h5f"] + LATE_BARRIER
+PRESETS["k-f1h5f-lbc"] = PRESETS["k-f1h5f"] + LATE_BARRIER + STEEP_CAP
+PRESETS["k-safe-dcl-cap"] = PRESETS["k-safe-dcl"] + STEEP_CAP
+PRESETS["k-safe-dcl-lb"] = PRESETS["k-safe-dcl"] + LATE_BARRIER

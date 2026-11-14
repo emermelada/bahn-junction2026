@@ -18,6 +18,14 @@ if TYPE_CHECKING:
     from .desk import Desk
 
 
+def barrier_cents(proj: float, n: int, barrier: tuple) -> float:
+    """Price of one expected late car (cents) under the late barrier: small while the week's expected late share is well inside
+    what the target allows, steep as it nears it, capped at 2^grip x eur. proj = the governor's projected on-time share."""
+    target, eur, grip, calm = barrier
+    used = n * (1.0 - proj) / (calm + n) / (1.0 - target)
+    return eur * 100.0 * min(2.0, max(0.0, used)) ** grip
+
+
 def sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-max(-40.0, min(40.0, x))))
 
