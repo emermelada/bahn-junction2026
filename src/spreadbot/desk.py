@@ -58,6 +58,8 @@ class GigRec:
     driver: Optional[str] = None
     fee: int = 0
     escalated: bool = False
+    repair: bool = False    # a pair that took in one of our sitting singles (repair_split applies)
+    relooked: bool = False  # the second look already raised it once
 
     @property
     def legs(self) -> list[tuple[str, int]]:
@@ -875,11 +877,12 @@ class Desk:
         if not best:
             return False
         last, first, second, rec = best
+        repair = rec is not None and self.now - rec.posted_at > self.cfg.bundle_window
         if rec is not None:
             self.withdraw(rec.id)
         self.chain_held.pop(first.order["id"], None)
         self.chain_held.pop(second.order["id"], None)
-        self.post_bundle(first, second, last)
+        self.post_bundle(first, second, last, why="repair" if repair else "bundle")
         return True
 
     def repair_ok(self, first: OrderBook, second: OrderBook) -> bool:
@@ -962,7 +965,7 @@ class Desk:
         audience = {"experienced": any(x.order["legs"][0]["car"]["premium"] for x in (first, second)), "manualLicence": False}
         cfg = self.cfg
         typical = self.base_fee(first, [0]) + self.base_fee(second, [0])
-        mult = cfg.bundle_mult
+        mult = cfg.repair_mult if why == "repair" and cfg.repair_mult else cfg.bundle_mult
         if cfg.bundle_soon_lead and max(self.now + cfg.bundle_lead, first.order["legs"][0]["pickup"]["window"]["from"]) - self.now < cfg.bundle_soon_lead:
             mult = cfg.bundle_soon_mult  # starts soon: drivers' days are mostly planned, pay nearly two gigs' worth
             self.bundle_soon.update((first.order["id"], second.order["id"]))
@@ -977,7 +980,7 @@ class Desk:
         sched = dedupe(sorted(out, key=lambda x: (x["at"], x["feeCents"])))
         action = {"type": "post", "stops": stops, "audience": audience, "schedule": sched}
         self.outbox.append(action)
-        self.pending_posts.append((action, "bundle"))
+        self.pending_posts.append((action, "repair" if why == "repair" else "bundle"))
         self.bundle_last[first.order["id"]] = last
         self.bundle_last[second.order["id"]] = last
         for x in (first, second):
@@ -1320,6 +1323,7 @@ class Desk:
                 self.pending_posts = [(pa, w) for (pa, w) in self.pending_posts if pa is not a]
                 if res.get("ok"):
                     rec = GigRec(res["id"], a["stops"], a["audience"], a["schedule"], self.now)
+                    rec.repair = why == "repair"
                     self.gigs[rec.id] = rec
                     for key in rec.legs:
                         self.leg_gig[key] = rec.id
@@ -1410,6 +1414,10 @@ class Desk:
                     soon = all(o in self.bundle_soon for o, _ in rec.legs)
                     if last - self.now < (self.cfg.bundle_soon_slack if soon else self.cfg.unbundle_minutes):
                         self.unbundle(rec, "timeout")
+                    elif self.cfg.repair_split and rec.repair and self.now - rec.posted_at >= self.cfg.repair_split:
+                        self.unbundle(rec, "repair-split")  # the pair did not catch a driver fast: the cars go back alone
+        if self.cfg.relook_minutes:
+            self.relook()
         if self.cfg.view_raise_n:
             # Many drivers looked and none booked: the fee is short of the clearing fee. Raise once, now,
             # instead of waiting for the clock (a late raise finds drivers whose day is already planned).
@@ -1442,6 +1450,31 @@ class Desk:
             self.gov_logged = self.now // (2 * HOUR)
             self.say("GOV", f"proj={self.gov.projection():.3f} cal={self.gov.calibration():.3f} won={self.won_count} "
                             f"ontime={len(self.ontime_orders)} late={len(self.late_orders)} bar={self.gov.bar():.2f}")
+
+    def relook(self) -> None:
+        """Second look: a single gig nobody booked for relook_minutes is short of its clearing fee. Raise it once, now,
+        while drivers still plan that day, instead of waiting for the fee_rel steps hours later (Halal: one re-pick after 6 h)."""
+        cfg = self.cfg
+        for gid in sorted(self.gigs):
+            rec = self.gigs[gid]
+            if rec.status != "open" or rec.escalated or rec.relooked or len({o for o, _ in rec.legs}) != 1:
+                continue
+            if self.now - rec.posted_at < cfg.relook_minutes:
+                continue
+            ob = self.orders.get(rec.legs[0][0])
+            legs = [l for _, l in rec.legs]
+            rec.relooked = True
+            if not ob or self.last_pickup(ob, legs) - self.now <= cfg.relook_min_left:
+                continue
+            base = self.base_fee(ob, legs)
+            fee = int(round(base * cfg.relook_mult))
+            cur = current_fee(rec.schedule, self.now)
+            if fee <= cur:
+                continue
+            later = [x for x in rec.schedule if x["at"] > self.now and x["feeCents"] > fee]
+            rec.schedule = dedupe([{"at": self.now, "feeCents": fee}] + later)
+            self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": rec.schedule})
+            self.say("RELOOK", f"{rec.id} {ob.order['id']} sat {self.now - rec.posted_at} min {cur}->{fee}")
 
     def offer_viewers(self) -> None:
         """A driver who viewed our gig and did not book is active today and close by; in the app they may be

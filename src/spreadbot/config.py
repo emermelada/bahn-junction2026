@@ -153,6 +153,14 @@ class Config:
     repair_pairs: bool = False         # a car won during the day may pair with any open unbooked single of ours, not only one posted in the last bundle_window
     repair_drive: int = 300            # such a pair drives at most this many minutes (k18: chains under 5 h book 85%)
     repair_lead: int = 360             # and starts at least this long from now (k18: pairs formed under 2 h ahead book 46%)
+    repair_mult: float = 0.0           # fee of such a pair over the two typical fees (0 = bundle_mult). Halal: 0.85, a sitting car paired
+                                       # finds a driver within 60 min 83-85% of the time vs 24% alone (research/TOP_TEAMS.md §2)
+    repair_split: int = 0              # minutes: a pair built from a sitting single and still unbooked after this is split back into
+                                       # singles (Halal: 60); 0 = only the usual unbundle_minutes before its last start
+    # --- second look: one raise for a single that sits unbooked (Halal: +€1.9k with board pairs, 350 -> 438 orders)
+    relook_minutes: int = 0            # an open single still unbooked this long after posting gets one raise now (Halal 360); 0 = off
+    relook_mult: float = 1.2           # to this x typical fee (one step above fee_open 1.05); later fee_rel steps stay above it
+    relook_min_left: int = 8 * 60      # only while its last pickup is further than this: closer, fee_rel's own raises take over
     # --- backhaul offers: one of our drivers finishing near an open car of ours gets a direct offer for it
     backhaul: bool = False             # the app does not notify a driver where our gigs took them; a second car costs them little
     backhaul_mult: float = 1.0         # offer fee over typical fee (never under the app fee unless backhaul_below)
