@@ -766,6 +766,8 @@ class Desk:
         dB = geo.drive(LB["pickup"]["placeId"], LB["delivery"]["placeId"])
         if dA + tr + dB > min(12 * HOUR - 30, cfg.bundle_max_drive):
             return None
+        if cfg.bundle_empty_end and dA + tr + dB > cfg.bundle_empty_end[0] and                 self.home_near_delivery(LB["delivery"]["placeId"]) < cfg.bundle_empty_end[1]:
+            return None  # a long chain ending where few drivers live: 45% booked in 60 min, 18.5% warned (PAIRS.md)
         start = max(self.now + cfg.bundle_lead, LA["pickup"]["window"]["from"])
         soon = start - self.now < cfg.bundle_soon_lead
         if start - self.now < cfg.bundle_min_lead and not soon:
