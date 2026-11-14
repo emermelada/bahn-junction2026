@@ -55,29 +55,33 @@ async function freeSlots(): Promise<number> {
   return MAX_TEAM - open - Number(args.reserve)
 }
 
-/** Runs every (cfg, seed) job with at most `slots` worlds at once. A failed job is reported and skipped. */
+/** Runs every (cfg, seed) job with at most `slots` worlds at once, taking a slot only when the team has one free
+ * (after --reserve). A failed job is reported and skipped. */
 async function runJobs(jobs: { cfg: Cfg; seed: string; tag: string }[], policy: StepPolicy): Promise<RunSummary[]> {
-  let free = await freeSlots()
-  for (let waited = 0; free <= 0; waited++) {
-    if (waited % 10 === 0) console.log(`no free practice slot (team free after reserve: ${free}); waiting...`)
-    await new Promise((done) => setTimeout(done, 30_000))
-    free = await freeSlots()
-  }
-  const slots = Math.max(1, Math.min(Number(args.slots), free, jobs.length))
-  console.log(`${jobs.length} jobs on ${slots} slots, policy ${policy.kind}/${policy.strideMin}`)
+  const max = Math.min(Number(args.slots), jobs.length)
+  console.log(`${jobs.length} jobs, up to ${max} slots, policy ${policy.kind}/${policy.strideMin}`)
   const out: RunSummary[] = []
   let next = 0
-  const worker = async () => {
-    while (next < jobs.length) {
-      const job = jobs[next++]!
-      try {
-        out.push(await runPractice(client, { ...job, level, policy, onWorld: registered, quiet: args.quiet }))
-      } catch (error) {
-        console.error(`[${job.seed}] FAILED: ${(error as Error).message}`)
-      }
+  let running = 0
+  let said = false
+  const tasks: Promise<void>[] = []
+  while (next < jobs.length) {
+    if (running >= max || (await freeSlots()) <= 0) {
+      if (!said && running === 0) (console.log("waiting for a free practice slot..."), (said = true))
+      await new Promise((done) => setTimeout(done, running >= max ? 2000 : 20_000))
+      continue
     }
+    const job = jobs[next++]!
+    running++
+    tasks.push(
+      runPractice(client, { ...job, level, policy, onWorld: registered, quiet: args.quiet })
+        .then((r) => void out.push(r))
+        .catch((error) => console.error(`[${job.seed}] FAILED: ${(error as Error).message}`))
+        .finally(() => running--),
+    )
+    await new Promise((done) => setTimeout(done, 3000)) // let the world register before counting free slots again
   }
-  await Promise.all(Array.from({ length: slots }, worker))
+  await Promise.all(tasks)
   return out
 }
 

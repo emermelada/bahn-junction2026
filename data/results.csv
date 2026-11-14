@@ -1,0 +1,2 @@
+runId,tag,seed,level,cfgName,cfgHash,policy,gitSha,startedAt,steps,wallMin,marginEur,revenueEur,wonOrders,onTimePct,undeliveredPct,ranked,requests,unquoted,warnings,refused,exceptions,driverFeeEur,lateRefundEur,undeliveredEur,failedVisitEur,fineEur
+starter-reg-spread-1-ac3106-20261114T001311,starter-reg,spread-1,8,starter,ac3106e47dae,starter,25d9128,2026-11-14T00:13:11.993Z,1891,5.5,-72612.51,71332.00,949,45.52,1.26,false,1037,0,1249,101,0,-118593.29,-20301.15,-3506.00,-1251.78,0.00

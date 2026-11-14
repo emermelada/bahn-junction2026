@@ -225,7 +225,7 @@ export async function runPractice(client: Client, opts: RunOptions): Promise<Run
     writeFileSync(`${dir}/meta.json`, JSON.stringify(summary, null, 1))
     appendFileSync(`${RUNS_DIR}/index.jsonl`, JSON.stringify(summary) + "\n")
     appendResult(summary)
-    say(`END ${fmtScore(score)}  ${score.ranked ? "RANKED" : "unranked"}  steps ${steps} (${summary.msPerStep} ms/step, ${(wallMs / 60000).toFixed(1)} min)  unquoted ${summary.unquoted}  refused ${refused}  exc ${exceptions}`)
+    console.log(`[${seed}] END ${fmtScore(score)}  ${score.ranked ? "RANKED" : "unranked"}  steps ${steps} (${summary.msPerStep} ms/step, ${(wallMs / 60000).toFixed(1)} min)  unquoted ${summary.unquoted}  refused ${refused}  exc ${exceptions}`)
     return summary
   } catch (error) {
     flushDecisions()
