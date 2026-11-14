@@ -150,8 +150,7 @@ class Fee1:
         price = ob.order.get("priceCents") or 2 * base
         r_fee, r_late = cfg.fee1_rescue
         v_res = r_fee * base + r_late * cfg.late_cost_frac * price
-        drive = sum(d.geo.drive(ob.order["legs"][l]["pickup"]["placeId"], ob.order["legs"][l]["delivery"]["placeId"]) for l in legs)
-        floor = max(cfg.fee1_desert_floor if desert else 0.0, cfg.fee1_long[1] if cfg.fee1_long and drive >= cfg.fee1_long[0] else 0.0)
+        floor = self.floor(ob, legs, desert)
         grid = [m for m in cfg.fee1_grid if m >= floor] or [max(cfg.fee1_grid)]
         mu1 = self.mu(ob, legs, d.now) + self.delta
         # A car that sat unbooked at fee m0: its residual is above (ln m0 - mu0) / sigma, it books now only above that
@@ -209,8 +208,47 @@ class Fee1:
             return None
         m, e, p1, t1, v2, info = pl
         b = max(1.0, base)
+        tag = ""
+        v5 = self.v5(ob, legs, last, desert, info["miss"])
+        if v5 is not None:
+            tag = f" v5={v5[1]} model={m:.2f}"  # p1, E and V2 below are the model's, for its pick
+            m = v5[0]
         return m, (f"m={m:.2f} p1={p1:.2f} t1={t1} E={e / b:.3f} V2={v2 / b:.3f} c50={math.exp(info['mu']):.2f} d={info['delta']:+.3f} "
-                   f"harm={info['harm'] / b:.2f} going={info['going']:.2f} w1={info['w1']:.2f}{' repick' if info['miss'] else ''}")
+                   f"harm={info['harm'] / b:.2f} going={info['going']:.2f} w1={info['w1']:.2f}{' repick' if info['miss'] else ''}{tag}")
+
+    def floor(self, ob: "OrderBook", legs: list[int], desert: bool) -> float:
+        """The lowest fee (x typical) this car may get: desert deliveries fee1_desert_floor, long cars (fee1_long) their floor."""
+        d, cfg = self.desk, self.desk.cfg
+        drive = sum(d.geo.drive(ob.order["legs"][l]["pickup"]["placeId"], ob.order["legs"][l]["delivery"]["placeId"]) for l in legs)
+        return max(cfg.fee1_desert_floor if desert else 0.0, cfg.fee1_long[1] if cfg.fee1_long and drive >= cfg.fee1_long[0] else 0.0)
+
+    def misses(self, oid: str, legs: list[int]) -> int:
+        """Single one-fee gigs of these legs withdrawn without a booking (re-picks, last calls, pairings; restart-proof)."""
+        n = 0
+        for gid in sorted(self.desk.gigs):
+            rec = self.desk.gigs[gid]
+            if (rec.status == "withdrawn" and not rec.fee and len(rec.schedule) == 1 and {o for o, _ in rec.legs} == {oid}
+                    and any(l in legs for _, l in rec.legs)):
+                n += 1
+        return n
+
+    def v5(self, ob: "OrderBook", legs: list[int], last: int, desert: bool, miss: bool) -> Optional[tuple[float, str]]:
+        """V5 fee-first (flags v5_open, v5_repost): a flat fee instead of the model's pick, or None (the model decides). Off in a
+        scarce week (desk.scarce, set by the quote builder): then the model alone, as in the release."""
+        d, cfg = self.desk, self.desk.cfg
+        if getattr(d, "scarce", False):
+            return None
+        oid = ob.order["id"]
+        if miss:
+            # The one re-pick: the car's first post sat unbooked. A last call (<= fee1_last_call before the alarm) keeps the model.
+            alarm = max(cfg.alarm_minutes, cfg.desert_alarm) if desert else cfg.alarm_minutes
+            if (cfg.v5_repost and self.misses(oid, legs) == 1
+                    and (not cfg.fee1_last_call or last - alarm - d.now > cfg.fee1_last_call)):
+                return max(cfg.v5_repost, self.floor(ob, legs, desert)), "repost"
+            return None
+        if cfg.v5_open and last - d.now >= cfg.v5_open[0] * 60:
+            return max(cfg.v5_open[1], self.floor(ob, legs, desert)), "open"
+        return None
 
     def quote_cost(self, r: dict, opt: dict) -> Optional[tuple[float, float]]:
         """For the quote (MARKET): (fee m, expected fee + rescue cost in cents) of moving this request's car alone if we win this

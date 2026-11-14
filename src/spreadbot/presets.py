@@ -198,3 +198,6 @@ PRESETS["k-safe-dclD"] = PRESETS["k-safe-dcl"] + ["long_warn_distinct=true"]
 # V5a: long cars (>= 4 h drive) may go down to 0.90 under fee1 (they paid 1.00-1.05x at 24 h+ leads: EUR ~900/wk above 0.90x,
 # research/re/v5/lead_open_f1h5f.out); the guard counts warned cars, not warning events (ARCHIVE D_LONGWARN.md).
 PRESETS["v5a"] = PRESETS["k-f1h5f"] + ["long_warn_distinct=true", "fee1_long=(240,0.9)"]
+# V5 FLEET (research/re/v5/FLEET_BUILD.md). v5f1: fee1 cars with >= 8 h lead open at a flat 0.90 (floors kept), the one re-pick
+# posts at 1.03 (a 0.90 opening ends at 0.945x over all attempts vs 0.80 picks' 0.91x after 1.6-1.7 gigs/car; openings2.py).
+PRESETS["v5f1"] = PRESETS["v5a"] + ["v5_open=(8,0.9)", "v5_repost=1.03"]

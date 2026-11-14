@@ -1778,7 +1778,9 @@ class Desk:
             last_call = (cfg.fee1_last_call and cfg.fee1_min_minutes <= left <= cfg.fee1_last_call
                          and self.now - rec.posted_at >= 60 and posts <= cfg.fee1_max_posts)
             if not last_call:
-                if self.now < repick_at(rec.posted_at, cfg.fee1_repick) or posts >= cfg.fee1_max_posts:
+                # v5_repost: one re-pick at a flat fee, then the car keeps it to the last call (no second model re-pick)
+                max_posts = min(cfg.fee1_max_posts, 2) if cfg.v5_repost and not getattr(self, "scarce", False) else cfg.fee1_max_posts
+                if self.now < repick_at(rec.posted_at, cfg.fee1_repick) or posts >= max_posts:
                     continue  # (a re-pick that would fall at night waits for the morning: nobody plans a trip then)
                 if left < cfg.fee1_min_minutes + (cfg.fee1_last_call or 0):
                     continue  # too close to the alarm for another choice: the last call (or the alarm) takes it
