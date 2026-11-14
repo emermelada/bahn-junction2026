@@ -26,6 +26,13 @@ class Config:
     dealer_lr: float = 0.006           # per dealer: the competitor cuts where we win most
     min_ratio: float = 1.00            # never quote under list
     max_ratio: float = 1.80
+    menu: bool = False                 # one price in fastest-option euros, slower options cheaper by the dealer's speed value, every option
+                                       # at the same margin (dealer buys max(threshold - price); Halal: next = same - €14.5, 3 days = next - €6.1)
+    speed_cents: tuple = (1450, 610)   # the dealer's euros for same->next day and next->within 3 days (Halal's medians)
+    s_cap_cents: int = 0               # with same_day and next_day quoted, same_day at most next_day + this - €1: a dealer pays ~€9-15 more for
+                                       # speed, so past that gap it takes next_day for less (our weeks: gap €15-20 -> takes same_day 38%) (0 = off)
+    mu_w: tuple = ()                   # (day, dealer, lane) weights of mu's parts when pricing (learning unchanged): fitted on 34 c3g weeks,
+                                       # 0.65/0.4/0.6, the full parts over-react (research/re/market/PRICING.md) (() = 1/1/1)
     shadow_cents: int = 0              # opportunity cost of one car of driver capacity
     min_ev_cents: int = 200            # expected margin below this is not worth a driver
     pl_cal: tuple = ()                 # ((drive minutes under, factor), ...): scale the quoted P(late) in the risk price by drive time.
@@ -77,6 +84,7 @@ class Config:
     cong_horizon: int = 18 * 60        # only gigs whose last pickup is within this many minutes
     # --- load: our cars due per day over the world's drivers
     load_free: float = 0.07            # rc3: with late 2.0 the long and thin-town cars get dear, so the safe ones can take more load (y4)
+    load_free_mon2: float = 0.0        # load_free for cars due on the last Monday (0 = load_free): Friday noev is 80-94% the load charge, Mon2 cars 2.4-3.2% late (research/re/market/WAR_FRIDAY.md)
     adaptive_load: bool = False        # scale load_free by how easily our first posts book this week
     cap_min: float = 0.7
     cap_max: float = 1.4

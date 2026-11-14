@@ -58,6 +58,18 @@ PRESETS["d-feer"] = PRESETS["d-fee"] + ["relook_minutes=90", "relook_mult=1.05"]
 PRESETS["d-fee3"] = PRESETS["c3g"] + ["fee_open_rule=((24,40,0.92),(12,80,0.95))"]
 PRESETS["d-pair"] = PRESETS["c3g"] + ["bundle_empty_end=(240,11)"]  # no long pairs ending where nobody lives
 # killed: hold_min_left=1440 (-434), offer_home_n=3 (-220, 1.5% of offers accepted)
-PRESETS["c3gf"] = PRESETS["d-fee"]  # old name of the d-fee runs (tag d-c3gf); re-market's c3gf, if merged, takes precedence
 PRESETS["d-pfee"] = PRESETS["c3g"] + ["bundle_open_dense=(12,80,0.76)"]  # cheaper pairs that end where many drivers live
 PRESETS["d-fee4"] = PRESETS["c3g"] + ["fee_open_rule=((24,0,0.92),(12,0,0.95))"]  # d-fee3 (cut only near drivers) gave +65: cut wider instead
+# re-market: menu pricing (one effective price, slower options cheaper by the dealer's speed value, every option at one margin).
+PRESETS["m1menu"] = PRESETS["c3g"] + ["menu=true"]
+# re-market: no load charge on cars due the last Monday (Friday noev is the load charge; Mon2 cars are our safest).
+PRESETS["m2mon2"] = PRESETS["c3g"] + ["load_free_mon2=0.2"]
+# re-market: same_day capped at next_day + €9 (the dealer's speed value), and pricing with damped mu parts.
+PRESETS["m3scap"] = PRESETS["c3g"] + ["s_cap_cents=900"]
+PRESETS["m4muw"] = PRESETS["c3g"] + ["mu_w=(0.65,0.4,0.6)"]
+# re-capacity: load charge as a barrier at the measured knee (fee/typical flat 1.11-1.12 up to day load 0.12, then 1.16/1.24;
+# late 5% -> 12%; research/re/feeload.py). dev-07..18 +944 (se 246) 11/12 vs c3g, min on-time 0.929.
+PRESETS["k-load"] = PRESETS["c3g"] + ["load_free=0.12", "load_slope=2"]
+# Stacks: + re-drivers' opening-fee rule (d-fee), + re-market's last-Monday load room (m2mon2 at a gentler 0.15).
+PRESETS["k-s1"] = PRESETS["k-load"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))"]
+PRESETS["k-s2"] = PRESETS["k-s1"] + ["load_free_mon2=0.15"]
