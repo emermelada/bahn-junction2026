@@ -511,6 +511,15 @@ class Desk:
             else:
                 prices["same_day"] = max(s, int(round(n / cfg.steer)))
             info.append(f"steer {s}/{n}->{prices['same_day']}/{prices['next_day']}")
+        if cfg.slow_only_floor and prices and r["options"][0]["kind"] not in prices:
+            # Without the dealer's fastest option we win about 0.32 at any price (36 k18 weeks, flat from
+            # mu-0.2 to mu+0.25): the price barely moves the win, so quote at least mu + floor.
+            mu = self.market.mu_for(dealer, day, r["legs"][0]["pickup"]["placeId"], lane_of(r))
+            ratio = min(cfg.max_ratio, mu + cfg.slow_only_floor)
+            for o in r["options"]:
+                if o["kind"] in prices:
+                    prices[o["kind"]] = max(prices[o["kind"]], int(round(o["listPriceCents"] * ratio * tf)))
+            info.append(f"slowfloor r>={ratio:.2f}")
         self.quote_meta[r["id"]] = meta
         head = f"bar={bar:.2f} bl={backlog} tg={t_gain/100:.0f} tf={tf:.2f} mu={self.market.mu_for(dealer, day, r["legs"][0]["pickup"]["placeId"]):.3f} cost={cost/100:.0f}"
         if not prices:
