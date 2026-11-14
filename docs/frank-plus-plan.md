@@ -47,7 +47,7 @@ The cost model is not biased: on 3,920 single-car gigs, booked fee / modelled co
 
 ## Plan (in order)
 
-1. Add `max_per_batch=6` to the k18 preset after the last 3 rc10 seeds confirm it.
+1. Done: `max_per_batch=6` confirmed on all 12 rc10 weeks (mean 11,041 vs 10,791, 12/12, min on-time 0.918 vs 0.901); preset `chains_plus` on branch `a/frank-plus`.
 2. Chain-aware quoting (above): price a request at chain cost when it fits a car we hold; measure orders a week, chains a week, mean and min on-time on rc10 against k18.
 3. Escalation cost: your own log shows 66 escalated singles costing €2.5k a week above typical. Measure which of them were predictable at quote time (slack, town supply, hour) and price or decline those.
 4. The thinnest week (rc10-02, 90.1%): find what went late there before loosening anything.
