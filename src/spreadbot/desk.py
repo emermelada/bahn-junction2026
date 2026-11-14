@@ -1582,8 +1582,8 @@ class Desk:
                 if a["type"] == "withdraw" and a["gigId"] in self.gigs:
                     # A driver booked it first (or it started): the gig is live, so its cars must not be posted again.
                     rec = self.gigs[a["gigId"]]
-                    if self.cfg.fee1 and self._fee1 is not None and rec.id in self._fee1.done and rec.status == "withdrawn":
-                        self._fee1.closed_n += 1  # a re-pick's withdraw lost to a booking: the calibration counts the booking
+                    if self.cfg.fee1 and self._fee1 is not None and rec.status == "withdrawn":
+                        self._fee1.booked_after_all(rec.id)  # a re-pick's withdraw lost to a booking: the week's offset counts it booked
                     rec.status = "booked"
                     for key in rec.legs:
                         if key[0] in self.orders and self.orders[key[0]].order["deliveredAt"][key[1]] is None:

@@ -286,6 +286,14 @@ class Fee1:
         except Exception as exc:  # the offset must never stop the desk
             self.desk.say("ERR", f"fee1 close {type(exc).__name__}: {exc}")
 
+    def booked_after_all(self, gid: str) -> None:
+        """A re-pick's withdraw was refused: a driver booked the gig first, so it did clear at its fee."""
+        try:
+            if gid in self.obs:
+                self.obs[gid] = (self.obs[gid][0], 1)
+        except Exception as exc:  # never stop the desk
+            self.desk.say("ERR", f"fee1 booked_after_all {type(exc).__name__}: {exc}")
+
     def calibrate(self) -> None:
         """delta: the week's offset of ln(clearing fee), by Newton steps on the probit likelihood of this week's first posts
         (booked at m: residual <= z; sat a window unbooked: above) with a normal prior; once per world hour."""

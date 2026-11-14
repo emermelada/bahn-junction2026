@@ -232,7 +232,9 @@ class Config:
     fee1_rescue: tuple = (1.31, 0.19)  # (fee x typical, P(late)) of a single not booked by our alarm (k-safe-dcl, rescue_cost.py)
     fee1_desert_floor: float = 1.05    # desert deliveries (desert_n) never below this (the tail guard of d-feerd)
     fee1_harm: float = 1.0             # weight of the harm a fee above the going fee does to our other waiting gigs (0 = off; Halal: -EUR 2,967/wk without)
-    fee1_rel_share: float = 0.78       # share of a fee's pull that comes from our own other gigs: Halal's fee sign 3.96 on m/level, 0.88 on level
+    fee1_rel_share: float = 0.15       # share of a fee's pull that comes from our own other gigs: PROBE measured ~0.1-0.3 (DRIVERS.md: +10% on our
+                                       # other gigs moves P(book|view) 0.03-0.05 pp vs 0.52 pp for +10% own; HARM.md: neighbours equal at 0.85 vs 1.2)
+                                       # (Halal's logistic: 3.96 on m/level vs 0.88 on level = 0.78)
     # ln(clearing fee) = intercept + ln(1+drivers <= 30 road min from the delivery) + same for the pickup + ln(lead h to the last pickup)
     # + ln(drive min) + posted Fri..Mon2 + private end + premium; sigma. PROBE's counterfactual forks (57 cars, 227 probes,
     # research/re/probe/out/clear_fit.json): median clearing fee ~0.98 (few drivers near the delivery, < 8 h) to 0.64 (many, > 40 h).
