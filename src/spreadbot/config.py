@@ -198,6 +198,9 @@ class Config:
     hold_km: float = 0.0               # air km from A's delivery to B's pickup for a release pair (0 = bundle_km)
     hold_weekend: bool = False         # a held car whose last pickup is on the last Monday is released Sunday at hold_hour (not before Friday):
                                        # bookings made 2+ days ahead are a third dropped and a fifth late (RESEARCH_2 round 2), Mon2 drivers are idle
+    drop_calm_hours: float = 0.0       # a single dropped with more than this many hours to its last pickup is posted again at the opening
+                                       # fee instead of escalated (k-safe, 35 weeks: 25 of 35 drops/wk had > 16 h left, rebooked at
+                                       # 1.24-1.31x typical, 2-4% late); 0 = off
     repair_pairs: bool = False         # a car won during the day may pair with any open unbooked single of ours, not only one posted in the last bundle_window
     repair_drive: int = 300            # such a pair drives at most this many minutes (k18: chains under 5 h book 85%)
     repair_lead: int = 360             # and starts at least this long from now (k18: pairs formed under 2 h ahead book 46%)

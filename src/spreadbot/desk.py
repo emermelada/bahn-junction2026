@@ -333,6 +333,16 @@ class Desk:
                 self.outbox.append({"type": "reprice", "gigId": rec.id, "schedule": rec.schedule})
                 self.say("KEEP_BUNDLE", f"{gid} fee={fee}")
                 return
+        if self.cfg.drop_calm_hours and why == "dropped" and len({o for o, _ in rec.legs}) == 1:
+            ob = self.orders.get(rec.legs[0][0])
+            legs = [l for _, l in rec.legs]
+            if ob and not ob.urgent and self.last_pickup(ob, legs) - self.now > self.cfg.drop_calm_hours * HOUR:
+                # Plenty of time left: post it again at the opening fee. A new post notifies nearby drivers (~10 views
+                # in 30 min); escalating paid 1.24-1.31x typical for drops with > 16 h left that were only 2-4% late.
+                self.withdraw(gid)
+                self.dispatch_order(ob.order["id"], "drop-repost")
+                self.say("DROP_REPOST", f"{gid} {ob.order['id']} left={(self.last_pickup(ob, legs) - self.now) // 60}h")
+                return
         # The gig is in the app again with its old schedule: make sure it can still find a driver.
         self.escalate_gig(rec, why)
 
