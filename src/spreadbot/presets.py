@@ -130,3 +130,5 @@ PRESETS["k-safe"] = PRESETS["c3g"] + MON2S + ["fee_open_rule=((24,0,0.92),(12,80
                                               "desert_n=11", "desert_alarm=720"]
 # re-market: the outage detector (pickup region, 08-18, flagged at z 4, priced +25%), on the k-safe bar.
 PRESETS["m11out"] = PRESETS["k-safe"] + ["outage_z=4.0"]
+# re-market: the weekly change of shape of the competitor's price list, as a slope on ln(km), on the k-safe bar.
+PRESETS["m12dist"] = PRESETS["k-safe"] + ["dist_lr=0.002"]

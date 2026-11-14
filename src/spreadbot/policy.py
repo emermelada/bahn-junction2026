@@ -113,6 +113,7 @@ class Market:
         self.kal: dict[int, list[list[float]]] = {}
         self.war_seen = False
         self.out_acc: dict[tuple[int, str], list[float]] = {}  # (day, region centre) -> [sum(won - p), sum p(1-p), n], 08-18
+        self.beta = 0.0                                         # dist_lr: competitor level per ln(km) around the median lane (e^4.97 = 144 km)
         self.outage: dict[int, str] = {}                        # day -> centre of the flagged outage region
 
     def kal_day(self, day: int) -> list[list[float]]:
@@ -140,7 +141,18 @@ class Market:
             return self.mu_base(dealer, day, place, lane) * (1 + self.cfg.outage_up)
         return self.mu_base(dealer, day, place, lane)
 
+    def dist_x(self, lane: str) -> float:
+        if not lane:
+            return 0.0
+        a, b = lane.split(">")
+        return math.log(max(10.0, self.desk.geo.km(a, b))) - 4.97
+
     def mu_base(self, dealer: str, day: int, place: str = "", lane: str = "") -> float:
+        if self.cfg.dist_lr:
+            return self.mu_core(dealer, day, place, lane) + self.beta * self.dist_x(lane)
+        return self.mu_core(dealer, day, place, lane)
+
+    def mu_core(self, dealer: str, day: int, place: str = "", lane: str = "") -> float:
         if self.cfg.day_kalman:
             return self.base_for(dealer, day, place, lane) + sum(w * d for w, d, v in self.kal_day(day))
         return (self.mu + self.day_shift[day] + self.dealer_shift[dealer] + self.place_shift.get((place, day), 0.0)
@@ -207,6 +219,8 @@ class Market:
                         and a[0] >= self.cfg.outage_z * math.sqrt(a[1])):
                     self.outage[day] = c
                     self.desk.say("OUTAGE", f"day {day} region {c} z={a[0] / math.sqrt(a[1]):.1f} n={a[2]}")
+        if self.cfg.dist_lr:
+            self.beta = min(0.4, max(-0.4, self.beta + self.cfg.dist_lr * k * g * self.dist_x(lane)))
         war = self.cfg.war_guard and self.day_shift[day] < -self.cfg.war_shift
         if not war:
             # On a price-war day (the competitor 20% under everywhere) only today's shift learns: tomorrow it is back.
