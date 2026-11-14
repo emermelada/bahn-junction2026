@@ -13,6 +13,7 @@ from spreadbot.governor import risk_mode
 
 DAY = 24 * 60
 EASY_DRIVERS = 30  # in rescue mode, only pickups with this many drivers living within 30 km count as easy
+TROUBLE_WINDOW = 2 * DAY  # a town's warnings count for two days, then it gets another chance
 NOTIFY_KM = 30  # RULES: the app notifies drivers whose home is within 30 km of the first pickup, in a straight line
 
 
@@ -44,6 +45,8 @@ def unserviceable(request: PriceRequest, option: DeliveryOption, state: State) -
         cap = FLAGS["cars_per_driver_day"]
         if cap and won_cars(state, town, day) + 1 > cap * near:
             why.append("town_full")
+    if FLAGS["trouble_warnings"] and any(trouble(state, leg["pickup"]["placeId"]) >= FLAGS["trouble_warnings"] for leg in request["legs"]):
+        why.append("town_trouble")
     batch = request["batchId"]
     if FLAGS["max_per_batch"] and batch and sum(1 for o in state.orders.values() if o["status"] != "cancelled"
                                                 and state.requests[o["id"]]["batchId"] == batch) >= FLAGS["max_per_batch"]:
@@ -66,6 +69,13 @@ def unserviceable(request: PriceRequest, option: DeliveryOption, state: State) -
     if mode == "rescue" and min(drivers_near(state, leg["pickup"]["placeId"]) for leg in request["legs"]) < EASY_DRIVERS:
         why.append("rescue_hard")
     return why
+
+
+def trouble(state: State, town: str) -> int:
+    """Deadline warnings in the last TROUBLE_WINDOW minutes for orders picked up in this town: no driver took
+    them 3 hours before their last pickup. In a week where a town lost its drivers, this is the first sign."""
+    return sum(1 for oid, at in state.urgent.items() if state.now - at <= TROUBLE_WINDOW
+               and oid in state.orders and state.orders[oid]["legs"][0]["pickup"]["placeId"] == town)
 
 
 def slack(request: PriceRequest, option: DeliveryOption, state: State) -> int:
