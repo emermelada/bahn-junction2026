@@ -17,4 +17,11 @@ PRESETS = {
         "lane_w=1.0",                                     # competitor lane factor from 443 weeks
         "steep_relaxed=(1.2,1.4)",                        # cheap rescue escalation
     ],
+    # c3 (Sat 14 Nov): c1 with late_cost_frac 1.2. dev-07..18: 12,927 vs 12,365 for c1 and 11,579 for y4, 12/12 ranked,
+    # min on-time 0.912, best p10 (9,756). Candidate under the raw-margin decision.
+    "c3": [
+        "gov_tight=0.92", "gov_rescue=0.92", "gov_relaxed=0.93",
+        "theta=0.7", "lane_w=1.0", "steep_relaxed=(1.2,1.4)",
+        "late_cost_frac=1.2",                             # milder lateness price: more cars won, still ranked on 12/12
+    ],
 }
