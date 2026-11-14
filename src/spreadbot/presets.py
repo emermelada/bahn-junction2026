@@ -53,3 +53,4 @@ PRESETS["c3g"] = PRESETS["c3"] + ["ontime_model=gbm"]
 # Candidates (claude/re-drivers): post next-day cars with an early last pickup at once; opening fee by slack and drivers near the delivery.
 PRESETS["c3gh"] = PRESETS["c3g"] + ["hold_min_left=1440"]
 PRESETS["c3gf"] = PRESETS["c3g"] + ["fee_open_rule=((24,0,0.92),(12,80,0.95))"]
+PRESETS["c3gf2"] = PRESETS["c3g"] + ["fee_open_rule=((24,80,0.85),(24,0,0.9),(12,80,0.92))"]  # deeper: drivers near the delivery skip the dear trip home
