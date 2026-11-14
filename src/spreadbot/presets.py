@@ -204,3 +204,17 @@ PRESETS["v5r"] = PRESETS["k-f1h5fD"] + ["steep_plan=(1.5,1.7,1.9)", "steep_rescu
 # V5 + FLEET's volume arm V2 (pairs count 0.6 in the day's load; load barrier at the knee 0.12, slope 2): +779 WAR on the release, but
 # fresh-10/20 0.891/0.893 (LEAD sc-V2). The scarcity switch (claude/v5-quote) is meant to turn it off in such weeks.
 PRESETS["v5aV2"] = PRESETS["v5a"] + ["load_bundle_w=0.6", "load_free=0.12", "load_slope=2"]
+# V5 quote (research/re/v5/QUOTE_BUILD.md). v5q1: a car declined for no margin (noev) gets a second look at the true fleet cost
+# (0.95x typical, or fee1's own estimate if lower) when P(on time) >= 0.97, drive < 4 h, not a desert, its day's load < 0.12, not Friday.
+PRESETS["v5q1"] = PRESETS["v5a"] + ["safe_admit=(0.97,0.95,0.12)"]
+# v5q2: + the scarcity switch from Tue 24:00 (last 24 h fee/typ >= 1.08 or warned/won >= 0.06): no admits, long cars declined, risk x1.5.
+SCARCITY = ["scarcity=(1.08,0.06)", "scarcity_long=240", "scarcity_risk=1.5"]
+PRESETS["v5q2"] = PRESETS["v5q1"] + SCARCITY
+# v5q3: v5q2 with admits allowed on Friday too.
+PRESETS["v5q3"] = PRESETS["v5q2"] + ["safe_admit_fri=true"]
+# FLEET's volume arm V2 (load_bundle_w 0.6, load_free 0.12, load_slope 2: +779 on WAR, but fresh-10 0.891 / fresh-20 0.893 vs release
+# 0.939 / 0.927) with the scarcity switch turning its load params back to the release's (0.07, 1.0, 1.0) once the week is scarce.
+PRESETS["k-f1h5fV1"] = PRESETS["k-f1h5f"] + ["load_bundle_w=0.6"]  # as on claude/fleet-run (v1-fleet-run presets.py)
+PRESETS["k-f1h5fV2"] = PRESETS["k-f1h5fV1"] + ["load_free=0.12", "load_slope=2"]
+PRESETS["v5q2V"] = PRESETS["k-f1h5fV2"] + ["long_warn_distinct=true"] + SCARCITY + [
+    "scarce_set=(('load_free',0.07),('load_slope',1.0),('load_bundle_w',1.0))"]

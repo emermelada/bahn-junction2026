@@ -272,5 +272,27 @@ class RetryTest(Base):
             emulate.time = old
 
 
+
+class ScarcityTest(Base):
+    def test_the_switch_flips_at_the_same_hour_after_any_restart(self):
+        from spreadbot.presets import PRESETS
+        cfg = Config.parse(PRESETS["v5q2V"])
+        flips = set()
+        for T in (2350, 3300, 4300, 6000):
+            with self.subTest(minute=T):
+                desk, _ = self.rebuild(FakeWorld(WEEK, T), cfg)
+                if T < cfg.scarcity_from:
+                    self.assertFalse(desk.scarce)
+                    self.assertEqual(desk.cfg.load_free, cfg.load_free)
+                    continue
+                lines = [l.split("	")[2].split(":")[0] for l in desk.log if "	SCARCE	" in l]
+                self.assertEqual(len(lines), 1 if desk.scarce else 0)
+                flips.add((desk.scarce, tuple(lines)))
+                if desk.scarce:  # the switched config is the one price() and due_load() read
+                    self.assertEqual((desk.cfg.load_free, desk.cfg.load_slope, desk.cfg.load_bundle_w), (0.07, 1.0, 1.0))
+                    self.assertIs(desk.market.cfg, desk.cfg)
+        self.assertEqual(len(flips), 1, f"restarts disagree on the flip: {flips}")
+
+
 if __name__ == "__main__":
     unittest.main()
