@@ -80,6 +80,7 @@ class OrderBook:
     p_exp: float = 0.0
 
 
+V5_PAIR2_SLACK = 360  # v5_pair2: a partner needs this many min to its last pickup (the 3 h warning + a pair's extra drive)
 V5_SHORT_H = 8  # v5_short_open: ladder singles under this many hours to the last pickup (6-8 h cars paid 1.13x, 0-6 h 1.27x)
 
 
@@ -556,6 +557,7 @@ class Desk:
         meta: dict = {}
         info = []
         cands: list = []
+        admits: list = []  # safe_admit candidates (kind, opt, p_ok, load, ratio, ev, cost), used only if nothing else is quoted
         for opt in r["options"]:
             kind = opt["kind"]
             if kind not in cfg.quote_options:
@@ -614,13 +616,10 @@ class Desk:
                 if adm is None:
                     info.append(f"{kind}:noev")
                     continue
-                ratio, ev, c_adm = adm
-                if r["id"] not in self.admitted:  # one count per request (a rejoin quotes open requests again)
-                    self.admitted.add(r["id"])
-                    self.admits[self.now // DAY] += 1
-                prices[kind] = int(round(opt["listPriceCents"] * ratio * tf))
-                meta[kind] = p_ok
-                info.append(f"{kind}:admit(r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f},c={c_adm/100:.0f},L={load:.3f},n={self.admits[self.now // DAY]})")
+                # Admits wait for the end of the loop: they count only when no option of this request makes margin as it is
+                # (MARKET review: 40% of admits sat next to a normal quote, so an admit could undercut our own normal option).
+                admits.append((kind, opt, p_ok, load) + tuple(adm))
+                info.append(f"{kind}:noev")
                 continue
             if cfg.trust_invest and self.investing(dealer, p_ok):
                 # Build a big dealer's trust fast: win its safe cars with high probability while each still
@@ -634,6 +633,14 @@ class Desk:
             prices[kind] = int(round(opt["listPriceCents"] * ratio * tf))
             meta[kind] = p_ok
             info.append(f"{kind}:r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f},L={load:.3f}")
+        if admits and not prices:
+            for kind, opt, p_ok, load, ratio, ev, c_adm in admits:
+                prices[kind] = int(round(opt["listPriceCents"] * ratio * tf))
+                meta[kind] = p_ok
+                info.append(f"{kind}:admit(r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f},c={c_adm/100:.0f},L={load:.3f})")
+            if r["id"] not in self.admitted:  # one count per request (a rejoin quotes open requests again)
+                self.admitted.add(r["id"])
+                self.admits[self.now // DAY] += 1
         if cfg.menu and cands:
             place = r["legs"][0]["pickup"]["placeId"]
             fast = r["options"][0]
@@ -1377,7 +1384,7 @@ class Desk:
                 opening = self.open_rule(ob, legs, last, opening)
             if (cfg.v5_short_open and cfg.fee1 and not getattr(self, "scarce", False) and last - now < V5_SHORT_H * HOUR
                     and not ob.p_exp >= cfg.hot_p and not (cfg.desert_n and self.desert(ob.order["legs"][legs[-1]]["delivery"]["placeId"]))):
-                opening = cfg.v5_short_open  # short lead, fee1 could not choose: open lower, the fee_rel raises stay
+                opening = min(opening, cfg.v5_short_open)  # short lead, fee1 could not choose: open lower (never above a cheaper rule), the fee_rel raises stay
                 self.say("V5_SHORT", f"{ob.order['id']} left={last - now} open={opening:.2f}")
             out, prev = [{"at": now, "feeCents": int(round(base * opening))}], int(round(base * opening))
             for hours_before, mult in cfg.fee_rel:
@@ -1902,6 +1909,8 @@ class Desk:
             other = self.orders.get(r2.legs[0][0])
             if not other or other is ob or not self.simple(other):
                 continue
+            if other.urgent or self.last_pickup(other, [l for _, l in r2.legs]) - self.now < V5_PAIR2_SLACK:
+                continue  # MARKET review: a partner near its last pickup would restart its booking clock in a new post
             for first, second in ((ob, other), (other, ob)):
                 last = self.chain(first, second)
                 if last is not None and (best is None or self.chain_key(last, first, second) > self.chain_key(best[0], best[1], best[2])):
