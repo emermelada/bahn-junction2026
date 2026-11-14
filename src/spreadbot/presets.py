@@ -153,3 +153,6 @@ PRESETS["m11out"] = PRESETS["k-safe"] + ["outage_z=4.5", "outage_up=0.3"]
 PRESETS["m12dist"] = PRESETS["k-safe"] + ["dist_lr=0.002"]
 # re-market: quote the fee rule's cheaper opening as the cost (wins the cars drivers near the delivery take cheaply), on k-safe.
 PRESETS["m13mc"] = PRESETS["k-safe"] + ["quote_move_cost=true"]
+
+# Drops with time to spare: post again at the opening fee instead of escalating (claude/spec-drops).
+PRESETS["k-safe-dc"] = PRESETS["k-safe"] + ["drop_calm_hours=16"]
