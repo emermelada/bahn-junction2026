@@ -224,3 +224,5 @@ PRESETS["k-f1h5fV2s"] = PRESETS["k-f1h5fV2"] + ["strict_warn=0.07"]
 # Kill V2s: strict_warn 0.07 fired in 6/8 weeks, on-time unchanged (0.918 vs 0.921), -500..-2,100 where it fired: too late a signal.
 # V2m: the gentler volume arm, barrier at day load 0.10 (between V1 +154 / worst 0.946 and V2 +780 / worst 0.921).
 PRESETS["k-f1h5fV2m"] = PRESETS["k-f1h5fV1"] + ["load_free=0.10", "load_slope=2"]
+# V1b: pairs count 0.6 only once a driver holds them (V2/V2m broke fresh-20: open pairs that split in a scarce week hid load).
+PRESETS["k-f1h5fV1b"] = PRESETS["k-f1h5fV1"] + ["load_bundle_booked=true"]

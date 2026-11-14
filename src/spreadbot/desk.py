@@ -688,7 +688,7 @@ class Desk:
             chained = 0
             for rec in self.gigs.values():
                 oids = {o for o, _ in rec.legs}
-                if len(oids) > 1 and rec.status in ("open", "booked", "working"):
+                if len(oids) > 1 and rec.status in (("booked", "working") if self.cfg.load_bundle_booked else ("open", "booked", "working")):
                     for o in oids:
                         ob = self.orders.get(o)
                         if ob and min(self.deadline(ob.order, l) for l in range(len(ob.order["legs"]))) // DAY == day:
