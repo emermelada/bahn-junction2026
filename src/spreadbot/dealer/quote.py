@@ -12,7 +12,7 @@ from spread.types import PriceRequest
 from spreadbot.core.rng import rng
 from spreadbot.core.state import State
 from spreadbot.dealer.flags import FLAGS
-from spreadbot.dealer import dealer_level, week_level
+from spreadbot.dealer import dealer_level, events, week_level
 from spreadbot.dealer.trust import CAP as TRUST_FULL, trust_count, trust_factor
 from spreadbot.dealer.win_model import curve, record_quote
 from spreadbot.driver.cost import estimate_cost
@@ -38,6 +38,9 @@ def quote(request: PriceRequest, state: State) -> dict[str, int]:
     ratio = FLAGS["quote_ratio"] + FLAGS["lane_weight"] * lane_shift(request)
     if FLAGS["trust_invest"] and big_dealer(state, request["dealerId"]) and trust_count(state, request["dealerId"]) < TRUST_FULL:
         ratio -= FLAGS["trust_invest"]  # win this dealer's early orders cheaper: each on-time one lifts all its later prices 1%
+    if FLAGS["outage_up"] or FLAGS["war_down"]:
+        ratio += events.shift(state, request, FLAGS["outage_up"], FLAGS["war_down"])
+        events.record(state, request)
     if FLAGS["dealer_level"]:
         ratio += max(-DEALER_CAP, min(DEALER_CAP, FLAGS["dealer_level"] * dealer_level.shift(state, request["dealerId"])))
         dealer_level.record(state, request["id"], request["dealerId"])
