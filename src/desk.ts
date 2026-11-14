@@ -13,6 +13,8 @@ import { Fees } from "./fees.ts"
 import { Pricing } from "./pricing.ts"
 import { Offers } from "./offers.ts"
 import type { OfferNeed } from "./offers.ts"
+import { readNote } from "./notes.ts"
+import type { NoteFacts } from "./notes.ts"
 
 /** How to post a leg again after a failed visit. */
 export type Retry = { pickupFrom: number; manualLicence: boolean; plates: boolean }
@@ -376,8 +378,9 @@ export class V2Desk implements Desk {
 
   async post(order: Order, legs: number[], retry = FIRST_TRY): Promise<void> {
     if (this.cfg.flags.bundles && retry === FIRST_TRY && legs.length === 1 && order.legs.length === 1 && this.tryBundle(order)) return
-    const audience = { experienced: order.legs.some((leg) => leg.car.premium), manualLicence: retry.manualLicence }
-    const stops = withoutWindows(stopsFor(order, legs, this.requests.get(order.id)!.note, retry), this.now)
+    const facts = this.factsOf(order)
+    const audience = { experienced: order.legs.some((leg) => leg.car.premium), manualLicence: retry.manualLicence || !!facts?.manual }
+    const stops = withoutWindows(stopsFor(order, legs, this.requests.get(order.id)!.note, retry, facts), this.now)
     this.outbox.push({ type: "post", stops, audience, schedule: this.feesFor(order, legs.length) })
     if (legs.length === 1) return
     // A trade-in over the 12-hour limit for a gig with two cars goes as one gig per car.
@@ -385,10 +388,18 @@ export class V2Desk implements Desk {
     if (this.gigsOf(order.id).length === 0) for (const leg of legs) await this.post(order, [leg], retry)
   }
 
+  /** The note facts of an order's request when the notes flag is on (null = no facts), else undefined (starter reader). */
+  factsOf(order: Order): NoteFacts | null | undefined {
+    if (!this.cfg.flags.notes) return undefined
+    const request = this.requests.get(order.id)
+    return request ? readNote(request.note, request) : null
+  }
+
   /** One car alone, at its own fees (no bundle attempt). */
   postSingle(order: Order, windowsBefore: number): void {
-    const audience = { experienced: order.legs.some((leg) => leg.car.premium), manualLicence: false }
-    const stops = withoutWindows(stopsFor(order, [0], this.requests.get(order.id)!.note, FIRST_TRY), windowsBefore)
+    const facts = this.factsOf(order)
+    const audience = { experienced: order.legs.some((leg) => leg.car.premium), manualLicence: !!facts?.manual }
+    const stops = withoutWindows(stopsFor(order, [0], this.requests.get(order.id)!.note, FIRST_TRY, facts), windowsBefore)
     this.outbox.push({ type: "post", stops, audience, schedule: this.feesFor(order, 1) })
   }
 
@@ -420,7 +431,7 @@ export class V2Desk implements Desk {
     if (this.urgent.has(order.id) || this.now >= order.lastPickupAt) return false
     const B = this.cfg.bundles
     const note = this.requests.get(order.id)?.note ?? null
-    const mine = withoutWindows(stopsFor(order, [0], note, FIRST_TRY), this.now)
+    const mine = withoutWindows(stopsFor(order, [0], note, FIRST_TRY, this.factsOf(order)), this.now)
     if (mine.some((st) => st.window)) return false
     const a = order.legs[0]!
     let best: { gigId: string; partner: Order; first: Order; second: Order; drive: number } | null = null
@@ -443,7 +454,7 @@ export class V2Desk implements Desk {
     const { gigId, partner, first, second } = best
     this.legGigs.get(partner.id)?.delete(0)
     this.outbox.push({ type: "withdraw", gigId })
-    const stopsOf = (o: Order) => withoutWindows(stopsFor(o, [0], this.requests.get(o.id)!.note, FIRST_TRY), this.now)
+    const stopsOf = (o: Order) => withoutWindows(stopsFor(o, [0], this.requests.get(o.id)!.note, FIRST_TRY, this.factsOf(o)), this.now)
     const base = (this.fees.open(first, this.requests.get(first.id)!, 1) + this.fees.open(second, this.requests.get(second.id)!, 1)) * B.feeMult
     const f = first.legs[0]!
     const cliffAt = Math.min(first.lastPickupAt, second.lastPickupAt - this.geo.road(f.pickup.placeId, f.delivery.placeId) - this.geo.road(f.delivery.placeId, second.legs[0]!.pickup.placeId) - 30)
@@ -561,7 +572,8 @@ export const rising = (now: number, fee: number, level: number): FeeStep[] =>
 export const steep = (now: number, fee: number, level: number): FeeStep[] =>
   (level === 1 ? [0] : [0, 1, 2, 3, 4]).map((k) => ({ at: now + k * 30, feeCents: Math.max(1, Math.round(fee * (1.5 + k / 4))) }))
 
-export function stopsFor(order: Order, legs: number[], note: Note | null, retry: Retry): StopRef[] {
+export function stopsFor(order: Order, legs: number[], note: Note | null, retry: Retry, facts?: NoteFacts | null): StopRef[] {
+  if (facts !== undefined) return stopsFromFacts(order, legs, facts, retry)
   return legs.flatMap((leg): StopRef[] => {
     const { car, pickup, delivery } = order.legs[leg]!
     const noted = windowFromNote(note, pickup.window, "pickup")
@@ -571,6 +583,23 @@ export function stopsFor(order: Order, legs: number[], note: Note | null, retry:
     const deliveryWindow = windowFromNote(note, deliveryBase, "delivery")
     const lowBattery = car.electric && car.chargePercent !== null && car.chargePercent < 30
     const first: StopRef = { orderId: order.id, leg, kind: "pickup", withPlates: retry.plates, withCharging: lowBattery }
+    const second: StopRef = { orderId: order.id, leg, kind: "delivery" }
+    return [narrower(first, pickupWindow, pickup.window), narrower(second, deliveryWindow, deliveryBase)]
+  })
+}
+
+/** 6.8 notes: the pickup not before the note's ready / after-payment time, the delivery by the note's deadline,
+ * plates fetched on the way when the note says the car has none. */
+export function stopsFromFacts(order: Order, legs: number[], facts: NoteFacts | null, retry: Retry): StopRef[] {
+  return legs.flatMap((leg): StopRef[] => {
+    const { car, pickup, delivery } = order.legs[leg]!
+    const start = Math.max(pickup.window.from, facts?.readyFrom ?? 0, facts?.afterPayment ?? 0, retry.pickupFrom)
+    const pickupWindow = { from: start, to: Math.max(pickup.window.to, start) }
+    const deliveryBase = { from: delivery.window.from, to: Math.max(delivery.window.from, order.deadline) }
+    const due = Math.min(deliveryBase.to, facts?.deadline ?? Infinity)
+    const deliveryWindow = { from: deliveryBase.from, to: Math.max(due, deliveryBase.from) }
+    const lowBattery = car.electric && car.chargePercent !== null && car.chargePercent < 30
+    const first: StopRef = { orderId: order.id, leg, kind: "pickup", withPlates: retry.plates || !!facts?.plates, withCharging: lowBattery }
     const second: StopRef = { orderId: order.id, leg, kind: "delivery" }
     return [narrower(first, pickupWindow, pickup.window), narrower(second, deliveryWindow, deliveryBase)]
   })
