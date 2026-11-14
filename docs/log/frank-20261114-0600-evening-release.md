@@ -6,6 +6,17 @@
 
 **The test.** Paired sweeps on dev-07..18 (level 8), then a fresh check on unused seeds.
 
-**Numbers.** (filled in below)
+**Numbers.** dev-07..18, paired. Base reproduces v1am to the cent (deterministic).
 
-**Keep or kill.** (below)
+| Tag | Release | Ranked | Min on-time | p10 | Median | Mean | Orders |
+|---|---|---|---|---|---|---|---|
+| e0-base | off | 12/12 | 0.938 | 5,608 | 9,422 | 9,661 | 298 |
+| e1-hold18 | 18:00 | 12/12 | 0.922 | 5,385 | 10,247 | 10,364 | 300 |
+| **e2-hold16** | **16:00** | **12/12** | **0.931** | **6,826** | 9,452 | **10,690** | 299 |
+| e3-hold20 | 20:00 | 12/12 | 0.931 | 5,074 | 10,188 | 9,987 | 297 |
+| f1-hold14 (7 of 12 seeds) | 14:00 | 7/7 | 0.944 | | | +1,358 vs base on the same 7 | |
+
+hold16 vs base by seed: +1792, +3179, -666, +2631, +1218, +1315, -35, +833, -169, +1154, +1965, -870.
+18:00 was too late: release pairs left unbooked into the night (no notifications 23:00-07:00) were split by the 6 h alarm the next day. About 105 cars/week rode in release pairs (offline estimate: 110-165).
+
+**Keep or kill.** Keep, at 16:00 or earlier; 14:00 looks better still (incomplete). Next: finish 14:00 and 12:00, then bundle_keep, hold_price, hold_km, bundle_mult, then a fresh check on dev-19..30 against rc2.
