@@ -124,3 +124,7 @@ MON2S = ["load_free_mon2=0.2", "mon2_max_drive=240"]
 PRESETS["k-s5"] = PRESETS["k-s3dlx"] + MON2S
 PRESETS["k-s5c17"] = PRESETS["k-s5"] + ["load_cap=0.17"]
 PRESETS["k-s5c15"] = PRESETS["k-s5"] + ["load_cap=0.15"]
+# The conservative stack: only changes whose worst week stayed near c3g's on all three tuning sets.
+# re-market m8mon2s (Mon2 room for drives < 4 h: +594/+834/+519, 34/34, worst 0.944-0.948) + re-drivers d-feerd (worst 0.938-0.941).
+PRESETS["k-safe"] = PRESETS["c3g"] + MON2S + ["fee_open_rule=((24,0,0.92),(12,80,0.95))", "relook_minutes=90", "relook_mult=1.05",
+                                              "desert_n=11", "desert_alarm=720"]
