@@ -52,3 +52,6 @@ PRESETS["c3bprl"] = PRESETS["c3bp"] + ["relook_minutes=360"]
 PRESETS["c3pc"] = PRESETS["c3"] + ["pick_cap=true"]
 PRESETS["c3sw"] = PRESETS["c3"] + ["stop_windows=true"]
 PRESETS["c3swpc"] = PRESETS["c3"] + ["stop_windows=true", "pick_cap=true"]
+# The lateness model from all our weeks (late_gbm.py, AUC 0.897 vs 0.737) in place of the logistic, with and without the pickup windows.
+PRESETS["c3g"] = PRESETS["c3"] + ["ontime_model=gbm"]
+PRESETS["c3gw"] = PRESETS["c3swpc"] + ["ontime_model=gbm"]

@@ -41,6 +41,7 @@ class OnTime:
     def __init__(self, desk: "Desk"):
         self.desk = desk
         self._sup: dict[tuple[str, float], int] = {}
+        self._late = None  # LateModel, built on first use when ontime_model is "gbm"
 
     def supply(self, place: str, radius: float) -> int:
         key = (place, radius)
@@ -71,6 +72,13 @@ class OnTime:
 
     def p_ok(self, r: dict, deadline: int, option: str) -> tuple[float, float]:
         f = self.features(r, deadline, option)
+        if self.desk.cfg.ontime_model == "gbm":
+            # The trees fitted on 804k won orders (late_gbm.py): held-out AUC 0.897 against 0.737 for the logistic below.
+            if self._late is None:
+                from .late_gbm import LateModel
+                self._late = LateModel(self.desk)
+            opt = next((o for o in r["options"] if o["kind"] == option), r["options"][0])
+            return 1.0 - self._late.p_late(r, opt), f["slack"]
         coef = ONTIME_COEF_RESEARCH if self.desk.cfg.ontime_model == "research" else ONTIME_COEF
         z = coef["intercept"] + sum(c * f[k] for k, c in coef.items() if k != "intercept")
         return sigmoid(z + self.desk.cfg.ontime_shift), f["slack"]

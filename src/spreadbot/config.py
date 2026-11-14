@@ -52,7 +52,7 @@ class Config:
     # --- on-time selection
     ontime_fee_assumed: float = 1.6    # the fee the on-time model assumes (fee_plan reaches about this)
     ontime_shift: float = 0.0
-    ontime_model: str = "policy"       # "policy": fit on weeks of this dispatch policy; "research": the first fit
+    ontime_model: str = "policy"       # "policy": fit on weeks of this dispatch policy; "research": the first fit; "gbm": late_gbm.py trees
     dilute: bool = True               # in rescue, the bar is the projection (+ margin), not a fixed 0.92
     dilute_margin: float = 0.01
     calibrate: bool = False            # scale P(on time) by this world's observed/predicted on-time ratio
