@@ -484,6 +484,15 @@ class Desk:
             prices[kind] = int(round(opt["listPriceCents"] * ratio * tf))
             meta[kind] = p_ok
             info.append(f"{kind}:r={ratio:.2f},p={p_ok:.2f},ev={ev/100:.0f},L={load:.3f}")
+        if cfg.steer and "same_day" in prices and "next_day" in prices:
+            # Steer dealers to next_day: it pays more per car, can wait for the evening release and pair, and a
+            # pickup the day before the deadline costs less than one on the deadline day.
+            s, n = prices["same_day"], prices["next_day"]
+            if cfg.steer_down:
+                prices["next_day"] = min(n, max(int(round(s * cfg.steer)), int(next(o["listPriceCents"] for o in r["options"] if o["kind"] == "next_day") * cfg.min_ratio)))
+            else:
+                prices["same_day"] = max(s, int(round(n / cfg.steer)))
+            info.append(f"steer {s}/{n}->{prices['same_day']}/{prices['next_day']}")
         self.quote_meta[r["id"]] = meta
         head = f"bar={bar:.2f} bl={backlog} tg={t_gain/100:.0f} tf={tf:.2f} mu={self.market.mu_for(dealer, day, r["legs"][0]["pickup"]["placeId"]):.3f} cost={cost/100:.0f}"
         if not prices:

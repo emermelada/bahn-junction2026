@@ -39,6 +39,8 @@ class Config:
     gate_target: float = 0.935
     gate_span: float = 0.02            # full bonus this far under target
     gate_safe_p: float = 0.95
+    steer: float = 0.0                 # with both quoted: same_day at least next_day / steer (dealers take next_day under ~0.85x)
+    steer_down: bool = False           # instead lower next_day to steer x same_day
     # --- on-time selection
     ontime_fee_assumed: float = 1.6    # the fee the on-time model assumes (fee_plan reaches about this)
     ontime_shift: float = 0.0
