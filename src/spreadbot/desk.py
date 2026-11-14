@@ -81,6 +81,7 @@ class OrderBook:
 
 
 V5_PAIR2_SLACK = 360  # v5_pair2: a partner needs this many min to its last pickup (the 3 h warning + a pair's extra drive)
+PAIR_END_RADIUS = 30  # pair_end / pair_long_empty: a chain end's supply = drivers living <= this many road min of it (PAIRS.md's nd30)
 V5_SHORT_H = 8  # v5_short_open: ladder singles under this many hours to the last pickup (6-8 h cars paid 1.13x, 0-6 h 1.27x)
 
 
@@ -131,6 +132,7 @@ class Desk:
         self.home_count: dict[str, int] = defaultdict(int)
         self._near_q: dict[tuple[str, int], int] = {}
         self.home_offered: set = set()  # gigs that already had their offer_home round
+        self.pair_blocks: dict[str, tuple] = {}  # order -> (chains refused by the end guards, reason, drive, nd30) at the current decision
         for d in roster:
             self.home_count[d["homePlaceId"]] += 1
         self.won_count = 0
@@ -1084,6 +1086,8 @@ class Desk:
         last = min(self.last_pickup(A, [0]), self.last_pickup(B, [0]) - dA - tr)
         if last - self.now < (cfg.bundle_soon_slack + 60 if soon else cfg.bundle_min_slack):
             return None
+        if self.pair_blocked(dA + tr + dB, LB["delivery"]["placeId"], [A, B]):
+            return None
         return last
 
     # ------------------------------------------------------------------ chain planner (hold_minutes)
@@ -1093,12 +1097,51 @@ class Desk:
         return min(self.now + cfg.hold_minutes, L["pickup"]["window"]["from"] - cfg.hold_lead, self.last_pickup(ob, [0]) - cfg.hold_slack)
 
     def chain_key(self, last: int, first: OrderBook, second: OrderBook) -> float:
+        """Rank of a feasible pair among a car's candidate partners (higher wins). Base, in minutes: the latest chain start
+        (most slack), or minus the chain's drive with bundle_short. With pair_end, end_score() adds the end's drivers."""
         if not self.cfg.bundle_short:
-            return last
-        A, B = first.order["legs"][0], second.order["legs"][0]
-        g = self.geo
-        return -(g.drive(A["pickup"]["placeId"], A["delivery"]["placeId"]) + g.drive(A["delivery"]["placeId"], B["pickup"]["placeId"])
-                 + g.drive(B["pickup"]["placeId"], B["delivery"]["placeId"]))
+            base = last
+        else:
+            A, B = first.order["legs"][0], second.order["legs"][0]
+            g = self.geo
+            base = -(g.drive(A["pickup"]["placeId"], A["delivery"]["placeId"]) + g.drive(A["delivery"]["placeId"], B["pickup"]["placeId"])
+                     + g.drive(B["pickup"]["placeId"], B["delivery"]["placeId"]))
+        return self.end_score(base, second.order["legs"][0]["delivery"]["placeId"])
+
+    def end_score(self, base: float, end: str) -> float:
+        """pair_end (R1): a candidate chain's score, in hours = base / 60 + w x ln(1 + nd30(end)), where base is the old key in
+        minutes (higher better) and nd30 counts drivers living <= 30 road min of the chain's final delivery. Pairs book by their
+        end (AUC .65-.68; hop .51, start .52; PAIRS.md), so the end decides and the old key breaks near-ties. Off: base unchanged."""
+        if not self.cfg.pair_end:
+            return base
+        return base / 60.0 + self.cfg.pair_end[0] * math.log1p(self.home_near_delivery(end, PAIR_END_RADIUS))
+
+    def pair_blocked(self, drive: int, end: str, seq: list) -> bool:
+        """The end guards on a chain that fits in time (chain(), chain_seq()): R2 pair_long_empty (long chain into an empty town)
+        and pair_end's min_nd. Blocked chains are noted per car for the caller's PAIR_BLOCK line (pair_block_note)."""
+        cfg = self.cfg
+        if not cfg.pair_long_empty and not (cfg.pair_end and cfg.pair_end[1] > 0):
+            return False
+        nd = self.home_near_delivery(end, PAIR_END_RADIUS)
+        why = ""
+        if cfg.pair_long_empty and drive > cfg.pair_long_empty[0] and nd <= cfg.pair_long_empty[1]:
+            why = "long-empty"
+        elif cfg.pair_end and cfg.pair_end[1] > 0 and nd < cfg.pair_end[1]:
+            why = "end-min"
+        if not why:
+            return False
+        for x in seq:
+            n, w0, d0, nd0 = self.pair_blocks.get(x.order["id"], (0, why, drive, nd))
+            self.pair_blocks[x.order["id"]] = (n + 1, w0, d0, nd0)
+        return True
+
+    def pair_block_note(self, singles: list) -> None:
+        """One PAIR_BLOCK line per car posted alone at this decision that had a fitting partner the end guards refused."""
+        for ob in singles:
+            b = self.pair_blocks.get(ob.order["id"])
+            if b:
+                self.say("PAIR_BLOCK", f"{ob.order['id']} single: {b[1]} x{b[0]} (first: drive={b[2]} nd30={b[3]})")
+        self.pair_blocks.clear()
 
     def chain_seq(self, seq: list[OrderBook]) -> Optional[int]:
         """chain() for any number of cars: one driver takes them in this order, all on time with room to spare."""
@@ -1126,6 +1169,8 @@ class Desk:
                 return None
         if drive > min(12 * HOUR - 30, cfg.bundle_max_drive) or last - self.now < cfg.bundle_min_slack:
             return None
+        if self.pair_blocked(drive, Ls[-1]["delivery"]["placeId"], seq):
+            return None
         return last
 
     def try_extend(self, ob: OrderBook) -> bool:
@@ -1142,11 +1187,14 @@ class Desk:
                 continue
             for seq in ([ob] + pair, pair + [ob]):
                 last = self.chain_seq(seq)
-                if last is not None and (best is None or last > best[0]):
-                    best = (last, seq, rec)
+                if last is None:
+                    continue
+                key = self.end_score(last, seq[-1].order["legs"][0]["delivery"]["placeId"])
+                if best is None or key > best[0]:
+                    best = (key, last, seq, rec)
         if not best:
             return False
-        last, seq, rec = best
+        _, last, seq, rec = best
         self.withdraw(rec.id)
         self.chain_held.pop(ob.order["id"], None)
         stops = [st for x in seq for st in self.stops_for(x, 0)]
@@ -1170,6 +1218,7 @@ class Desk:
     def try_bundle(self, ob: OrderBook) -> bool:
         if not self.simple(ob):
             return False
+        self.pair_blocks.clear()
         if self.cfg.bundle3 and self.try_extend(ob):
             return True
         best = None
@@ -1197,7 +1246,9 @@ class Desk:
                 if last is not None and (best is None or self.chain_key(last, first, second) > self.chain_key(best[0], best[1], best[2])):
                     best = (last, first, second, rec)
         if not best:
+            self.pair_block_note([ob])
             return False
+        self.pair_blocks.clear()
         last, first, second, rec = best
         repair = rec is not None and self.now - rec.posted_at > self.cfg.bundle_window
         if rec is not None:
@@ -1268,6 +1319,7 @@ class Desk:
         if cfg.hold_km:
             self.cfg = cfg.with_(bundle_km=cfg.hold_km)
         edges = []
+        self.pair_blocks.clear()
         try:
             for a in A:
                 if not self.simple(a):
@@ -1280,11 +1332,13 @@ class Desk:
                         if last is not None:
                             L1, L2 = first.order["legs"][0], second.order["legs"][0]
                             tr = self.geo.drive(L1["delivery"]["placeId"], L2["pickup"]["placeId"])
-                            edges.append((tr, -last, first.order["id"], second.order["id"], last))
+                            # Greedy order: shortest hop first; with pair_end the end's score first (base = -hop), hop then slack break ties.
+                            key = -self.end_score(-tr, L2["delivery"]["placeId"]) if cfg.pair_end else 0.0
+                            edges.append((key, tr, -last, first.order["id"], second.order["id"], last))
         finally:
             self.cfg = cfg
         used: set = set()
-        for tr, _, f, s, last in sorted(edges):
+        for _, tr, _, f, s, last in sorted(edges):
             if f in used or s in used:
                 continue
             used.update((f, s))
@@ -1293,6 +1347,7 @@ class Desk:
                 if x in open_recs:
                     self.withdraw(open_recs[x].id)
             self.post_bundle(self.orders[f], self.orders[s], last, why="release")
+        self.pair_block_note([a for a in A if a.order["id"] not in used])
         for a in A:
             if a.order["id"] not in used:
                 self.dispatch_order(a.order["id"], "release")
@@ -2011,6 +2066,7 @@ class Desk:
         if not ob or len(rec.legs) != 1 or not self.simple(ob):
             return False
         best = None
+        self.pair_blocks.clear()
         for gid in sorted(self.gigs):
             r2 = self.gigs[gid]
             if gid == rec.id or r2.status != "open" or r2.escalated or len(r2.legs) != 1:
@@ -2025,7 +2081,9 @@ class Desk:
                 if last is not None and (best is None or self.chain_key(last, first, second) > self.chain_key(best[0], best[1], best[2])):
                     best = (last, first, second, r2)
         if best is None:
+            self.pair_block_note([ob])
             return False
+        self.pair_blocks.clear()
         last, first, second, r2 = best
         self.say("V5_PAIR2", f"{rec.id}+{r2.id} {first.order['id']}+{second.order['id']} last={last} sat {self.now - rec.posted_at}"
                              f"+{self.now - r2.posted_at} min")

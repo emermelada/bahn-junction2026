@@ -339,3 +339,10 @@ PRESETS["v5La-pc1"] = PRESETS["v5La"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0
 PRESETS["v5La-pc2"] = PRESETS["v5La"] + ["bundle_climb=((0,0.60),(27,0.67),(54,0.74),(81,0.80))"]
 # The barrier's other direction: v5La96 (target 0.96) lost -202 with 14 fewer orders; 0.95 lets more volume through it.
 PRESETS["v5La95"] = PRESETS["v5aV2"] + ["late_barrier=(0.95,300,4,20)"]
+# V5 HUB (research/re/v5/HUB_BUILD.md): pairs book by their END (research/re/drivers/PAIRS.md). Pair score in hours = old key / 60 + w x
+# ln(1 + nd30 of the final delivery). w = 2: nd30 5 -> 100 adds 2 x 2.8 = 5.6 h, above the usual spread of the old keys among a car's
+# feasible partners (latest start: p75 spread on the fixture week in HUB_BUILD.md; release hop: <= ~1 h, 98% of pairs hop <= 30 min);
+# that move is worth ~+18-24 pts of 60-min booking and warned 9.7% -> 1.6-3%, the strongest pair term after drive.
+PRESETS["v5h1"] = PRESETS["v5La"] + ["pair_end=(2.0,0)"]
+PRESETS["v5h2"] = PRESETS["v5h1"] + ["pair_long_empty=(240,10)"]  # + R2: no chain > 4 h of road into an end with nd30 <= 10 (18.5% warned)
+PRESETS["v5h3"] = PRESETS["v5La"] + ["pair_long_empty=(240,10)"]  # R2 alone
