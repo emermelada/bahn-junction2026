@@ -11,6 +11,7 @@ FLAGS = {
     "max_ratio": 0.0,  # >0: an option under the floor is priced at fee + floor, up to this ratio of list; 0 declines it
     "learn_price": False,  # pick the ratio from the live win model instead of quote_ratio
     "trust": True,  # scale prices by the dealer's trust factor (level 8), so wins stay as likely and pay more (b6)
+    "thursday_extra": 0.0,  # added to the ratio on Thursday, the day whose wins are most often late (60 fresh weeks)
     "ratio_long": 0.0,  # added to the ratio for options with a day or more to the last pickup; 0 is off (with ratio_short)
     "ratio_short": 0.0,  # added to the ratio for options with less than a day to the last pickup
     "steer_only": False,  # add same_day_extra only when the dealer also accepts a slower option (else it only loses wins)

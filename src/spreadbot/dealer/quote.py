@@ -37,6 +37,8 @@ def quote(request: PriceRequest, state: State) -> dict[str, int]:
     trust = trust_factor(state, request["dealerId"]) if FLAGS["trust"] else 1.0
     costs = {o["kind"]: estimate_cost(request, o, state) for o in request["options"]}
     ratio = FLAGS["quote_ratio"] + FLAGS["lane_weight"] * lane_shift(request)
+    if FLAGS["thursday_extra"] and state.now // DAY == 3:  # Thursday wins run 7-8% late against 3-5% on other days
+        ratio += FLAGS["thursday_extra"]
     if FLAGS["trust_invest"] and big_dealer(state, request["dealerId"]) and trust_count(state, request["dealerId"]) < TRUST_FULL:
         ratio -= FLAGS["trust_invest"]  # win this dealer's early orders cheaper: each on-time one lifts all its later prices 1%
     if FLAGS["outage_up"] or FLAGS["war_down"]:
