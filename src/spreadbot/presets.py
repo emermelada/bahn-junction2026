@@ -184,3 +184,5 @@ PRESETS["k-safe-dcls"] = PRESETS["k-safe-dc"] + ["long_split=(360,180)"]
 # ending far from them) instead of one week-mean cost; the week's fee level stays cost_mult.
 PRESETS["kdcl-fm"] = PRESETS["k-safe-dcl"] + ["fee_model=1.0"]
 PRESETS["kdcl-fm5"] = PRESETS["k-safe-dcl"] + ["fee_model=0.5"]
+# fee_model alone: EUR -58 (se 233) but on time 0.965 -> 0.974 at equal orders (fewer dear late cars): spend that room on volume.
+PRESETS["kdcl-fm-ls"] = PRESETS["kdcl-fm"] + ["load_slope=0.5"]
