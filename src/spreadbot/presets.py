@@ -291,4 +291,8 @@ PRESETS["v6-v5-p86"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.68),(25,0.77),(
 # p58 (ARCHIVE 02:25: p62's gain is the pair fee itself, +100 se 28; p86 lost -63): lower climb 0.58 -> 0.67 -> 0.76
 PRESETS["v6-v5-p58"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.58),(25,0.67),(50,0.76))"]
 # v6 stack (V5 builds, LEAD gates): v5S-an5 + pair climb p58 (+293 se 157 vs an5 on tuning43; pair fee +135 se 32).
-PRESETS["v6"] = PRESETS["v6-v5-p58"]
+# (02:50 v6 was p58 alone; superseded below)
+# FLEET components (code from claude/fleet-anchor @db7dbcd; presets copied for the to-the-cent reproduction check)
+PRESETS["v6-fleet-extn"] = PRESETS["v5S-an5"] + ["anchor_extras=10", "anchor_extras_only=n"]
+# v6 = an5 + p58 pair climb + FLEET extn (note-only cars anchored to the line); LEAD 03:05
+PRESETS["v6"] = PRESETS["v6-v5-p58"] + ["anchor_extras=10", "anchor_extras_only=n"]

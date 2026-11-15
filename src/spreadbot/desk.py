@@ -121,6 +121,8 @@ class Desk:
         self.need_resync = False
         self.cost_pred_sum = 0.0  # this week's bookings: the table's ratio, summed
         self.cost_paid_sum = 0.0  # and the ratio they paid
+        self.anc_lane: dict = {}  # anchor_lane: lane -> [n, sum of log(ref / line)]
+        self.anc_cat: dict = {}   # anchor_extras: extra key -> [n, sum of log(ref / line)]
         self.anc = [50.0, 50 * 1.75, 50 * 1.75 ** 2 + 50 * 1.0, 50 * (1680 + 2200 * 1.75), 50 * (1680 * 1.75 + 2200 * (1.75 ** 2 + 1.0))]  # fee_anchor: n, Sx, Sxx, Sy, Sxy (prior: 50 requests on 16.8 + 22.0/h)
         self._nearby: dict[str, list[tuple[str, float]]] = {}
         self.fast_book: list[tuple[int, bool]] = []  # (posted at, booked within an hour at the opening fee) per first post
@@ -213,10 +215,20 @@ class Desk:
         r = e["request"]
         if r["id"] not in self.requests:
             self.dealer_requests[r["dealerId"]] += 1
-        if r["id"] not in self.requests and self.cfg.fee_anchor and self.plain(r):
-            x = self.geo.drive(r["legs"][0]["pickup"]["placeId"], r["legs"][0]["delivery"]["placeId"]) / 60
-            a = self.anc
-            a[0] += 1; a[1] += x; a[2] += x * x; a[3] += r["referenceFeeCents"]; a[4] += x * r["referenceFeeCents"]
+        if r["id"] not in self.requests and self.cfg.fee_anchor and len(r["legs"]) == 1:
+            if self.cfg.anchor_lane or self.cfg.anchor_extras:
+                # This week's offset of a lane (plain cars) or an extra (private / premium / note) to the drive-time line, as a
+                # log ratio, taken against the line as it stands at the request (later requests refine the line, not this ratio).
+                lr = math.log(max(1.0, r["referenceFeeCents"]) / max(1.0, self.anchor_line(r)))
+                if self.plain(r):
+                    acc = self.anc_lane.setdefault(lane_of(r), [0, 0.0])
+                else:
+                    acc = self.anc_cat.setdefault(self.extra_key(r), [0, 0.0])
+                acc[0] += 1; acc[1] += lr
+            if self.plain(r):
+                x = self.geo.drive(r["legs"][0]["pickup"]["placeId"], r["legs"][0]["delivery"]["placeId"]) / 60
+                a = self.anc
+                a[0] += 1; a[1] += x; a[2] += x * x; a[3] += r["referenceFeeCents"]; a[4] += x * r["referenceFeeCents"]
         self.requests[r["id"]] = r
         prices, why = self.price(r)
         self.quoted[r["id"]] = prices
@@ -1446,18 +1458,39 @@ class Desk:
         L = r["legs"][0]
         return not (L["pickup"].get("privateAddress") or L["delivery"].get("privateAddress") or L["car"].get("premium"))
 
-    def typ(self, r: dict) -> float:
-        """The typical fee our fees and quote costs are multiples of: the request's own, or with fee_anchor, pulled towards this
-        week's drive-time line (drivers weigh a fee against the drive, not against the request's noisy typical, sd ~11%)."""
-        ref = float(r["referenceFeeCents"])
-        w = self.cfg.fee_anchor
-        if not w or not self.plain(r):
-            return ref
+    def anchor_line(self, r: dict) -> float:
+        """This week's drive-time line (cents) for a one-leg request: a + b x drive hours, fitted on the plain requests so far."""
         n, sx, sxx, sy, sxy = self.anc
         b = (n * sxy - sx * sy) / max(1e-9, n * sxx - sx * sx)
         a = (sy - b * sx) / n
         x = self.geo.drive(r["legs"][0]["pickup"]["placeId"], r["legs"][0]["delivery"]["placeId"]) / 60
-        line = max(0.5 * ref, min(2.0 * ref, a + b * x))
+        return a + b * x
+
+    def extra_key(self, r: dict) -> str:
+        """The extras of a one-leg request that keep it out of plain(): private pickup/delivery, premium, note."""
+        L = r["legs"][0]
+        return ("p" if (L["pickup"].get("privateAddress") or L["delivery"].get("privateAddress")) else "") +                ("m" if L["car"].get("premium") else "") + ("n" if r.get("note") else "")
+
+    def typ(self, r: dict) -> float:
+        """The typical fee our fees and quote costs are multiples of: the request's own, or with fee_anchor, pulled towards this
+        week's drive-time line (drivers weigh a fee against the drive, not against the request's noisy typical, sd ~11%).
+        anchor_lane: the line times this lane's shrunk offset (towns differ beyond drive time: lane median log loss 0.659 vs line
+        0.6625, research/re/refnoise.py). anchor_extras: cars with extras anchored too, to the line times their extra's offset."""
+        ref = float(r["referenceFeeCents"])
+        w = self.cfg.fee_anchor
+        if not w or len(r["legs"]) != 1:
+            return ref
+        if self.plain(r):
+            line = self.anchor_line(r)
+            if self.cfg.anchor_lane:
+                n, s_ = self.anc_lane.get(lane_of(r), (0, 0.0))
+                line *= math.exp(s_ / (n + self.cfg.anchor_lane))
+        elif self.cfg.anchor_extras and (not self.cfg.anchor_extras_only or self.extra_key(r) in self.cfg.anchor_extras_only.split(",")):
+            n, s_ = self.anc_cat.get(self.extra_key(r), (0, 0.0))
+            line = self.anchor_line(r) * math.exp(s_ / (n + self.cfg.anchor_extras))
+        else:
+            return ref
+        line = max(0.5 * ref, min(2.0 * ref, line))
         return ref ** (1 - w) * line ** w
 
     def gig_base(self, rec: GigRec) -> float:
@@ -1486,6 +1519,8 @@ class Desk:
             return dedupe([{"at": now + int(h * HOUR), "feeCents": max(1, int(round(base * m)))} for h, m in cfg.late_plan])
         if ob.urgent or last - now < 2 * HOUR:
             return steep(now, base, cfg, plan=self.steep_plan_now(ob))
+        if cfg.anchor_seg and cfg.fee_anchor:
+            base *= self.seg_mult(ob, legs, last)
         if cfg.fee1:
             try:
                 q = ob.order["legs"][legs[-1]]["delivery"]["placeId"]
@@ -1525,6 +1560,20 @@ class Desk:
             out.append({"at": now + int(span * frac), "feeCents": fee})
             prev = fee
         return dedupe(out)
+
+    def seg_mult(self, ob: OrderBook, legs: list[int], last: int) -> float:
+        """anchor_seg: a plain single's booking segment as a multiple of the line (F_LINE_SPLITS.md), ^ cfg.anchor_seg; else 1."""
+        r = self.requests.get(ob.order["id"])
+        if not r or len(ob.order["legs"]) != 1 or not self.plain(r):
+            return 1.0
+        today, m = self.now // DAY, 1.0
+        if last // DAY > today:
+            m *= self.cfg.anchor_seg_f[0]  # next-day pickup: books 66-77% at 0.82 line
+        elif today == 4:
+            m *= self.cfg.anchor_seg_f[1]  # Friday same-day: 30% at 0.81 line
+        if self.home_near_delivery(ob.order["legs"][0]["delivery"]["placeId"], 30) <= 15:
+            m *= self.cfg.anchor_seg_f[2]  # thin delivery town
+        return m ** self.cfg.anchor_seg
 
     def home_near_delivery(self, place: str, minutes: int = 30) -> int:
         """Drivers whose trip home from this delivery takes at most `minutes` of road (fixed per world: cached)."""
