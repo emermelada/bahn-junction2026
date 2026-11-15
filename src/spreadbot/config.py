@@ -167,6 +167,9 @@ class Config:
                                        # (research/re/refnoise.py, 4,253 first posts; log loss 0.682 on ref vs 0.663 on the formula)
     anchor_lane: float = 0.0           # fee_anchor: also each lane's (pickup > delivery town) log offset to the line, shrunk with this many pseudo-requests (0 = off)
     anchor_extras: float = 0.0         # fee_anchor: also anchor cars with extras (private / premium / note) to the line x their extra's offset, shrunk likewise (0 = off)
+    barrier_excess: bool = False       # late_barrier: while the projection is under the barrier's target, a car pays only for its risk above
+                                       # the current share, max(0, proj - p_ok) x barrier, not (1 - p_ok) x barrier: cars likelier on time than
+                                       # the share lift it and pay nothing, so a locked week can climb back (spec 03:38; v6x/an5 dev-05 low modes)
     gov_release: tuple = ()            # (day, floor): from this day's 00:00, the governor's bar is theta while its projection is >= floor
                                        # (() = off). v6x dev-05 self-lock: bar 0.90-0.92 admits nothing, ~110 orders, the share cannot climb
                                        # (PROBE dev05_gov.out); an5's low mode recovers on Thursday the same way. The late barrier stays on.

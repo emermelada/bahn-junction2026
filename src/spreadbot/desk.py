@@ -549,7 +549,8 @@ class Desk:
         if cfg.gate_bonus_cents and self.won_count >= 30:
             gate = cfg.gate_bonus_cents * min(1.0, max(0.0, (cfg.gate_target - self.gov.projection()) / cfg.gate_span))
         cal = self.gov.calibration() if cfg.calibrate else 1.0
-        barrier = barrier_cents(self.gov.projection(), len(self.orders), cfg.late_barrier) if cfg.late_barrier else 0.0
+        proj_b = self.gov.projection() if cfg.late_barrier else 1.0
+        barrier = barrier_cents(proj_b, len(self.orders), cfg.late_barrier) if cfg.late_barrier else 0.0
         brake = 1.45 * min(1.0, cfg.backlog_brake[4] * self.brake_excess() ** 2) if cfg.backlog_brake else 0.0
         drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
         if cfg.long_warn and drive >= cfg.long_warn[0]:
@@ -619,7 +620,10 @@ class Desk:
                     short = cost * (cfg.short_fee[2] - 1)  # a long car won at short notice pays well over the usual fee
                     info.append(f"sfee={kind}/{lead_h:.1f}h")
             load_cost += short
-            load_cost += (1 - p_ok) * barrier  # late_barrier: what this car's lateness risk costs the week's on-time share
+            if cfg.barrier_excess and cfg.late_barrier and proj_b < cfg.late_barrier[0]:
+                load_cost += max(0.0, proj_b - p_ok) * barrier  # barrier_excess: only risk above the current share costs
+            else:
+                load_cost += (1 - p_ok) * barrier  # late_barrier: what this car's lateness risk costs the week's on-time share
             load_cost += brake * (520 + 135 * drive / 60 + 0.24 * r["referenceFeeCents"])  # backlog_brake (RoutePulse's unit, cents)
             # Dealer trust (level 8): an on-time car raises this dealer's future prices by 1%, a late one halves the count.
             trust_adj = cfg.trust_bonus * ((1 - p_ok) * t_loss - p_ok * t_gain) + cfg.trust_loss_w * (1 - p_ok) * t_loss

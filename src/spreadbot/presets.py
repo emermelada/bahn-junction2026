@@ -303,3 +303,5 @@ PRESETS["v6x"] = PRESETS["v5S-an5"] + ["anchor_extras=10", "anchor_extras_only=n
 PRESETS["v6xg"] = PRESETS["v6x"] + ["anchor_extras_proj=0.94"]
 PRESETS["v6xg92"] = PRESETS["v6x"] + ["anchor_extras_proj=0.92"]  # PROBE: dev-05's mode is set by projection < 0.92 at Mon 20:02
 PRESETS["v6xr"] = PRESETS["v6x"] + ["gov_release=(3,0.90)"]       # governor bar released from Thursday 00:00 while projection >= 0.90
+PRESETS["v6xe"] = PRESETS["v6x"] + ["barrier_excess=true"]   # spec 03:38: late barrier charges only risk above the current share
+PRESETS["an5e"] = PRESETS["v5S-an5"] + ["barrier_excess=true"]
