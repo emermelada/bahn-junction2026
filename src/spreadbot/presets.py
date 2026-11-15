@@ -290,3 +290,5 @@ PRESETS["v6-v5-p62"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.62),(25,0.71),(
 PRESETS["v6-v5-p86"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.68),(25,0.77),(50,0.86))", "bundle_mult=0.82"]
 # p62b: low first look as p62, then back to the usual climb by 25 min (0.62 -> 0.74 -> 0.80)
 PRESETS["v6-v5-p62b"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.62),(25,0.74),(50,0.80))"]
+# p58 (ARCHIVE 02:25: p62's gain is the pair fee itself, +100 se 28; p86 lost -63): lower climb 0.58 -> 0.67 -> 0.76
+PRESETS["v6-v5-p58"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.58),(25,0.67),(50,0.76))"]
