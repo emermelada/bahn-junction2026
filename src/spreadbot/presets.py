@@ -282,3 +282,6 @@ PRESETS["v5S"] = PRESETS["v5h2"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0.80))
 
 PRESETS["v5S-an"] = PRESETS["v5S"] + ["fee_anchor=1.0"]  # fees and quote costs off the week's drive-time line (plain cars)
 PRESETS["v5S-an5"] = PRESETS["v5S"] + ["fee_anchor=0.5"]
+# MARKET teamv5: the quote cost hold on the anchored typical (v5S-an5). The 1.05 hold was set on k-safe-dcl's typical; check it still fits.
+PRESETS["v6-market-h100"] = PRESETS["v5S-an5"] + ["quote_cost_hold=1.0"]
+PRESETS["v6-market-h110"] = PRESETS["v5S-an5"] + ["quote_cost_hold=1.1"]
