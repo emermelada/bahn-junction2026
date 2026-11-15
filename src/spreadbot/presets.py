@@ -282,3 +282,8 @@ PRESETS["v5S"] = PRESETS["v5h2"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0.80))
 
 PRESETS["v5S-an"] = PRESETS["v5S"] + ["fee_anchor=1.0"]  # fees and quote costs off the week's drive-time line (plain cars)
 PRESETS["v5S-an5"] = PRESETS["v5S"] + ["fee_anchor=0.5"]
+# --- team v6 FLEET (franc-cd), on v5S-an5 (a797fae)
+# 1. anchor weight sweep (w = 1.0 was +323 but dev-05 -1,941; w = 0.5 +344 on 43 tuning weeks)
+PRESETS["v6-fleet-w35"] = PRESETS["v5S"] + ["fee_anchor=0.35"]
+PRESETS["v6-fleet-w65"] = PRESETS["v5S"] + ["fee_anchor=0.65"]
+PRESETS["v6-fleet-w80"] = PRESETS["v5S"] + ["fee_anchor=0.8"]
