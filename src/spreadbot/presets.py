@@ -299,3 +299,5 @@ PRESETS["v6-fleet-seg10"] = PRESETS["v5S-an5"] + ["anchor_seg=1.0", "anchor_seg_
 PRESETS["v6-fleet-extn"] = PRESETS["v5S-an5"] + ["anchor_extras=10", "anchor_extras_only=n"]
 # 6. re-pairs (SCOUT EXTERNAL_0215 #2, Burger Han pairOpen 180: +197 se 113): a new car pairs with a sitting single of ours
 PRESETS["v6-fleet-rp"] = PRESETS["v5S-an5"] + ["repair_pairs=true", "repair_lead=180", "repair_mult=0.80", "repair_split=60"]
+# 7. small re-pick step with > 48 h left (PROBE waiting.out / repick_money.out: >48 h re-picks 33/wk, cap saves ~EUR 200/wk at equal booking)
+PRESETS["v6-fleet-rstep"] = PRESETS["v5S-an5"] + ["repick_step=(48,1.05)"]

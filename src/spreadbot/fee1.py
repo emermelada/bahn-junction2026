@@ -213,6 +213,14 @@ class Fee1:
         if v5 is not None:
             tag = f" v5={v5[1]} model={m:.2f}"  # p1, E and V2 below are the model's, for its pick
             m = v5[0]
+        cfg = self.desk.cfg
+        if cfg.repick_step and info["miss"] and last - self.desk.now >= cfg.repick_step[0] * 60 and not getattr(self.desk, "scarce", False):
+            miss = self.prior_miss(ob.order["id"], legs, self.desk.now)
+            if miss is not None:
+                cap = max(self.floor(ob, legs, desert), miss.schedule[0]["feeCents"] * cfg.repick_step[1] / b)
+                if m > cap:
+                    tag += f" rstep={cap:.2f} model={m:.2f}"
+                    m = cap
         return m, (f"m={m:.2f} p1={p1:.2f} t1={t1} E={e / b:.3f} V2={v2 / b:.3f} c50={math.exp(info['mu']):.2f} d={info['delta']:+.3f} "
                    f"harm={info['harm'] / b:.2f} going={info['going']:.2f} w1={info['w1']:.2f}{' repick' if info['miss'] else ''}{tag}")
 

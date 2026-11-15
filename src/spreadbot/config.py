@@ -281,6 +281,9 @@ class Config:
     # --- V5 FLEET: fee-first single cars (research/re/v5/FLEET_BUILD.md). All off by default; Desk.scarce=True turns them all off.
     v5_open: tuple = ()                # (min lead h, mult): a fee1 first post with >= this lead opens at this flat fee, never under the floors,
                                        # instead of the model's pick (0.80 picks ended 0.91x after 1.6-1.7 gigs/car; a 0.90 opening 0.945x, openings2.py)
+    repick_step: tuple = ()            # (hours, step): a fee1 re-pick with >= hours to the last pickup posts at most step x the missed fee
+                                       # (() = off). PROBE waiting.out: re-viewers convert alike at any step (0.040/view); the re-pick's value is
+                                       # ~24 fresh views; > 48 h left late ~5-7.6% at any fee < 1.3x line
     v5_repost: float = 0.0             # fee1's re-pick posts once at max(this, floors); no further model re-picks (last call and alarm unchanged; 0 = off)
     v5_pair2: bool = False             # at the re-pick, first try to pair the car with another open unbooked single of ours (pairs pay 0.84x)
     v5_short_open: float = 0.0         # ladder singles with < 8 h to the last pickup (fee1 cannot choose) open at this, not fee_open (0 = off)
