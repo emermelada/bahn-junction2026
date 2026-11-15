@@ -349,6 +349,13 @@ class Governor:
                     p = min(p, cap)
             open_p += p
         total = ontime + late + n_open
+        pf = d.cfg.proj_future
+        if pf and total:
+            # Self-lock fix: the share the bar can still recover to, counting the cars this week's pace would add by Friday night.
+            elapsed = min(5.0, d.now / DAY)
+            if elapsed >= 0.5:
+                k = min(float(total), total / elapsed * max(0.0, 5.0 - elapsed))
+                return (ontime + open_p + pf * k) / (total + k)
         return (ontime + open_p) / total if total else 1.0
 
     def bar(self) -> float:

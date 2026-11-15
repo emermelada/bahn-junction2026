@@ -302,3 +302,4 @@ PRESETS["v6-market-lf"] = PRESETS["v5S-an5"] + ["learn_fastest=true"]
 PRESETS["v6-market-psmu"] = PRESETS["v5S-an5"] + ["price_slope=5.5", "price_slope_mu=1.25"]  # Gemini triage R2
 PRESETS["v6-market-ssev"] = PRESETS["v6-market-ss"] + ["share_shadow_hours=(16,23)"]  # Gemini triage R3
 PRESETS["v6-market-cf"] = PRESETS["v5S-an5"] + ["cell_floor=(5,0.95,1.25)"]  # Fable #6: weekday x option quote cost floor
+PRESETS["v6-market-pf"] = PRESETS["v5S-an5"] + ["proj_future=0.95"]  # PROBE self-lock fix 2 (spec 03:50)
