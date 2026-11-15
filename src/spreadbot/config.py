@@ -174,6 +174,10 @@ class Config:
                                        # P(booked <= 60 min), 9,909 first posts on v5S + an5; research/re/archive/F_LINE_SPLITS.md)
     anchor_seg_f: tuple = (0.73, 1.19, 1.0)  # anchor_seg factors: next-day, Friday same-day, thin delivery (fee1 already posts thin towns
                                        # at 1.115x base, so 1.0 there; ARCHIVE 02:40)
+    flu_gate: tuple = ()               # (n, nday, hours): >= n of our gigs dropped within 2 h, or >= nday since midnight, gates the cheaper
+                                       # settings off for `hours`: new pairs climb by flu_gate_climb and no anchored extras; a car dropped once
+                                       # never gets them again (v6 = p58 + extn died on fresh-20's Thursday flu night; Gemini 1, triage 03:13)
+    flu_gate_climb: tuple = ((0, 0.68), (25, 0.74), (50, 0.80))  # the pair climb while gated: v5S's (bundle_climb)
     crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar
     view_raise_n: int = 0              # this many viewers and no booking: raise to view_raise_mult at once
     view_raise_after: int = 45

@@ -112,6 +112,9 @@ class Desk:
         self.chain_held: dict[str, int] = {}  # order -> minute to stop holding it for a chain partner and post it alone (chain planner)
         self.bundle_soon: set[str] = set()  # orders in a chain posted at short notice (split later, at bundle_soon_slack)
         self.morning_drops: dict[int, int] = defaultdict(int)
+        self.drop_at: list[int] = []          # flu_gate: minutes of our gigs' drops (folded from events: rebuilt on rejoin)
+        self.gate_until = 0                   # flu_gate: the cheaper settings are off until this minute
+        self.dropped_orders: set[str] = set()  # flu_gate: orders with a car dropped once (never the cheaper settings again)
         self.night_drops: dict[int, int] = defaultdict(int)  # drops 00:00-01:00 per day (flu nights)
         self.flu_days: set = set()
         self.long_warns: list[int] = []  # minutes of deadline warnings on our long-drive orders (long_warn)
@@ -347,7 +350,18 @@ class Desk:
         self.say("OFFER_ANS", f"{e['gigId']} {e['driverId']} {e['answer']}")
 
     def on_gig_dropped(self, e: dict) -> None:
+        rec0 = self.gigs.get(e["gigId"])
         self._reopen(e["gigId"], "dropped")
+        if self.cfg.flu_gate and rec0 is not None:
+            n2, nday, hours = self.cfg.flu_gate
+            self.drop_at.append(e["at"])
+            self.dropped_orders.update(o for o, _ in rec0.legs)
+            last2 = sum(1 for t in self.drop_at if t > e["at"] - 2 * HOUR)
+            today = sum(1 for t in self.drop_at if t // DAY == e["at"] // DAY)
+            if (last2 >= n2 or today >= nday) and e["at"] + hours * HOUR > self.gate_until:
+                if self.gate_until <= e["at"]:
+                    self.say("FLU_GATE", f"{last2} drops in 2 h, {today} today: cheaper pairs and anchored extras off for {hours} h")
+                self.gate_until = e["at"] + hours * HOUR
         day, h = e["at"] // DAY, (e["at"] % DAY) // 60
         if h == 0 and self.cfg.flu_drops:
             self.night_drops[day] += 1
@@ -372,6 +386,10 @@ class Desk:
                     if rec.status == "open" and ob and self.last_pickup(ob, [l for _, l in rec.legs]) < (day + 1) * DAY:
                         ob.urgent = True
                         self.escalate_gig(rec, "crunch")
+
+    def gated(self, oid: str) -> bool:
+        """flu_gate: the cheaper settings (low pair climb, anchored extras) are off now, or for this order (a car of it was dropped)."""
+        return bool(self.cfg.flu_gate) and (self.now < self.gate_until or oid in self.dropped_orders)
 
     def on_no_show(self, e: dict) -> None:
         self._reopen(e["gigId"], "no_show")
@@ -1340,8 +1358,9 @@ class Desk:
         out = [{"at": self.now, "feeCents": int(round(typical * opening))}]
         if cfg.bundle_climb and why != "repair" and last - self.now >= cfg.bundle_climb_slack * HOUR:
             # Open low, climb to the usual opening: the first drivers who look take it cheaper, the rest see the usual fee soon.
-            climb = [{"at": self.now + m, "feeCents": int(round(typical * min(share, opening)))} for m, share in cfg.bundle_climb]
-            end = cfg.bundle_climb[-1][0] + (cfg.bundle_climb[-1][0] - cfg.bundle_climb[-2][0] if len(cfg.bundle_climb) > 1 else 25)
+            bc = cfg.flu_gate_climb if (self.gated(first.order["id"]) or self.gated(second.order["id"])) else cfg.bundle_climb
+            climb = [{"at": self.now + m, "feeCents": int(round(typical * min(share, opening)))} for m, share in bc]
+            end = bc[-1][0] + (bc[-1][0] - bc[-2][0] if len(bc) > 1 else 25)
             out = climb + [{"at": self.now + end, "feeCents": out[0]["feeCents"]}]
         prev = out[-1]["feeCents"]
         # Raises: fee_rel scaled by the bundle discount, or bundle_rel as shares of the two typical fees.
@@ -1485,7 +1504,8 @@ class Desk:
             if self.cfg.anchor_lane:
                 n, s_ = self.anc_lane.get(lane_of(r), (0, 0.0))
                 line *= math.exp(s_ / (n + self.cfg.anchor_lane))
-        elif self.cfg.anchor_extras and (not self.cfg.anchor_extras_only or self.extra_key(r) in self.cfg.anchor_extras_only.split(",")):
+        elif (self.cfg.anchor_extras and (not self.cfg.anchor_extras_only or self.extra_key(r) in self.cfg.anchor_extras_only.split(","))
+              and not self.gated(r["id"])):
             n, s_ = self.anc_cat.get(self.extra_key(r), (0, 0.0))
             line = self.anchor_line(r) * math.exp(s_ / (n + self.cfg.anchor_extras))
         else:
