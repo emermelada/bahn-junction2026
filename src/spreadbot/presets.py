@@ -288,5 +288,7 @@ PRESETS["v6-v5-p62"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.62),(25,0.71),(
 # p86: ends higher (0.68 -> 0.77 -> 0.86, usual opening 0.82 x 1.05 = 0.861): chain drops are fee-driven (booked within 2 h at 0.81x: 19% drop
 # vs singles at 1.10x: 7%; research/re/v5/exposure_v5S.out), so fewer bookings that "only just paid".
 PRESETS["v6-v5-p86"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.68),(25,0.77),(50,0.86))", "bundle_mult=0.82"]
-# v6 stack (V5 builds, LEAD gates): v5S-an5 + surviving tuning arms. Components so far: p62 pair climb (+152, se 122).
-PRESETS["v6"] = PRESETS["v6-v5-p62"]
+# p58 (ARCHIVE 02:25: p62's gain is the pair fee itself, +100 se 28; p86 lost -63): lower climb 0.58 -> 0.67 -> 0.76
+PRESETS["v6-v5-p58"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.58),(25,0.67),(50,0.76))"]
+# v6 stack (V5 builds, LEAD gates): v5S-an5 + pair climb p58 (+293 se 157 vs an5 on tuning43; pair fee +135 se 32).
+PRESETS["v6"] = PRESETS["v6-v5-p58"]
