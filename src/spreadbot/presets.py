@@ -282,3 +282,9 @@ PRESETS["v5S"] = PRESETS["v5h2"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0.80))
 
 PRESETS["v5S-an"] = PRESETS["v5S"] + ["fee_anchor=1.0"]  # fees and quote costs off the week's drive-time line (plain cars)
 PRESETS["v5S-an5"] = PRESETS["v5S"] + ["fee_anchor=0.5"]
+# V5 (team v5, 02:00): pair-fee climb arms on the anchor (v5S-an5). The climb is capped at the usual pair opening (bundle_mult x fee_open).
+# p62: starts lower (0.62 -> 0.71 -> 0.80, then the usual 0.84): with the anchor the summed typical is better aimed, cheaper first looks.
+PRESETS["v6-v5-p62"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.62),(25,0.71),(50,0.80))"]
+# p86: ends higher (0.68 -> 0.77 -> 0.86, usual opening 0.82 x 1.05 = 0.861): chain drops are fee-driven (booked within 2 h at 0.81x: 19% drop
+# vs singles at 1.10x: 7%; research/re/v5/exposure_v5S.out), so fewer bookings that "only just paid".
+PRESETS["v6-v5-p86"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.68),(25,0.77),(50,0.86))", "bundle_mult=0.82"]
