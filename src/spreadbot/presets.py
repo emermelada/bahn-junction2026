@@ -291,3 +291,6 @@ PRESETS["v6-fleet-w80"] = PRESETS["v5S"] + ["fee_anchor=0.8"]
 PRESETS["v6-fleet-lane"] = PRESETS["v5S-an5"] + ["anchor_lane=5"]
 # 3. anchored extras: private / premium / note cars to the line times their extra's offset (10 pseudo-requests), w = 0.5
 PRESETS["v6-fleet-ext"] = PRESETS["v5S-an5"] + ["anchor_extras=10"]
+# 5. booking segments on the anchor (ARCHIVE F_LINE_SPLITS: next-day x0.73, Fri same-day x1.19, thin delivery x1.13), ^ strength
+PRESETS["v6-fleet-seg"] = PRESETS["v5S-an5"] + ["anchor_seg=1.0"]
+PRESETS["v6-fleet-seg5"] = PRESETS["v5S-an5"] + ["anchor_seg=0.5"]

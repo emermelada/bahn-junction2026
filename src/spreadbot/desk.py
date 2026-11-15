@@ -1519,6 +1519,8 @@ class Desk:
             return dedupe([{"at": now + int(h * HOUR), "feeCents": max(1, int(round(base * m)))} for h, m in cfg.late_plan])
         if ob.urgent or last - now < 2 * HOUR:
             return steep(now, base, cfg, plan=self.steep_plan_now(ob))
+        if cfg.anchor_seg and cfg.fee_anchor:
+            base *= self.seg_mult(ob, legs, last)
         if cfg.fee1:
             try:
                 q = ob.order["legs"][legs[-1]]["delivery"]["placeId"]
@@ -1558,6 +1560,20 @@ class Desk:
             out.append({"at": now + int(span * frac), "feeCents": fee})
             prev = fee
         return dedupe(out)
+
+    def seg_mult(self, ob: OrderBook, legs: list[int], last: int) -> float:
+        """anchor_seg: a plain single's booking segment as a multiple of the line (F_LINE_SPLITS.md), ^ cfg.anchor_seg; else 1."""
+        r = self.requests.get(ob.order["id"])
+        if not r or len(ob.order["legs"]) != 1 or not self.plain(r):
+            return 1.0
+        today, m = self.now // DAY, 1.0
+        if last // DAY > today:
+            m *= 0.73  # next-day pickup: books 66-77% at 0.82 line
+        elif today == 4:
+            m *= 1.19  # Friday same-day: 30% at 0.81 line
+        if self.home_near_delivery(ob.order["legs"][0]["delivery"]["placeId"], 30) <= 15:
+            m *= 1.13  # thin delivery town
+        return m ** self.cfg.anchor_seg
 
     def home_near_delivery(self, place: str, minutes: int = 30) -> int:
         """Drivers whose trip home from this delivery takes at most `minutes` of road (fixed per world: cached)."""

@@ -167,6 +167,9 @@ class Config:
                                        # (research/re/refnoise.py, 4,253 first posts; log loss 0.682 on ref vs 0.663 on the formula)
     anchor_lane: float = 0.0           # fee_anchor: also each lane's (pickup > delivery town) log offset to the line, shrunk with this many pseudo-requests (0 = off)
     anchor_extras: float = 0.0         # fee_anchor: also anchor cars with extras (private / premium / note) to the line x their extra's offset, shrunk likewise (0 = off)
+    anchor_seg: float = 0.0            # fee_anchor: scale a plain single's fee base by its booking segment ^ this (0 = off): next-day pickup
+                                       # x0.73, Friday same-day x1.19, delivery town <= 15 drivers within 30 min x1.13 (fee/line at equal
+                                       # P(booked <= 60 min), 9,909 first posts on v5S + an5; research/re/archive/F_LINE_SPLITS.md)
     crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar
     view_raise_n: int = 0              # this many viewers and no booking: raise to view_raise_mult at once
     view_raise_after: int = 45
