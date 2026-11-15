@@ -116,6 +116,7 @@ class Market:
         self.dealer_shift: dict[str, float] = defaultdict(float)  # competitor's answer to our wins per dealer
         self.place_shift: dict[tuple[str, int], float] = {}  # (pickup place, day): the outage region
         self.n_obs = 0
+        self.dealer_n: dict = {}  # ucb: resolved quotes per dealer this week
         self.day_obs: dict[int, list[bool]] = defaultdict(list)
         # day_kalman: per day, hypotheses [weight, mean shift, variance] for (normal day, war day), in ratio units.
         self.kal: dict[int, list[list[float]]] = {}
@@ -176,6 +177,12 @@ class Market:
 
     def p_price(self, ratio_eff: float, dealer: str, day: int, place: str = "", lane: str = "") -> float:
         """P(win) for pricing: with mu_w, today's, the dealer's and the lane's parts count only partly (they over-react)."""
+        if self.cfg.ucb and not self.cfg.day_kalman and not self.cfg.mu_w:
+            sig, n1, n2, mu_min = self.cfg.ucb
+            n = self.dealer_n.get(dealer, 0)
+            kap = 1.0 if n < n1 else 0.5 if n < n2 else 0.0
+            bump = kap * sig if self.mu > mu_min else 0.0
+            return sigmoid((self.cfg.price_slope or self.cfg.win_slope) * (self.mu_for(dealer, day, place, lane) + bump - ratio_eff))
         if (self.cfg.price_slope and not self.cfg.day_kalman and not self.cfg.mu_w
                 and (not self.cfg.price_slope_mu or self.mu >= self.cfg.price_slope_mu)):
             return sigmoid(self.cfg.price_slope * (self.mu_for(dealer, day, place, lane) - ratio_eff))
@@ -206,6 +213,7 @@ class Market:
     def observe(self, at: int, dealer: str, ratio_eff: float, won: bool, place: str = "", lane: str = "") -> None:
         day = at // DAY
         g = (1.0 if won else 0.0) - self.p_win(ratio_eff, dealer, day, place, lane)
+        self.dealer_n[dealer] = self.dealer_n.get(dealer, 0) + 1
         k = self.cfg.win_slope
         if self.cfg.day_kalman:
             # The day level lives in the two hypotheses; the world and dealer levels learn less while a war is likely,
@@ -280,7 +288,7 @@ class Market:
             eff = list_fast * r * tf
             m = max(((eff - (s - s0) * tf) * (1 - risk) - cost - extra for _, lst, s, risk, extra in cands if eff - (s - s0) * tf >= lst * cfg.min_ratio * tf), default=None)
             if m is not None:
-                ev = (self.p_price if self.cfg.price_slope else self.p_win)(r, dealer, day, place, lane) * m
+                ev = (self.p_price if (self.cfg.price_slope or self.cfg.ucb) else self.p_win)(r, dealer, day, place, lane) * m
                 if ev > best_ev:
                     best, best_ev, best_m = r, ev, m
             r += 0.01

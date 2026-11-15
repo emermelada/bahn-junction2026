@@ -10,6 +10,7 @@ class Config:
     quote_options: tuple = ("same_day", "next_day", "within_3_days")
     mu_prior: float = 1.28             # competitor over list: 3 research weeks, P(win)=0.5 near 1.28 (lab/frank/curves.py)
     share_shadow: tuple = ()           # (thr, cap, n): Mon-Thu, dealer's last-n quoted win rate above thr adds up to cap x list as cost (rival cuts prices each morning where we win most; RoutePulse market.ts:518)
+    ucb: tuple = ()                    # (sigma, n1, n2, mu_min): price at the dealer's level + k x sigma, k = 1 while < n1 of its quotes resolved this week, 0.5 while < n2, else 0; off while world mu <= mu_min (Fable #5)
     proj_future: float = 0.0           # >0: the governor's projection adds the cars we'd win in the rest of Mon-Fri at this pace (capped at the orders held), each on time at this p (PROBE self-lock fix 2)
     cell_floor: tuple = ()             # (n, lo, hi): quote cost >= typ x median booked fee/base in this (deadline weekday, option) cell when n >= n, clamped [lo, hi] (Fable #6)
     share_shadow_hours: tuple = ()     # share_shadow only for quotes in these clock hours [from, to) (e.g. (16, 23): just before the rival's morning re-price)
