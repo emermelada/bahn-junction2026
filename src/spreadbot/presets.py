@@ -305,3 +305,6 @@ PRESETS["v6xg92"] = PRESETS["v6x"] + ["anchor_extras_proj=0.92"]  # PROBE: dev-0
 PRESETS["v6xr"] = PRESETS["v6x"] + ["gov_release=(3,0.90)"]       # governor bar released from Thursday 00:00 while projection >= 0.90
 PRESETS["v6xe"] = PRESETS["v6x"] + ["barrier_excess=true"]   # spec 03:38: late barrier charges only risk above the current share
 PRESETS["an5e"] = PRESETS["v5S-an5"] + ["barrier_excess=true"]
+# Franco 04:00: stabilise v6x (dev-05 4/9 replays at EUR 625). Neither loosens admission.
+PRESETS["v6x-h"] = PRESETS["v6x"] + ["anchor_extras_w=0.25"]    # note cars anchored at half weight: typ = ref^0.75 x line^0.25
+PRESETS["v6x-p95"] = PRESETS["v6x"] + ["anchor_extras_p=0.95"]  # note cars quoted off the line only when p_ok >= 0.95

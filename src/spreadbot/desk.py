@@ -565,11 +565,17 @@ class Desk:
         if self.scarce and cfg.scarcity_long and drive >= cfg.scarcity_long:
             # A scarce week: long cars wait for drivers who are not there (long_warn's class, decided for the whole week).
             return decline_prices(r), f"DECLINE scarce long {drive} min"
-        cost = self.typ(r) * (cfg.quote_cost_hold or (self.drive_cost_mult(drive) if cfg.drive_cost else self.cost_mult()))
+        t_q = self.typ(r)
+        if cfg.anchor_extras_p and not self.plain(r) and t_q != float(r["referenceFeeCents"]):
+            # anchor_extras_p: an anchored extra is quoted off the line only if it is a safe car; else at its raw typical.
+            pq = [self.ontime.p_ok(r, o["deadline"], o["kind"])[0] for o in r["options"] if o["kind"] in cfg.quote_options]
+            if not pq or max(pq) * cal < cfg.anchor_extras_p:
+                t_q = float(r["referenceFeeCents"])
+        cost = t_q * (cfg.quote_cost_hold or (self.drive_cost_mult(drive) if cfg.drive_cost else self.cost_mult()))
         if cfg.quote_cost_hold and cfg.quote_cost_floor:
             # fee1's savings stop the quote's fall below the hold, nothing more: never under the base's quote, and a week where
             # drivers cost more (scarcity, or Monday's prior) still raises it.
-            cost = max(cost, self.typ(r) * self.cost_mult())
+            cost = max(cost, t_q * self.cost_mult())
         if cfg.hold_price and self.pairs_with_held(r):
             cost *= cfg.bundle_mult  # a held car for the same day starts or ends near this one: the evening release pairs them
         elif cfg.bundle_price and self.chainable(r):
@@ -1494,6 +1500,7 @@ class Desk:
               and self.extras_ok()):
             n, s_ = self.anc_cat.get(self.extra_key(r), (0, 0.0))
             line = self.anchor_line(r) * math.exp(s_ / (n + self.cfg.anchor_extras))
+            w = self.cfg.anchor_extras_w or w  # anchor_extras_w: extras pulled to the line at their own weight
         else:
             return ref
         line = max(0.5 * ref, min(2.0 * ref, line))
