@@ -560,7 +560,7 @@ class Desk:
             # fee1's savings stop the quote's fall below the hold, nothing more: never under the base's quote, and a week where
             # drivers cost more (scarcity, or Monday's prior) still raises it.
             cost = max(cost, self.typ(r) * self.cost_mult())
-        if cfg.share_shadow and day <= 3:
+        if cfg.share_shadow and day <= 3 and (not cfg.share_shadow_hours or cfg.share_shadow_hours[0] <= (self.now % DAY) // HOUR < cfg.share_shadow_hours[1]):
             thr, cap, n = cfg.share_shadow
             h = self.__dict__.get("dealer_hist", {}).get(dealer, [])
             if len(h) >= n / 2:

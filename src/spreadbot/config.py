@@ -10,6 +10,7 @@ class Config:
     quote_options: tuple = ("same_day", "next_day", "within_3_days")
     mu_prior: float = 1.28             # competitor over list: 3 research weeks, P(win)=0.5 near 1.28 (lab/frank/curves.py)
     share_shadow: tuple = ()           # (thr, cap, n): Mon-Thu, dealer's last-n quoted win rate above thr adds up to cap x list as cost (rival cuts prices each morning where we win most; RoutePulse market.ts:518)
+    share_shadow_hours: tuple = ()     # share_shadow only for quotes in these clock hours [from, to) (e.g. (16, 23): just before the rival's morning re-price)
     mon_shadow: float = 0.0            # >0: Monday quotes carry this x list as a cost (each Monday win lowers that dealer's rival price for the week; RESEARCH_LIT.md)
     price_slope_mu: float = 0.0        # price_slope only while the learned world level mu >= this (cheap-competitor weeks keep win_slope; dev-05 ~1.21)
     price_slope: float = 0.0           # >0: pricing (best_ratio/best_menu) uses this slope at the learned mu; real win curve is flatter (slope_fit.py)
