@@ -1451,13 +1451,18 @@ class Desk:
         week's drive-time line (drivers weigh a fee against the drive, not against the request's noisy typical, sd ~11%)."""
         ref = float(r["referenceFeeCents"])
         w = self.cfg.fee_anchor
-        if not w or not self.plain(r):
+        mult = 1.0
+        if w and self.cfg.anchor_private and not self.plain(r) and len(r["legs"]) == 1 and not r.get("note"):
+            L = r["legs"][0]
+            if (L["pickup"].get("privateAddress") or L["delivery"].get("privateAddress")) and not L["car"].get("premium"):
+                mult = self.cfg.anchor_private  # anchor_private: a private-address car, priced off the line x its booking gap
+        if not w or (mult == 1.0 and not self.plain(r)):
             return ref
         n, sx, sxx, sy, sxy = self.anc
         b = (n * sxy - sx * sy) / max(1e-9, n * sxx - sx * sx)
         a = (sy - b * sx) / n
         x = self.geo.drive(r["legs"][0]["pickup"]["placeId"], r["legs"][0]["delivery"]["placeId"]) / 60
-        line = max(0.5 * ref, min(2.0 * ref, a + b * x))
+        line = max(0.5 * ref, min(2.0 * ref, (a + b * x) * mult))
         return ref ** (1 - w) * line ** w
 
     def gig_base(self, rec: GigRec) -> float:

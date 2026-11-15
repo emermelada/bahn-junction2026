@@ -282,3 +282,6 @@ PRESETS["v5S"] = PRESETS["v5h2"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0.80))
 
 PRESETS["v5S-an"] = PRESETS["v5S"] + ["fee_anchor=1.0"]  # fees and quote costs off the week's drive-time line (plain cars)
 PRESETS["v5S-an5"] = PRESETS["v5S"] + ["fee_anchor=0.5"]
+# --- FLEET safe arms on v5S-an5 (Franco 03:57: no risk, small gains; neither loosens admission)
+PRESETS["an5-wd"] = PRESETS["v5S-an5"] + ["fee1_wd=(-0.09,0.0,0.035,0.065,-0.07,0.07)"]  # fee1 weekday / afternoon clearing terms
+PRESETS["an5-pv"] = PRESETS["v5S-an5"] + ["anchor_private=1.07"]                         # private-address cars on the line x 1.07

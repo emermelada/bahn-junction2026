@@ -125,7 +125,16 @@ class Fee1:
         priv = bool(L0["pickup"]["privateAddress"] or L1["delivery"]["privateAddress"])
         return (b0 + b_nd * math.log1p(d.home_near_delivery(q, 30)) + b_np * math.log1p(d.home_near_delivery(p, 30))
                 + b_lead * math.log(lead_h) + b_drive * math.log(max(5, drive)) + b_fri * float(at // DAY >= 4)
-                + b_priv * float(priv) + b_prem * float(any(o["legs"][l]["car"]["premium"] for l in legs)))
+                + b_priv * float(priv) + b_prem * float(any(o["legs"][l]["car"]["premium"] for l in legs))
+                + self.wd_shift(at))
+
+    def wd_shift(self, at: int) -> float:
+        """fee1_wd: the ln clearing-fee shift of a post at `at` by weekday (Mon-Thu; Friday keeps its own term) and hour."""
+        wd = self.desk.cfg.fee1_wd
+        if not wd:
+            return 0.0
+        day, hour = at // DAY, (at % DAY) // 60
+        return (wd[day] if day < 4 else 0.0) + (wd[5] if hour >= 13 else wd[4])
 
     # ------------------------------------------------------------------ the decision
     def window(self, minutes: float) -> float:

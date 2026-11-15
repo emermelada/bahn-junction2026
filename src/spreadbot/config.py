@@ -161,6 +161,8 @@ class Config:
                                        # deadline warning in the last window min (() = off). Both unranked fresh weeks: 2-3x the usual long
                                        # cars, 36-39% late, warned 5x as often, P(on time) at quote ~0.94 as usual (research/re/H2_AUTOPSY.md)
     long_warn_distinct: bool = False   # long_warn counts distinct warned cars, not warning events (one car can be warned 5x)
+    anchor_private: float = 0.0        # fee_anchor: also anchor single private-address cars (no note, not premium) to the line x this (0 = off).
+                                       # They book worse than plain at equal fee/line: 60% vs 73% at 0.9-1.0 (PROBE extras.out) -> ~+7%
     fee_anchor: float = 0.0            # w: price a plain single car's fees off typ = ref^(1-w) x (a + b x drive hours), a and b learned
                                        # from this week's plain requests (prior 16.8 + 22.0 EUR/h). Drivers book by fee over drive time:
                                        # at fee/ref 0.88, cars whose ref is >8% under the lane book 37% in 60 min, >8% over 67%
@@ -265,6 +267,9 @@ class Config:
     # ln(clearing fee) = intercept + ln(1+drivers <= 30 road min from the delivery) + same for the pickup + ln(lead h to the last pickup)
     # + ln(drive min) + posted Fri..Mon2 + private end + premium; sigma. PROBE's counterfactual forks (57 cars, 227 probes,
     # research/re/probe/out/clear_fit.json): median clearing fee ~0.98 (few drivers near the delivery, < 8 h) to 0.64 (many, > 40 h).
+    fee1_wd: tuple = ()                # (mon, tue, wed, thu, am, pm): added to fee1's ln clearing fee by post weekday (Mon-Thu) and post hour
+                                       # (< 13 h / >= 13 h); () = off. Booking at equal fee/line falls Tue -0.42, Wed -0.62, Thu -0.75 (logit vs
+                                       # Mon), afternoon -0.72 (SCOUT EXTERNAL_0215 #3); shifts centred on the week and halved (no blanket raise)
     fee1_clear: tuple = (0.1892, -0.0561, -0.0130, -0.1032, 0.0275, -0.0573, 0.0076, 0.0241, 0.2250)
     fee1_delta: tuple = (0.10, 0.30, 1440)  # this week's offset of ln(clearing fee): prior sd, clamp, half-life of a post's weight (min)
                                        # (Halal learns its intercept: -EUR 505/wk without; drivers booking us: 48 Mon, 61-62 Tue-Thu, 38 Fri)
