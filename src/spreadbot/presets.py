@@ -295,3 +295,5 @@ PRESETS["v6-v5-p58"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.58),(25,0.67),(
 # p60f (V5 research OUT_BATCHPAY.md: Macrina et al. 2024 ascending bundle auction, small steps beat few big ones when driver
 # thresholds are dispersed): 0.60 then +0.03 every 8 min, capped at 0.80 by minute 56
 PRESETS["v6-v5-p60f"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.60),(8,0.63),(16,0.66),(24,0.69),(32,0.72),(40,0.75),(48,0.78),(56,0.80))"]
+# p65 (Franco 03:57, milder): 0.65 -> 0.725 -> 0.80
+PRESETS["v6-v5-p65"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.65),(25,0.725),(50,0.80))"]
