@@ -287,3 +287,7 @@ PRESETS["v5S-an5"] = PRESETS["v5S"] + ["fee_anchor=0.5"]
 PRESETS["v6-fleet-w35"] = PRESETS["v5S"] + ["fee_anchor=0.35"]
 PRESETS["v6-fleet-w65"] = PRESETS["v5S"] + ["fee_anchor=0.65"]
 PRESETS["v6-fleet-w80"] = PRESETS["v5S"] + ["fee_anchor=0.8"]
+# 2. lane-level anchor: the line times the lane's shrunk offset (5 pseudo-requests), w = 0.5
+PRESETS["v6-fleet-lane"] = PRESETS["v5S-an5"] + ["anchor_lane=5"]
+# 3. anchored extras: private / premium / note cars to the line times their extra's offset (10 pseudo-requests), w = 0.5
+PRESETS["v6-fleet-ext"] = PRESETS["v5S-an5"] + ["anchor_extras=10"]

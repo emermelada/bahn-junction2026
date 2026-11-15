@@ -165,6 +165,8 @@ class Config:
                                        # from this week's plain requests (prior 16.8 + 22.0 EUR/h). Drivers book by fee over drive time:
                                        # at fee/ref 0.88, cars whose ref is >8% under the lane book 37% in 60 min, >8% over 67%
                                        # (research/re/refnoise.py, 4,253 first posts; log loss 0.682 on ref vs 0.663 on the formula)
+    anchor_lane: float = 0.0           # fee_anchor: also each lane's (pickup > delivery town) log offset to the line, shrunk with this many pseudo-requests (0 = off)
+    anchor_extras: float = 0.0         # fee_anchor: also anchor cars with extras (private / premium / note) to the line x their extra's offset, shrunk likewise (0 = off)
     crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar
     view_raise_n: int = 0              # this many viewers and no booking: raise to view_raise_mult at once
     view_raise_after: int = 45
