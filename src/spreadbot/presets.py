@@ -304,3 +304,4 @@ PRESETS["v6-market-ssev"] = PRESETS["v6-market-ss"] + ["share_shadow_hours=(16,2
 PRESETS["v6-market-cf"] = PRESETS["v5S-an5"] + ["cell_floor=(5,0.95,1.25)"]  # Fable #6: weekday x option quote cost floor
 PRESETS["v6-market-pf"] = PRESETS["v5S-an5"] + ["proj_future=0.95"]  # PROBE self-lock fix 2 (spec 03:50)
 PRESETS["v6-market-ucb"] = PRESETS["v5S-an5"] + ["ucb=(0.05,8,16,0.0)"]  # Fable #5 per-dealer caution early in the week
+PRESETS["v6-market-ucb2"] = PRESETS["v5S-an5"] + ["ucb=(0.05,8,16,1.305)"]  # ucb off while world mu <= 1.305 (cheap weeks)
