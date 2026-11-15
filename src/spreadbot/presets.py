@@ -292,3 +292,5 @@ PRESETS["v6-market-steer"] = PRESETS["v5S-an5"] + ["steer=0.92"]
 # price_slope: price on a flatter win curve (real within-quote slope ~2-3 vs learner 6.7; research/re/market/v4/slope_fit.py)
 PRESETS["v6-market-ps4"] = PRESETS["v5S-an5"] + ["price_slope=4.0"]
 PRESETS["v6-market-ps3"] = PRESETS["v5S-an5"] + ["price_slope=3.0"]
+PRESETS["v6-market-ps55"] = PRESETS["v5S-an5"] + ["price_slope=5.5"]
+PRESETS["v6-market-h120"] = PRESETS["v5S-an5"] + ["quote_cost_hold=1.2"]
