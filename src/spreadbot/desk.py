@@ -267,6 +267,10 @@ class Desk:
         if ratios:
             self.market.observe(at, r["dealerId"], min(ratios) / self.trust_factor(r["dealerId"]), won, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             self.n_quoted_outcomes += 1
+            if self.cfg.share_shadow:
+                h = self.__dict__.setdefault("dealer_hist", {}).setdefault(r["dealerId"], [])
+                h.append(1 if won else 0)
+                del h[:-int(self.cfg.share_shadow[2])]
             if won:
                 self.n_won_quoted += 1
                 o = self.orders.get(rid)
@@ -556,6 +560,13 @@ class Desk:
             # fee1's savings stop the quote's fall below the hold, nothing more: never under the base's quote, and a week where
             # drivers cost more (scarcity, or Monday's prior) still raises it.
             cost = max(cost, self.typ(r) * self.cost_mult())
+        if cfg.share_shadow and day <= 3:
+            thr, cap, n = cfg.share_shadow
+            h = self.__dict__.get("dealer_hist", {}).get(dealer, [])
+            if len(h) >= n / 2:
+                w = sum(h) / len(h)
+                if w > thr:
+                    cost += cap * min(1.0, (w - thr) / (1 - thr)) * min(o["listPriceCents"] for o in r["options"])
         if cfg.mon_shadow and day == 0:
             cost += cfg.mon_shadow * min(o["listPriceCents"] for o in r["options"])
         if cfg.hold_price and self.pairs_with_held(r):
