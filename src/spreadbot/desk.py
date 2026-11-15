@@ -1568,11 +1568,11 @@ class Desk:
             return 1.0
         today, m = self.now // DAY, 1.0
         if last // DAY > today:
-            m *= 0.73  # next-day pickup: books 66-77% at 0.82 line
+            m *= self.cfg.anchor_seg_f[0]  # next-day pickup: books 66-77% at 0.82 line
         elif today == 4:
-            m *= 1.19  # Friday same-day: 30% at 0.81 line
+            m *= self.cfg.anchor_seg_f[1]  # Friday same-day: 30% at 0.81 line
         if self.home_near_delivery(ob.order["legs"][0]["delivery"]["placeId"], 30) <= 15:
-            m *= 1.13  # thin delivery town
+            m *= self.cfg.anchor_seg_f[2]  # thin delivery town
         return m ** self.cfg.anchor_seg
 
     def home_near_delivery(self, place: str, minutes: int = 30) -> int:

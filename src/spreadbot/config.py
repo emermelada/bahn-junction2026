@@ -170,6 +170,8 @@ class Config:
     anchor_seg: float = 0.0            # fee_anchor: scale a plain single's fee base by its booking segment ^ this (0 = off): next-day pickup
                                        # x0.73, Friday same-day x1.19, delivery town <= 15 drivers within 30 min x1.13 (fee/line at equal
                                        # P(booked <= 60 min), 9,909 first posts on v5S + an5; research/re/archive/F_LINE_SPLITS.md)
+    anchor_seg_f: tuple = (0.73, 1.19, 1.0)  # anchor_seg factors: next-day, Friday same-day, thin delivery (fee1 already posts thin towns
+                                       # at 1.115x base, so 1.0 there; ARCHIVE 02:40)
     crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar
     view_raise_n: int = 0              # this many viewers and no booking: raise to view_raise_mult at once
     view_raise_after: int = 45
