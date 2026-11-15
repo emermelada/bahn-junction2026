@@ -167,6 +167,11 @@ class Config:
                                        # (research/re/refnoise.py, 4,253 first posts; log loss 0.682 on ref vs 0.663 on the formula)
     anchor_lane: float = 0.0           # fee_anchor: also each lane's (pickup > delivery town) log offset to the line, shrunk with this many pseudo-requests (0 = off)
     anchor_extras: float = 0.0         # fee_anchor: also anchor cars with extras (private / premium / note) to the line x their extra's offset, shrunk likewise (0 = off)
+    gov_release: tuple = ()            # (day, floor): from this day's 00:00, the governor's bar is theta while its projection is >= floor
+                                       # (() = off). v6x dev-05 self-lock: bar 0.90-0.92 admits nothing, ~110 orders, the share cannot climb
+                                       # (PROBE dev05_gov.out); an5's low mode recovers on Thursday the same way. The late barrier stays on.
+    anchor_extras_proj: float = 0.0    # anchor_extras only while the governor's on-time projection is >= this (0 = always): stop adding
+                                       # cheaper note cars once on-time gets tight (v6x dev-05: 4/9 jittered replays stuck at bar 0.90-0.92, EUR 625)
     anchor_extras_only: str = ""       # anchor_extras: only these extra keys, comma-separated (e.g. "n" = note-only cars; "" = all). PROBE 02:25:
                                        # notes book like plain at equal fee/line; private and premium book worse (keep their raw typical)
     anchor_seg: float = 0.0            # fee_anchor: scale a plain single's fee base by its booking segment ^ this (0 = off): next-day pickup

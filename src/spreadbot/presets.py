@@ -299,3 +299,7 @@ PRESETS["v6"] = PRESETS["v6-v5-p58"] + ["anchor_extras=10", "anchor_extras_only=
 # 03:00 v6 (p58 + extn together) is DEAD: fresh-20 unranked 0.895, jitter 6/9 unranked. Two separate candidates on this code:
 PRESETS["v6p"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.58),(25,0.67),(50,0.76))"]  # an5 + p58 pair climb
 PRESETS["v6x"] = PRESETS["v5S-an5"] + ["anchor_extras=10", "anchor_extras_only=n"]       # an5 + FLEET extn
+# FLEET 03:40 (Franco P1): v6x with anchored note cars only while the governor projects on-time >= 0.94 (fixes dev-05's EUR 625 mode)
+PRESETS["v6xg"] = PRESETS["v6x"] + ["anchor_extras_proj=0.94"]
+PRESETS["v6xg92"] = PRESETS["v6x"] + ["anchor_extras_proj=0.92"]  # PROBE: dev-05's mode is set by projection < 0.92 at Mon 20:02
+PRESETS["v6xr"] = PRESETS["v6x"] + ["gov_release=(3,0.90)"]       # governor bar released from Thursday 00:00 while projection >= 0.90

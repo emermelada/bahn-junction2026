@@ -112,6 +112,7 @@ class Desk:
         self.chain_held: dict[str, int] = {}  # order -> minute to stop holding it for a chain partner and post it alone (chain planner)
         self.bundle_soon: set[str] = set()  # orders in a chain posted at short notice (split later, at bundle_soon_slack)
         self.morning_drops: dict[int, int] = defaultdict(int)
+        self._xg_at, self._xg = -1, True  # anchor_extras_proj: the projection test, once per world minute (typ() is called often)
         self.night_drops: dict[int, int] = defaultdict(int)  # drops 00:00-01:00 per day (flu nights)
         self.flu_days: set = set()
         self.long_warns: list[int] = []  # minutes of deadline warnings on our long-drive orders (long_warn)
@@ -1485,13 +1486,27 @@ class Desk:
             if self.cfg.anchor_lane:
                 n, s_ = self.anc_lane.get(lane_of(r), (0, 0.0))
                 line *= math.exp(s_ / (n + self.cfg.anchor_lane))
-        elif self.cfg.anchor_extras and (not self.cfg.anchor_extras_only or self.extra_key(r) in self.cfg.anchor_extras_only.split(",")):
+        elif (self.cfg.anchor_extras and (not self.cfg.anchor_extras_only or self.extra_key(r) in self.cfg.anchor_extras_only.split(","))
+              and self.extras_ok()):
             n, s_ = self.anc_cat.get(self.extra_key(r), (0, 0.0))
             line = self.anchor_line(r) * math.exp(s_ / (n + self.cfg.anchor_extras))
         else:
             return ref
         line = max(0.5 * ref, min(2.0 * ref, line))
         return ref ** (1 - w) * line ** w
+
+    def extras_ok(self) -> bool:
+        """anchor_extras_proj: anchored extras only while the governor projects on-time >= the flag (checked once per world minute;
+        before 30 wins the projection says little, so they stay on)."""
+        x = self.cfg.anchor_extras_proj
+        if not x:
+            return True
+        if self._xg_at != self.now:
+            ok = self.won_count < 30 or self.gov.projection() >= x
+            if ok != self._xg:
+                self.say("XG", f"anchored extras {'on' if ok else 'off'}")
+            self._xg_at, self._xg = self.now, ok
+        return self._xg
 
     def gig_base(self, rec: GigRec) -> float:
         """The typical fee of every car in a gig, summed (a bundle carries cars of two orders)."""

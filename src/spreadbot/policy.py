@@ -351,6 +351,9 @@ class Governor:
     def bar(self) -> float:
         cfg = self.desk.gov_cfg()
         proj = self.projection()
+        rel = self.desk.cfg.gov_release
+        if rel and self.desk.now >= rel[0] * DAY and proj >= rel[1]:
+            return cfg.theta  # gov_release: late in the week, a held share above the floor no longer locks admission
         if proj < cfg.gov_rescue:
             if cfg.dilute:
                 # Take a car only if it is likelier on time than the orders we hold: each one then lifts the share.
