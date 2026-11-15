@@ -556,6 +556,8 @@ class Desk:
             # fee1's savings stop the quote's fall below the hold, nothing more: never under the base's quote, and a week where
             # drivers cost more (scarcity, or Monday's prior) still raises it.
             cost = max(cost, self.typ(r) * self.cost_mult())
+        if cfg.mon_shadow and day == 0:
+            cost += cfg.mon_shadow * min(o["listPriceCents"] for o in r["options"])
         if cfg.hold_price and self.pairs_with_held(r):
             cost *= cfg.bundle_mult  # a held car for the same day starts or ends near this one: the evening release pairs them
         elif cfg.bundle_price and self.chainable(r):
