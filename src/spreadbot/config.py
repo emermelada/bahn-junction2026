@@ -205,6 +205,9 @@ class Config:
                                        # hours to its last start opens low and climbs to the usual opening (RoutePulse bundling.ts:186-213:
                                        # 0.53-0.61 stepping every 25-30 min). Our pairs: 59% book within 10 min, 95% at the opening 0.84
                                        # (research/re/archive/c_pairbook.py): the opening is often above what drivers take. () = off
+    climb_adapt: tuple = ()            # (min pairs, hazard ratio, drop share, -): after >= n climbing pairs this week, if the booking
+                                       # hazard at the first rung < ratio x the second rung's, or > drop share of rung-0 bookings dropped,
+                                       # new pairs skip the first rung for the rest of the week (sticky; Fable #8). () = off
     bundle_climb_slack: int = 8        # hours to the pair's last start below which the climb is skipped (RoutePulse: slack >= 8 h)
     unbundle_minutes: int = 5 * 60     # unbooked this close to its last start: post the cars alone
     # --- chain planner (branch-v1-frank, preset chains): hold a won car a few hours, unposted, to find a chain partner

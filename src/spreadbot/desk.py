@@ -163,6 +163,10 @@ class Desk:
         self.won_log: list[int] = []  # minutes of our wins (scarcity)
         self.admitted: set[str] = set()  # requests quoted by safe_admit
         self.admits: dict[int, int] = defaultdict(int)  # day of quote -> safe_admit quotes (rebuilt by the replay of price requests)
+        self.ca_pairs: dict[str, int] = {}   # climb_adapt: climbing pair gig -> posted at (noted when the gig enters the books, live or replay)
+        self.ca_booked: dict[str, int] = {}  # climbing pair gig -> minute of its first booking
+        self.ca_dropped: set = set()         # climbing pairs booked at rung 0 and then dropped
+        self.ca_skip = False                 # sticky: new pairs skip the first climb rung
 
     # ------------------------------------------------------------------ helpers
     def say(self, code: str, detail: str = "") -> None:
@@ -340,13 +344,56 @@ class Desk:
                             break
                     self.cost_pred_sum += mult
                     self.cost_paid_sum += e["feeCents"] / max(1.0, self.gig_base(rec))
+            if rec.id in self.ca_pairs and rec.id not in self.ca_booked:
+                self.ca_booked[rec.id] = e["at"]
+                self.ca_check()
             self.say("BOOKED", f"{rec.id} {e['driverId']} {e['feeCents']}")
+
+    def ca_note(self, rec: GigRec) -> None:
+        """climb_adapt: note a climbing pair as it enters the books (read_results live, rejoin's replay, resync):
+        a pair whose schedule starts at its post minute and steps after the climb's first interval."""
+        cl = self.cfg.bundle_climb
+        if not self.cfg.climb_adapt or len(cl) < 2 or rec.id in self.ca_pairs or len({o for o, _ in rec.legs}) < 2:
+            return
+        sc = rec.schedule
+        if len(sc) >= 2 and sc[0]["at"] == rec.posted_at and sc[1]["at"] - sc[0]["at"] == cl[1][0] - cl[0][0]:
+            self.ca_pairs[rec.id] = rec.posted_at
+
+    def ca_check(self) -> None:
+        """climb_adapt: from this week's climbing pairs (post minutes, first-booking minutes, drops: all rebuilt by the
+        replay), the booking hazard per pair-minute on rung 0 [0, t1) and rung 1 [t1, t2) after posting, and the drop share
+        of rung-0 bookings. Run from the booking/drop handlers, so a replay flips at the same event."""
+        ca, cl = self.cfg.climb_adapt, self.cfg.bundle_climb
+        if self.ca_skip or not ca or len(cl) < 2 or len(self.ca_pairs) < ca[0]:
+            return
+        t1 = cl[1][0] - cl[0][0]
+        t2 = cl[2][0] - cl[0][0] if len(cl) > 2 else 2 * t1
+        n0 = n1 = m0 = m1 = 0
+        for gid, p in self.ca_pairs.items():
+            b = self.ca_booked.get(gid)
+            end = min(self.now, b) if b is not None else self.now
+            m0 += max(0, min(end, p + t1) - p)
+            m1 += max(0, min(end, p + t2) - (p + t1))
+            if b is not None and b <= self.now:
+                n0 += b < p + t1
+                n1 += p + t1 <= b < p + t2
+        h0, h1 = n0 / max(1, m0), n1 / max(1, m1)
+        drop = len(self.ca_dropped) / n0 if n0 else 0.0
+        if h0 < ca[1] * h1 or drop > ca[2]:
+            self.ca_skip = True
+            self.say("CLIMB_ADAPT", f"skip rung 0 from now: pairs={len(self.ca_pairs)} h0={n0}/{m0}={h0:.4f} h1={n1}/{m1}={h1:.4f} "
+                                    f"drop0={len(self.ca_dropped)}/{n0}={drop:.2f}")
 
     def on_offer_answered(self, e: dict) -> None:
         self.open_offers[e["gigId"]] = max(0, self.open_offers[e["gigId"]] - 1)
         self.say("OFFER_ANS", f"{e['gigId']} {e['driverId']} {e['answer']}")
 
     def on_gig_dropped(self, e: dict) -> None:
+        cl = self.cfg.bundle_climb
+        b = self.ca_booked.get(e["gigId"])
+        if b is not None and len(cl) > 1 and b < self.ca_pairs[e["gigId"]] + cl[1][0] - cl[0][0]:
+            self.ca_dropped.add(e["gigId"])
+            self.ca_check()
         self._reopen(e["gigId"], "dropped")
         day, h = e["at"] // DAY, (e["at"] % DAY) // 60
         if h == 0 and self.cfg.flu_drops:
@@ -1340,8 +1387,11 @@ class Desk:
         out = [{"at": self.now, "feeCents": int(round(typical * opening))}]
         if cfg.bundle_climb and why != "repair" and last - self.now >= cfg.bundle_climb_slack * HOUR:
             # Open low, climb to the usual opening: the first drivers who look take it cheaper, the rest see the usual fee soon.
-            climb = [{"at": self.now + m, "feeCents": int(round(typical * min(share, opening)))} for m, share in cfg.bundle_climb]
-            end = cfg.bundle_climb[-1][0] + (cfg.bundle_climb[-1][0] - cfg.bundle_climb[-2][0] if len(cfg.bundle_climb) > 1 else 25)
+            steps = cfg.bundle_climb
+            if self.ca_skip and len(steps) > 1:
+                steps = tuple((m - steps[1][0], share) for m, share in steps[1:])  # climb_adapt: start at the second rung
+            climb = [{"at": self.now + m, "feeCents": int(round(typical * min(share, opening)))} for m, share in steps]
+            end = steps[-1][0] + (steps[-1][0] - steps[-2][0] if len(steps) > 1 else 25)
             out = climb + [{"at": self.now + end, "feeCents": out[0]["feeCents"]}]
         prev = out[-1]["feeCents"]
         # Raises: fee_rel scaled by the bundle discount, or bundle_rel as shares of the two typical fees.
@@ -1857,6 +1907,7 @@ class Desk:
                     self.gig_open.setdefault(rec.id, a["schedule"][0]["feeCents"])
                     rec.repair = why == "repair"
                     self.gigs[rec.id] = rec
+                    self.ca_note(rec)
                     for key in rec.legs:
                         self.leg_gig[key] = rec.id
                     self.say("GIG", f"{rec.id} {a['stops'][0]['orderId']} {why} fee0={a['schedule'][0]['feeCents']}")
@@ -1890,6 +1941,7 @@ class Desk:
                 rec = GigRec(g["id"], g["stops"], g["audience"], g["schedule"], g["postedAt"])
                 self.gig_open.setdefault(rec.id, g["schedule"][0]["feeCents"])
                 self.gigs[rec.id] = rec
+                self.ca_note(rec)
             rec.status, rec.driver = g["status"], g.get("driverId")
             if g["status"] in ("open", "booked", "working"):
                 for key in rec.legs:

@@ -53,3 +53,33 @@ class TestClimbLive(unittest.TestCase):
             fees = [s["feeCents"] for s in g["schedule"]]
             self.assertEqual(fees, sorted(fees))  # only ever climbs
             self.assertLess(fees[0], fees[3])  # opens under the usual opening, reached at +75 min
+
+
+class TestClimbAdapt(unittest.TestCase):
+    def _desk(self, cfg):
+        from spreadbot.desk import Desk
+        d = Desk.__new__(Desk)  # only the climb_adapt books: no geo or roster needed
+        d.cfg, d.now, d.log = cfg, 0, []
+        d.ca_pairs, d.ca_booked, d.ca_dropped, d.ca_skip = {}, {}, set(), False
+        return d
+
+    def test_off_by_default_and_preset(self):
+        self.assertEqual(Config().climb_adapt, ())
+        self.assertEqual(Config.parse(PRESETS["v6pa"]).climb_adapt, (10, 0.5, 0.22, 0.67))
+
+    def test_slow_rung0_triggers_sticky(self):
+        d = self._desk(Config.parse(PRESETS["v6pa"]))
+        for i in range(9):  # pairs posted at 0; none book on rung 0, some on rung 1
+            d.ca_pairs[f"g{i}"] = 0
+        d.now = 60
+        for i in range(4):
+            d.ca_booked[f"g{i}"] = 30
+        d.ca_check()
+        self.assertFalse(d.ca_skip)  # 9 < 10 pairs: still learning
+        d.ca_pairs["g9"] = 0
+        d.ca_check()
+        self.assertTrue(d.ca_skip)  # h0 = 0 < 0.5 x h1
+        self.assertIn("CLIMB_ADAPT", d.log[-1])
+        d.ca_booked.clear()
+        d.ca_check()
+        self.assertTrue(d.ca_skip)  # sticky

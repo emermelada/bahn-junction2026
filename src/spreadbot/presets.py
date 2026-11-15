@@ -299,3 +299,5 @@ PRESETS["v6"] = PRESETS["v6-v5-p58"] + ["anchor_extras=10", "anchor_extras_only=
 # 03:00 v6 (p58 + extn together) is DEAD: fresh-20 unranked 0.895, jitter 6/9 unranked. Two separate candidates on this code:
 PRESETS["v6p"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.58),(25,0.67),(50,0.76))"]  # an5 + p58 pair climb
 PRESETS["v6x"] = PRESETS["v5S-an5"] + ["anchor_extras=10", "anchor_extras_only=n"]       # an5 + FLEET extn
+# v6pa = v6p + climb_adapt: skip the 0.58 rung for the rest of the week once this week's pairs say it books slow or drops
+PRESETS["v6pa"] = PRESETS["v6p"] + ["climb_adapt=(10,0.5,0.22,0.67)"]

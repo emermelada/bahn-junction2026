@@ -240,6 +240,7 @@ def rejoin(desk: Desk, snapshot: dict, history: list) -> None:
                     old.status = "withdrawn"  # a car is in one live gig at a time: this one replaced it
                 desk.leg_gig[key] = rec.id
             desk.gigs[rec.id] = rec
+            desk.ca_note(rec)
 
     # Replay each event at its own minute, as the first life handled it, so the chances, holds and retry
     # times computed then come out the same. (A Desk is built at the snapshot's minute: set it back first.)
