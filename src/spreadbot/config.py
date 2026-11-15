@@ -265,6 +265,9 @@ class Config:
     # ln(clearing fee) = intercept + ln(1+drivers <= 30 road min from the delivery) + same for the pickup + ln(lead h to the last pickup)
     # + ln(drive min) + posted Fri..Mon2 + private end + premium; sigma. PROBE's counterfactual forks (57 cars, 227 probes,
     # research/re/probe/out/clear_fit.json): median clearing fee ~0.98 (few drivers near the delivery, < 8 h) to 0.64 (many, > 40 h).
+    fee1_nd_exp: bool = False          # fee1_clear's driver-supply terms count only experienced drivers (completedGigs >= 50) near the
+                                       # town, scaled by roster size / experienced count so the week's mean level is unchanged (PROBE
+                                       # expw.py, 12.6k first posts: log loss 0.5878 vs 0.5906 for the plain count; log1p(cg) weights 0.5917)
     fee1_clear: tuple = (0.1892, -0.0561, -0.0130, -0.1032, 0.0275, -0.0573, 0.0076, 0.0241, 0.2250)
     fee1_delta: tuple = (0.10, 0.30, 1440)  # this week's offset of ln(clearing fee): prior sd, clamp, half-life of a post's weight (min)
                                        # (Halal learns its intercept: -EUR 505/wk without; drivers booking us: 48 Mon, 61-62 Tue-Thu, 38 Fri)

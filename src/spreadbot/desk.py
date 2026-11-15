@@ -132,10 +132,14 @@ class Desk:
         self.roster = {d["id"]: d for d in roster}
         self.home_count: dict[str, int] = defaultdict(int)
         self._near_q: dict[tuple[str, int], int] = {}
+        self.exp_count: dict[str, int] = defaultdict(int)  # fee1_nd_exp: experienced drivers (completedGigs >= 50) per home town
+        self._near_x: dict[tuple[str, int], float] = {}
         self.home_offered: set = set()  # gigs that already had their offer_home round
         self.pair_blocks: dict[str, tuple] = {}  # order -> (chains refused by the end guards, reason, drive, nd30) at the current decision
         for d in roster:
             self.home_count[d["homePlaceId"]] += 1
+            if d.get("completedGigs", 0) >= 50:
+                self.exp_count[d["homePlaceId"]] += 1
         self.won_count = 0
         self.late_orders: set[str] = set()
         self.ontime_orders: set[str] = set()
@@ -1532,6 +1536,19 @@ class Desk:
         if key not in self._near_q:
             self._near_q[key] = sum(c for h, c in sorted(self.home_count.items()) if self.geo.drive(place, h) <= minutes)
         return self._near_q[key]
+
+    def exp_near_delivery(self, place: str, minutes: int = 30) -> float:
+        """fee1_nd_exp: experienced drivers living within `minutes` of road, scaled by roster / experienced so the mean matches
+        home_near_delivery (only the town-to-town ordering changes). Falls back to the plain count with no experienced driver."""
+        key = (place, minutes)
+        if key not in self._near_x:
+            n_all, n_exp = sum(self.home_count.values()), sum(self.exp_count.values())
+            if n_exp <= 0:
+                self._near_x[key] = float(self.home_near_delivery(place, minutes))
+            else:
+                near = sum(c for h, c in sorted(self.exp_count.items()) if self.geo.drive(place, h) <= minutes)
+                self._near_x[key] = near * n_all / n_exp
+        return self._near_x[key]
 
     def desert(self, place: str) -> bool:
         """A delivery town the shortage emptied: fewer than desert_n drivers live within 60 road minutes (dev-46: 21% of won cars,

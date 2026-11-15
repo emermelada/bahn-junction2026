@@ -123,7 +123,8 @@ class Fee1:
         lead_h = max(1.0, (d.last_pickup(ob, legs) - at) / 60)
         b0, b_nd, b_np, b_lead, b_drive, b_fri, b_priv, b_prem, _ = cfg.fee1_clear
         priv = bool(L0["pickup"]["privateAddress"] or L1["delivery"]["privateAddress"])
-        return (b0 + b_nd * math.log1p(d.home_near_delivery(q, 30)) + b_np * math.log1p(d.home_near_delivery(p, 30))
+        near = d.exp_near_delivery if cfg.fee1_nd_exp else d.home_near_delivery
+        return (b0 + b_nd * math.log1p(near(q, 30)) + b_np * math.log1p(near(p, 30))
                 + b_lead * math.log(lead_h) + b_drive * math.log(max(5, drive)) + b_fri * float(at // DAY >= 4)
                 + b_priv * float(priv) + b_prem * float(any(o["legs"][l]["car"]["premium"] for l in legs)))
 
