@@ -299,3 +299,5 @@ PRESETS["v6"] = PRESETS["v6-v5-p58"] + ["anchor_extras=10", "anchor_extras_only=
 # 03:00 v6 (p58 + extn together) is DEAD: fresh-20 unranked 0.895, jitter 6/9 unranked. Two separate candidates on this code:
 PRESETS["v6p"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.58),(25,0.67),(50,0.76))"]  # an5 + p58 pair climb
 PRESETS["v6x"] = PRESETS["v5S-an5"] + ["anchor_extras=10", "anchor_extras_only=n"]       # an5 + FLEET extn
+# G2 (Fable #1, LEAD 03:25): v6 (p58 + extn) with "no second cheap post"
+PRESETS["v6g2"] = PRESETS["v6"] + ["g2_reopen=1.0"]

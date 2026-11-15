@@ -231,6 +231,10 @@ class Config:
     hold_slack: int = 8 * 60           # and this long before its last pickup
     # --- evening release: hold cars picked up on a later day, release them together and pair them first
     hold: bool = True                  # rc3: a car for a later day waits for its release (+14% on dev-19..30, 12/12 ranked)
+    g2_reopen: float = 0.0             # G2 "no second cheap post" (Fable 03:10 #1; 0 = off): a car already dropped or unbooked (fee1 prior
+                                       # miss) re-opens at >= max(g2_reopen x typical, its last posted fee); a pair with a dropped car skips
+                                       # the cheap bundle_climb rungs and climbs g2_pair_climb instead (v6 died on re-dropped cheap cars)
+    g2_pair_climb: tuple = ((0, 0.68), (25, 0.74), (50, 0.80))
     hold_hour: int = 16                # release at 16:00 the day before: 14-16 best; at 18-20 pairs stay unbooked into the night
     hold_min_left: int = 0             # post at once a car whose last pickup is less than this many minutes after its release (0 = off):
                                        # next-day cars with last pickup 12-14 h held to 16:00 are 25% late vs 11% posted at once (176 c3 weeks)

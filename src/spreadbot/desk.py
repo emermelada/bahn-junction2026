@@ -112,6 +112,7 @@ class Desk:
         self.chain_held: dict[str, int] = {}  # order -> minute to stop holding it for a chain partner and post it alone (chain planner)
         self.bundle_soon: set[str] = set()  # orders in a chain posted at short notice (split later, at bundle_soon_slack)
         self.morning_drops: dict[int, int] = defaultdict(int)
+        self.g2_dropped: set[str] = set()  # G2: orders with a car dropped or no-showed once (folded from replayed events)
         self.night_drops: dict[int, int] = defaultdict(int)  # drops 00:00-01:00 per day (flu nights)
         self.flu_days: set = set()
         self.long_warns: list[int] = []  # minutes of deadline warnings on our long-drive orders (long_warn)
@@ -347,6 +348,9 @@ class Desk:
         self.say("OFFER_ANS", f"{e['gigId']} {e['driverId']} {e['answer']}")
 
     def on_gig_dropped(self, e: dict) -> None:
+        rec0 = self.gigs.get(e["gigId"])
+        if self.cfg.g2_reopen and rec0 is not None:
+            self.g2_dropped.update(o for o, _ in rec0.legs)  # before _reopen: its re-post must see the drop
         self._reopen(e["gigId"], "dropped")
         day, h = e["at"] // DAY, (e["at"] % DAY) // 60
         if h == 0 and self.cfg.flu_drops:
@@ -374,6 +378,9 @@ class Desk:
                         self.escalate_gig(rec, "crunch")
 
     def on_no_show(self, e: dict) -> None:
+        rec0 = self.gigs.get(e["gigId"])
+        if self.cfg.g2_reopen and rec0 is not None:
+            self.g2_dropped.update(o for o, _ in rec0.legs)
         self._reopen(e["gigId"], "no_show")
 
     def _reopen(self, gid: str, why: str) -> None:
@@ -1340,8 +1347,11 @@ class Desk:
         out = [{"at": self.now, "feeCents": int(round(typical * opening))}]
         if cfg.bundle_climb and why != "repair" and last - self.now >= cfg.bundle_climb_slack * HOUR:
             # Open low, climb to the usual opening: the first drivers who look take it cheaper, the rest see the usual fee soon.
-            climb = [{"at": self.now + m, "feeCents": int(round(typical * min(share, opening)))} for m, share in cfg.bundle_climb]
-            end = cfg.bundle_climb[-1][0] + (cfg.bundle_climb[-1][0] - cfg.bundle_climb[-2][0] if len(cfg.bundle_climb) > 1 else 25)
+            bc = cfg.bundle_climb
+            if cfg.g2_reopen and (first.order["id"] in self.g2_dropped or second.order["id"] in self.g2_dropped):
+                bc = cfg.g2_pair_climb  # G2: a dropped car is not offered at the cheap rungs again
+            climb = [{"at": self.now + m, "feeCents": int(round(typical * min(share, opening)))} for m, share in bc]
+            end = bc[-1][0] + (bc[-1][0] - bc[-2][0] if len(bc) > 1 else 25)
             out = climb + [{"at": self.now + end, "feeCents": out[0]["feeCents"]}]
         prev = out[-1]["feeCents"]
         # Raises: fee_rel scaled by the bundle discount, or bundle_rel as shares of the two typical fees.
@@ -1397,12 +1407,35 @@ class Desk:
         manual = ob.manual or any(self.leg_note(o["id"], l).manual for l in legs)
         audience = {"experienced": any(o["legs"][l]["car"]["premium"] for l in legs), "manualLicence": manual}
         schedule = self.schedule(ob, legs)
+        if self.cfg.g2_reopen:
+            schedule = self.g2_floor(ob, legs, schedule)
         action = {"type": "post", "stops": stops, "audience": audience, "schedule": schedule}
         if ob.first_post_at is None:
             ob.first_post_at = self.now
         self.outbox.append(action)
         self.pending_posts.append((action, why))
         self.say("POST", f"{o['id']} legs={legs} {why} fee0={schedule[0]['feeCents']} feeN={schedule[-1]['feeCents']} n={len(schedule)}")
+
+    def g2_floor(self, ob: OrderBook, legs: list[int], schedule: list[dict]) -> list[dict]:
+        """G2 "no second cheap post": a car already dropped, or posted before and never booked (fee1 prior miss), is not posted
+        cheaper than max(g2_reopen x its typical fee, its last posted fee). Deterministic, from replayed state only."""
+        oid = ob.order["id"]
+        miss = self.fee1.prior_miss(oid, legs, self.now) if self.cfg.fee1 else None
+        if oid not in self.g2_dropped and miss is None:
+            return schedule
+        floor = self.base_fee(ob, legs) * self.cfg.g2_reopen
+        last = None
+        for gid in sorted(self.gigs):
+            rec = self.gigs[gid]
+            if {o for o, _ in rec.legs} == {oid} and any(l in legs for _, l in rec.legs) and rec.posted_at <= self.now:
+                if last is None or rec.posted_at >= last.posted_at:
+                    last = rec
+        if last is not None and last.schedule:
+            floor = max(floor, last.schedule[0]["feeCents"], last.fee)  # the fee it was booked at, if it was
+        floor = int(round(floor))
+        if schedule and schedule[0]["feeCents"] < floor:
+            self.say("G2", f"{oid} fee0 {schedule[0]['feeCents']} -> {floor}")
+        return dedupe([{"at": x["at"], "feeCents": max(x["feeCents"], floor)} for x in schedule])
 
     def stops_for(self, ob: OrderBook, leg: int) -> list[dict]:
         o = ob.order
