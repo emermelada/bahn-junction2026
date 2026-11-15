@@ -295,3 +295,5 @@ PRESETS["v6-fleet-ext"] = PRESETS["v5S-an5"] + ["anchor_extras=10"]
 PRESETS["v6-fleet-seg"] = PRESETS["v5S-an5"] + ["anchor_seg=1.0"]
 PRESETS["v6-fleet-seg5"] = PRESETS["v5S-an5"] + ["anchor_seg=0.5"]
 PRESETS["v6-fleet-seg10"] = PRESETS["v5S-an5"] + ["anchor_seg=1.0", "anchor_seg_f=(0.73,1.10,1.0)"]  # Friday at 1.10 (cost-optimal guess)
+# 3b. anchored extras for note-only cars (private / premium keep the raw typical; PROBE extras.out)
+PRESETS["v6-fleet-extn"] = PRESETS["v5S-an5"] + ["anchor_extras=10", "anchor_extras_only=n"]

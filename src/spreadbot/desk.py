@@ -1485,7 +1485,7 @@ class Desk:
             if self.cfg.anchor_lane:
                 n, s_ = self.anc_lane.get(lane_of(r), (0, 0.0))
                 line *= math.exp(s_ / (n + self.cfg.anchor_lane))
-        elif self.cfg.anchor_extras:
+        elif self.cfg.anchor_extras and (not self.cfg.anchor_extras_only or self.extra_key(r) in self.cfg.anchor_extras_only.split(",")):
             n, s_ = self.anc_cat.get(self.extra_key(r), (0, 0.0))
             line = self.anchor_line(r) * math.exp(s_ / (n + self.cfg.anchor_extras))
         else:

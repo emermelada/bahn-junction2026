@@ -167,6 +167,8 @@ class Config:
                                        # (research/re/refnoise.py, 4,253 first posts; log loss 0.682 on ref vs 0.663 on the formula)
     anchor_lane: float = 0.0           # fee_anchor: also each lane's (pickup > delivery town) log offset to the line, shrunk with this many pseudo-requests (0 = off)
     anchor_extras: float = 0.0         # fee_anchor: also anchor cars with extras (private / premium / note) to the line x their extra's offset, shrunk likewise (0 = off)
+    anchor_extras_only: str = ""       # anchor_extras: only these extra keys, comma-separated (e.g. "n" = note-only cars; "" = all). PROBE 02:25:
+                                       # notes book like plain at equal fee/line; private and premium book worse (keep their raw typical)
     anchor_seg: float = 0.0            # fee_anchor: scale a plain single's fee base by its booking segment ^ this (0 = off): next-day pickup
                                        # x0.73, Friday same-day x1.19, delivery town <= 15 drivers within 30 min x1.13 (fee/line at equal
                                        # P(booked <= 60 min), 9,909 first posts on v5S + an5; research/re/archive/F_LINE_SPLITS.md)
