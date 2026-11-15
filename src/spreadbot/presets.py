@@ -301,3 +301,6 @@ PRESETS["v6-fleet-extn"] = PRESETS["v5S-an5"] + ["anchor_extras=10", "anchor_ext
 PRESETS["v6-fleet-rp"] = PRESETS["v5S-an5"] + ["repair_pairs=true", "repair_lead=180", "repair_mult=0.80", "repair_split=60"]
 # 7. small re-pick step with > 48 h left (PROBE waiting.out / repick_money.out: >48 h re-picks 33/wk, cap saves ~EUR 200/wk at equal booking)
 PRESETS["v6-fleet-rstep"] = PRESETS["v5S-an5"] + ["repick_step=(48,1.05)"]
+# stacks on extn
+PRESETS["v6-fleet-xr"] = PRESETS["v6-fleet-extn"] + ["repick_step=(48,1.05)"]
+PRESETS["v6-fleet-xs"] = PRESETS["v6-fleet-extn"] + ["anchor_seg=1.0", "anchor_seg_f=(0.85,1.10,1.0)"]
