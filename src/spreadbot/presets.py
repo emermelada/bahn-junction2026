@@ -296,3 +296,6 @@ PRESETS["v6-v5-p58"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.58),(25,0.67),(
 PRESETS["v6-fleet-extn"] = PRESETS["v5S-an5"] + ["anchor_extras=10", "anchor_extras_only=n"]
 # v6 = an5 + p58 pair climb + FLEET extn (note-only cars anchored to the line); LEAD 03:05
 PRESETS["v6"] = PRESETS["v6-v5-p58"] + ["anchor_extras=10", "anchor_extras_only=n"]
+# 03:00 v6 (p58 + extn together) is DEAD: fresh-20 unranked 0.895, jitter 6/9 unranked. Two separate candidates on this code:
+PRESETS["v6p"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.58),(25,0.67),(50,0.76))"]  # an5 + p58 pair climb
+PRESETS["v6x"] = PRESETS["v5S-an5"] + ["anchor_extras=10", "anchor_extras_only=n"]       # an5 + FLEET extn
