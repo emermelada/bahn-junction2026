@@ -292,3 +292,6 @@ PRESETS["v6-v5-p86"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.68),(25,0.77),(
 PRESETS["v6-v5-p62b"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.62),(25,0.74),(50,0.80))"]
 # p58 (ARCHIVE 02:25: p62's gain is the pair fee itself, +100 se 28; p86 lost -63): lower climb 0.58 -> 0.67 -> 0.76
 PRESETS["v6-v5-p58"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.58),(25,0.67),(50,0.76))"]
+# p60f (V5 research OUT_BATCHPAY.md: Macrina et al. 2024 ascending bundle auction, small steps beat few big ones when driver
+# thresholds are dispersed): 0.60 then +0.03 every 8 min, capped at 0.80 by minute 56
+PRESETS["v6-v5-p60f"] = PRESETS["v5S-an5"] + ["bundle_climb=((0,0.60),(8,0.63),(16,0.66),(24,0.69),(32,0.72),(40,0.75),(48,0.78),(56,0.80))"]
