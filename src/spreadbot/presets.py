@@ -297,3 +297,5 @@ PRESETS["v6-fleet-seg5"] = PRESETS["v5S-an5"] + ["anchor_seg=0.5"]
 PRESETS["v6-fleet-seg10"] = PRESETS["v5S-an5"] + ["anchor_seg=1.0", "anchor_seg_f=(0.85,1.10,1.0)"]  # next-day 0.85 (under 0.75x line late 6.7% vs 4.1%), Friday 1.10 (1.19 does not pay on outcome; PROBE seg.out)
 # 3b. anchored extras for note-only cars (private / premium keep the raw typical; PROBE extras.out)
 PRESETS["v6-fleet-extn"] = PRESETS["v5S-an5"] + ["anchor_extras=10", "anchor_extras_only=n"]
+# 6. re-pairs (SCOUT EXTERNAL_0215 #2, Burger Han pairOpen 180: +197 se 113): a new car pairs with a sitting single of ours
+PRESETS["v6-fleet-rp"] = PRESETS["v5S-an5"] + ["repair_pairs=true", "repair_lead=180", "repair_mult=0.80", "repair_split=60"]
