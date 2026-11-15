@@ -121,6 +121,7 @@ class Desk:
         self.need_resync = False
         self.cost_pred_sum = 0.0  # this week's bookings: the table's ratio, summed
         self.cost_paid_sum = 0.0  # and the ratio they paid
+        self.anc = [50.0, 50 * 1.75, 50 * 1.75 ** 2 + 50 * 1.0, 50 * (1680 + 2200 * 1.75), 50 * (1680 * 1.75 + 2200 * (1.75 ** 2 + 1.0))]  # fee_anchor: n, Sx, Sxx, Sy, Sxy (prior: 50 requests on 16.8 + 22.0/h)
         self._nearby: dict[str, list[tuple[str, float]]] = {}
         self.fast_book: list[tuple[int, bool]] = []  # (posted at, booked within an hour at the opening fee) per first post
         self.first_posts: dict[str, int] = {}  # gig -> posted at, for first posts still being judged
@@ -212,6 +213,10 @@ class Desk:
         r = e["request"]
         if r["id"] not in self.requests:
             self.dealer_requests[r["dealerId"]] += 1
+        if r["id"] not in self.requests and self.cfg.fee_anchor and self.plain(r):
+            x = self.geo.drive(r["legs"][0]["pickup"]["placeId"], r["legs"][0]["delivery"]["placeId"]) / 60
+            a = self.anc
+            a[0] += 1; a[1] += x; a[2] += x * x; a[3] += r["referenceFeeCents"]; a[4] += x * r["referenceFeeCents"]
         self.requests[r["id"]] = r
         prices, why = self.price(r)
         self.quoted[r["id"]] = prices
@@ -546,11 +551,11 @@ class Desk:
         if self.scarce and cfg.scarcity_long and drive >= cfg.scarcity_long:
             # A scarce week: long cars wait for drivers who are not there (long_warn's class, decided for the whole week).
             return decline_prices(r), f"DECLINE scarce long {drive} min"
-        cost = r["referenceFeeCents"] * (cfg.quote_cost_hold or (self.drive_cost_mult(drive) if cfg.drive_cost else self.cost_mult()))
+        cost = self.typ(r) * (cfg.quote_cost_hold or (self.drive_cost_mult(drive) if cfg.drive_cost else self.cost_mult()))
         if cfg.quote_cost_hold and cfg.quote_cost_floor:
             # fee1's savings stop the quote's fall below the hold, nothing more: never under the base's quote, and a week where
             # drivers cost more (scarcity, or Monday's prior) still raises it.
-            cost = max(cost, r["referenceFeeCents"] * self.cost_mult())
+            cost = max(cost, self.typ(r) * self.cost_mult())
         if cfg.hold_price and self.pairs_with_held(r):
             cost *= cfg.bundle_mult  # a held car for the same day starts or ends near this one: the evening release pairs them
         elif cfg.bundle_price and self.chainable(r):
@@ -616,7 +621,7 @@ class Desk:
             c_opt = cost
             if cfg.quote_move_cost:
                 # The fee rule opens cheap where drivers live near the delivery and the pickup is far off: quote that cost.
-                c_opt = cost * self.move_cost(r, opt) / max(1.0, r["referenceFeeCents"] * self.cost_mult())
+                c_opt = cost * self.move_cost(r, opt) / max(1.0, self.typ(r) * self.cost_mult())
             ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, c_opt, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 adm = self.safe_admit(r, opt, p_ok, drive, dday, load, dealer, day, tf, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost)
@@ -906,7 +911,7 @@ class Desk:
         """Expected driver fee in cents for a request's option: typical fee x this week's fee level, scaled by the opening
         fee_open_rule would give it (cheap where drivers live near the delivery and the pickup is far off). For the quote."""
         drive = sum(self.geo.drive(L["pickup"]["placeId"], L["delivery"]["placeId"]) for L in r["legs"])
-        cost = r["referenceFeeCents"] * (self.drive_cost_mult(drive) if self.cfg.drive_cost else self.cost_mult())
+        cost = self.typ(r) * (self.drive_cost_mult(drive) if self.cfg.drive_cost else self.cost_mult())
         if (self.cfg.fee_open_rule or self.cfg.fee_open_day) and len(r["legs"]) == 1:
             L = r["legs"][0]
             last = min(opt["deadline"], L["pickup"]["window"]["to"] + drive) - drive
@@ -1434,18 +1439,39 @@ class Desk:
             d = n.deadline
         return d
 
+    def plain(self, r: dict) -> bool:
+        """A single car between two dealers with no extras: its typical fee is drive time plus noise."""
+        if len(r["legs"]) != 1 or r.get("note"):
+            return False
+        L = r["legs"][0]
+        return not (L["pickup"].get("privateAddress") or L["delivery"].get("privateAddress") or L["car"].get("premium"))
+
+    def typ(self, r: dict) -> float:
+        """The typical fee our fees and quote costs are multiples of: the request's own, or with fee_anchor, pulled towards this
+        week's drive-time line (drivers weigh a fee against the drive, not against the request's noisy typical, sd ~11%)."""
+        ref = float(r["referenceFeeCents"])
+        w = self.cfg.fee_anchor
+        if not w or not self.plain(r):
+            return ref
+        n, sx, sxx, sy, sxy = self.anc
+        b = (n * sxy - sx * sy) / max(1e-9, n * sxx - sx * sx)
+        a = (sy - b * sx) / n
+        x = self.geo.drive(r["legs"][0]["pickup"]["placeId"], r["legs"][0]["delivery"]["placeId"]) / 60
+        line = max(0.5 * ref, min(2.0 * ref, a + b * x))
+        return ref ** (1 - w) * line ** w
+
     def gig_base(self, rec: GigRec) -> float:
         """The typical fee of every car in a gig, summed (a bundle carries cars of two orders)."""
         total = 0.0
         for oid, leg in rec.legs:
             r = self.requests.get(oid)
             if r:
-                total += r["referenceFeeCents"] / len(r["legs"])
+                total += self.typ(r) / len(r["legs"])
         return total or 5000.0
 
     def base_fee(self, ob: OrderBook, legs: list[int]) -> float:
         r = self.requests.get(ob.order["id"])
-        ref = r["referenceFeeCents"] if r else 5000
+        ref = self.typ(r) if r else 5000
         return ref * len(legs) / len(ob.order["legs"])
 
     def schedule(self, ob: OrderBook, legs: list[int]) -> list[dict]:

@@ -279,3 +279,6 @@ PRESETS["v5La-pc1b"] = PRESETS["v5La"] + ["bundle_climb=((0,0.68),(25,0.76))"]
 # V5 stack (V5, 23:05): the shipped v5La + end-at-hub pairs (v5h2: +134 se 167 vs v5La, worst 0.926, dev-05 no collapse) + ARCHIVE's climbing
 # pair fee (pc1: +379 se 132 vs v5La, MARKET's arm). Both touch pairs (which partner / at what fee): tested together before holdouts.
 PRESETS["v5S"] = PRESETS["v5h2"] + ["bundle_climb=((0,0.68),(25,0.74),(50,0.80))"]
+
+PRESETS["v5S-an"] = PRESETS["v5S"] + ["fee_anchor=1.0"]  # fees and quote costs off the week's drive-time line (plain cars)
+PRESETS["v5S-an5"] = PRESETS["v5S"] + ["fee_anchor=0.5"]

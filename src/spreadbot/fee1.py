@@ -260,7 +260,7 @@ class Fee1:
         last = d.est_last_pickup(r, opt["deadline"])
         order = {"id": r["id"], "legs": r["legs"], "lastPickupAt": last, "priceCents": opt["listPriceCents"]}
         q = r["legs"][0]["delivery"]["placeId"]
-        pl = self.plan(OrderBook(order, d.now), [0], last, float(r["referenceFeeCents"]), bool(d.cfg.desert_n and d.desert(q)))
+        pl = self.plan(OrderBook(order, d.now), [0], last, float(d.typ(r)), bool(d.cfg.desert_n and d.desert(q)))
         return None if pl is None else (pl[0], pl[1])
 
     # ------------------------------------------------------------------ harm to our other waiting gigs

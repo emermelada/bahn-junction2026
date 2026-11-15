@@ -161,6 +161,10 @@ class Config:
                                        # deadline warning in the last window min (() = off). Both unranked fresh weeks: 2-3x the usual long
                                        # cars, 36-39% late, warned 5x as often, P(on time) at quote ~0.94 as usual (research/re/H2_AUTOPSY.md)
     long_warn_distinct: bool = False   # long_warn counts distinct warned cars, not warning events (one car can be warned 5x)
+    fee_anchor: float = 0.0            # w: price a plain single car's fees off typ = ref^(1-w) x (a + b x drive hours), a and b learned
+                                       # from this week's plain requests (prior 16.8 + 22.0 EUR/h). Drivers book by fee over drive time:
+                                       # at fee/ref 0.88, cars whose ref is >8% under the lane book 37% in 60 min, >8% over 67%
+                                       # (research/re/refnoise.py, 4,253 first posts; log loss 0.682 on ref vs 0.663 on the formula)
     crunch_drops: int = 0              # this many drops 05-13h = a crunch day (flu): escalate today's open gigs, tighten the bar
     view_raise_n: int = 0              # this many viewers and no booking: raise to view_raise_mult at once
     view_raise_after: int = 45
