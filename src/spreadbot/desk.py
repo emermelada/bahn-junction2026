@@ -321,6 +321,8 @@ class Desk:
             ob = self.orders.get(rec.legs[0][0])
             if ob:
                 self.book_ratios.append(e["feeCents"] / max(1.0, self.gig_base(rec)))
+                if self.cfg.cell_floor and ob.order.get("deadline") is not None:
+                    self.__dict__.setdefault("cell_ratios", {}).setdefault((ob.order["deadline"] // DAY % 7, ob.order.get("option")), []).append(self.book_ratios[-1])
                 if rec.id in self.gig_open:
                     self.bo_ratios.append(e["feeCents"] / max(1, self.gig_open[rec.id]))
                 if len({o for o, _ in rec.legs}) == 1:
@@ -635,6 +637,11 @@ class Desk:
             if cfg.quote_move_cost:
                 # The fee rule opens cheap where drivers live near the delivery and the pickup is far off: quote that cost.
                 c_opt = cost * self.move_cost(r, opt) / max(1.0, self.typ(r) * self.cost_mult())
+            if cfg.cell_floor:
+                xs = self.__dict__.get("cell_ratios", {}).get((opt["deadline"] // DAY % 7, kind), [])
+                if len(xs) >= cfg.cell_floor[0]:
+                    med = sorted(xs)[len(xs) // 2]
+                    c_opt = max(c_opt, self.typ(r) * min(cfg.cell_floor[2], max(cfg.cell_floor[1], med)))
             ratio, ev = self.market.best_ratio(dealer, day, opt["listPriceCents"], tf, c_opt, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost, r["legs"][0]["pickup"]["placeId"], lane_of(r))
             if ratio <= 0 or ev < cfg.min_ev_cents:
                 adm = self.safe_admit(r, opt, p_ok, drive, dday, load, dealer, day, tf, risk_frac, cfg.shadow_cents + congestion + trust_adj + load_cost)
