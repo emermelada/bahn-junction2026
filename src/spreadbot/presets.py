@@ -299,3 +299,4 @@ PRESETS["v6-market-mon10"] = PRESETS["v5S-an5"] + ["mon_shadow=0.10"]
 PRESETS["v6-market-ss"] = PRESETS["v5S-an5"] + ["share_shadow=(0.64,0.05,10)"]
 PRESETS["v6-market-h110ss"] = PRESETS["v6-market-h110"] + ["share_shadow=(0.64,0.05,10)"]
 PRESETS["v6-market-lf"] = PRESETS["v5S-an5"] + ["learn_fastest=true"]
+PRESETS["v6-market-psmu"] = PRESETS["v5S-an5"] + ["price_slope=5.5", "price_slope_mu=1.25"]  # Gemini triage R2

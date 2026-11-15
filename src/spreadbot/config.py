@@ -11,6 +11,7 @@ class Config:
     mu_prior: float = 1.28             # competitor over list: 3 research weeks, P(win)=0.5 near 1.28 (lab/frank/curves.py)
     share_shadow: tuple = ()           # (thr, cap, n): Mon-Thu, dealer's last-n quoted win rate above thr adds up to cap x list as cost (rival cuts prices each morning where we win most; RoutePulse market.ts:518)
     mon_shadow: float = 0.0            # >0: Monday quotes carry this x list as a cost (each Monday win lowers that dealer's rival price for the week; RESEARCH_LIT.md)
+    price_slope_mu: float = 0.0        # price_slope only while the learned world level mu >= this (cheap-competitor weeks keep win_slope; dev-05 ~1.21)
     price_slope: float = 0.0           # >0: pricing (best_ratio/best_menu) uses this slope at the learned mu; real win curve is flatter (slope_fit.py)
     win_slope: float = 6.7             # same fit: win 0.87 at 1.0, 0.19 at 1.5
     mu_lr: float = 0.004               # world level: slow, ~100 quotes to move a lot
