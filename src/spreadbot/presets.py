@@ -288,3 +288,7 @@ PRESETS["v6-market-h110"] = PRESETS["v5S-an5"] + ["quote_cost_hold=1.1"]
 # MARKET bold arm (quote_cal.py on v5S-an5: same_day wins 2-7 pts above the learner's P, next_day short 6-10 below; PRICING.md saw the same
 # on c3g): with both quoted, same_day costs at least next_day / 0.92 (+8.7%), so same-day buyers pay for speed and price-led ones step down.
 PRESETS["v6-market-steer"] = PRESETS["v5S-an5"] + ["steer=0.92"]
+
+# price_slope: price on a flatter win curve (real within-quote slope ~2-3 vs learner 6.7; research/re/market/v4/slope_fit.py)
+PRESETS["v6-market-ps4"] = PRESETS["v5S-an5"] + ["price_slope=4.0"]
+PRESETS["v6-market-ps3"] = PRESETS["v5S-an5"] + ["price_slope=3.0"]

@@ -176,6 +176,8 @@ class Market:
 
     def p_price(self, ratio_eff: float, dealer: str, day: int, place: str = "", lane: str = "") -> float:
         """P(win) for pricing: with mu_w, today's, the dealer's and the lane's parts count only partly (they over-react)."""
+        if self.cfg.price_slope and not self.cfg.day_kalman and not self.cfg.mu_w:
+            return sigmoid(self.cfg.price_slope * (self.mu_for(dealer, day, place, lane) - ratio_eff))
         if not self.cfg.mu_w or self.cfg.day_kalman:
             return self.p_win(ratio_eff, dealer, day, place, lane)
         wd, wl, wn = self.cfg.mu_w
@@ -277,7 +279,7 @@ class Market:
             eff = list_fast * r * tf
             m = max(((eff - (s - s0) * tf) * (1 - risk) - cost - extra for _, lst, s, risk, extra in cands if eff - (s - s0) * tf >= lst * cfg.min_ratio * tf), default=None)
             if m is not None:
-                ev = self.p_win(r, dealer, day, place, lane) * m
+                ev = (self.p_price if self.cfg.price_slope else self.p_win)(r, dealer, day, place, lane) * m
                 if ev > best_ev:
                     best, best_ev, best_m = r, ev, m
             r += 0.01
